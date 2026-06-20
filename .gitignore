@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# Web app runtime / uploads
+runpod-comfyui/webapp/frames/
+runpod-comfyui/webapp/*.log
+
+# Secrets (keep .env.example, ignore real env files)
+.env
+*.env
+!*.env.example
+runpod-comfyui/webapp/.env
+
+# OS
+Thumbs.db
+.DS_Store

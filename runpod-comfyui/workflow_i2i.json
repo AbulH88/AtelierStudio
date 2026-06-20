@@ -1,0 +1,138 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "frame.png", "upload": "image" },
+    "_meta": { "title": "Chosen frame" }
+  },
+  "2": {
+    "class_type": "AILab_QwenVL_Advanced",
+    "inputs": {
+      "image": ["1", 0],
+      "model_name": "Qwen3-VL-4B-Instruct-Unredacted-MAX",
+      "attention_mode": "sage",
+      "use_torch_compile": false,
+      "device": "auto",
+      "preset_prompt": "🖼️ Detailed Description",
+      "custom_prompt": "Describe the ultra-detailed clothing, background, pose, and expression of the woman, excluding any facial, skin tone, or hair details. Detail everything together in one flowing paragraph. Add body shape (curvy hourglass figure:1.4), (defined narrow waist:1.4), (full bust:1.3), (wide hips:1.3). Ignore any sign, text, or tattoo on clothing or background.",
+      "max_tokens": 2048,
+      "temperature": 0.6,
+      "top_p": 0.9,
+      "num_beams": 1,
+      "repetition_penalty": 1.2,
+      "frame_count": 16,
+      "keep_model_loaded": false,
+      "seed": 1,
+      "keep_last_prompt": false
+    },
+    "_meta": { "title": "QwenVL auto-caption" }
+  },
+  "3": {
+    "class_type": "CLIPLoader",
+    "inputs": { "clip_name": "Wan/umt5_xxl_fp16.safetensors", "type": "wan", "device": "default" },
+    "_meta": { "title": "CLIP / text encoder" }
+  },
+  "4": {
+    "class_type": "StringConcatenate",
+    "inputs": { "string_a": "ing2lorance, ", "string_b": ["2", 0], "delimiter": " " },
+    "_meta": { "title": "face prefix + caption" }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "clip": ["3", 0], "text": ["4", 0] },
+    "_meta": { "title": "Positive" }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": ["3", 0],
+      "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走, censored, sunburnt skin, rashy skin, red cheeks"
+    },
+    "_meta": { "title": "Negative (default)" }
+  },
+  "7": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "wan_2.1_vae.safetensors" },
+    "_meta": { "title": "VAE" }
+  },
+  "10": {
+    "class_type": "UNETLoader",
+    "inputs": { "unet_name": "WAN/Wan2.2/Text/low_noise_model/wan2.2_t2v_low_noise_14B_fp16.safetensors", "weight_dtype": "default" },
+    "_meta": { "title": "Wan 2.2 low-noise UNet" }
+  },
+  "14": {
+    "class_type": "PathchSageAttentionKJ",
+    "inputs": { "model": ["10", 0], "sage_attention": "auto" },
+    "_meta": { "title": "Sage attention (VERIFY field name)" }
+  },
+  "11": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "model": ["14", 0], "lora_name": "wan/Wan2.2-Lightning/Wan2.1-Distill-Loras/wan2.1_t2v_14b_lora_rank64_lightx2v_4step.safetensors", "strength_model": 1.0 },
+    "_meta": { "title": "LoRA helper: lightx2v" }
+  },
+  "12": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "model": ["11", 0], "lora_name": "wan/WanRealisomLora/Lenovo.safetensors", "strength_model": 1.0 },
+    "_meta": { "title": "LoRA helper: Lenovo" }
+  },
+  "13": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "model": ["12", 0], "lora_name": "wan/Own/LoranceNew/LoranceNew.safetensors", "strength_model": 1.0 },
+    "_meta": { "title": "LoRA character slot" }
+  },
+  "20": {
+    "class_type": "ImageResizeKJv2",
+    "inputs": {
+      "image": ["1", 0],
+      "width": 1080,
+      "height": 1920,
+      "upscale_method": "nearest-exact",
+      "keep_proportion": "resize",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 2,
+      "device": "cpu"
+    },
+    "_meta": { "title": "Resize frame" }
+  },
+  "21": {
+    "class_type": "ImageNoiseAugmentation",
+    "inputs": { "image": ["20", 0], "noise_aug_strength": 0.01, "seed": 0 },
+    "_meta": { "title": "Noise aug" }
+  },
+  "22": {
+    "class_type": "VAEEncode",
+    "inputs": { "pixels": ["21", 0], "vae": ["7", 0] },
+    "_meta": { "title": "VAE encode" }
+  },
+  "23": {
+    "class_type": "RepeatLatentBatch",
+    "inputs": { "samples": ["22", 0], "amount": 1 },
+    "_meta": { "title": "Variations (batch)" }
+  },
+  "30": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["13", 0],
+      "positive": ["5", 0],
+      "negative": ["6", 0],
+      "latent_image": ["23", 0],
+      "seed": 0,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "res_2s",
+      "scheduler": "bong_tangent",
+      "denoise": 0.65
+    },
+    "_meta": { "title": "KSampler (res_2s / bong_tangent)" }
+  },
+  "31": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["30", 0], "vae": ["7", 0] },
+    "_meta": { "title": "VAE decode" }
+  },
+  "40": {
+    "class_type": "SaveImage",
+    "inputs": { "images": ["31", 0], "filename_prefix": "lorance" },
+    "_meta": { "title": "Save" }
+  }
+}

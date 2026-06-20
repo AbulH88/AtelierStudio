@@ -1,0 +1,16 @@
+{
+  "input": {
+    "image_b64": "PASTE_BASE64_OF_A_TEST_FRAME_HERE",
+    "character_lora": "lorance",
+    "character_strength": 1.0,
+    "variations": 2,
+    "width": 1080,
+    "height": 1920,
+    "denoise": 0.65,
+    "seed": 0,
+    "helper_loras": [
+      { "key": "lightx2v", "strength": 1.0 },
+      { "key": "lenovo", "strength": 1.0 }
+    ]
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "3": {
+    "class_type": "CLIPLoader",
+    "inputs": { "clip_name": "Wan/umt5_xxl_fp16.safetensors", "type": "wan", "device": "default" },
+    "_meta": { "title": "CLIP / text encoder" }
+  },
+  "7": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "wan_2.1_vae.safetensors" },
+    "_meta": { "title": "VAE" }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "clip": ["3", 0], "text": "a woman, editorial photo" },
+    "_meta": { "title": "Positive (handler sets prompt)" }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "clip": ["3", 0], "text": "low quality" },
+    "_meta": { "title": "Negative (handler sets default)" }
+  },
+  "10": {
+    "class_type": "UNETLoader",
+    "inputs": { "unet_name": "WAN/Wan2.2/Text/high_noise_model/wan2.2_t2v_high_noise_14B_fp16.safetensors", "weight_dtype": "default" },
+    "_meta": { "title": "Wan 2.2 HIGH-noise UNet" }
+  },
+  "11": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "model": ["10", 0], "lora_name": "wan/Wan2.2-Lightning/Wan2.1-Distill-Loras/wan2.1_t2v_14b_lora_rank64_lightx2v_4step.safetensors", "strength_model": 1.0 },
+    "_meta": { "title": "HIGH · lightx2v" }
+  },
+  "12": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "model": ["11", 0], "lora_name": "wan/Own/LoranceNew/LoranceNew.safetensors", "strength_model": 1.0 },
+    "_meta": { "title": "HIGH · character slot" }
+  },
+  "15": {
+    "class_type": "UNETLoader",
+    "inputs": { "unet_name": "WAN/Wan2.2/Text/low_noise_model/wan2.2_t2v_low_noise_14B_fp16.safetensors", "weight_dtype": "default" },
+    "_meta": { "title": "Wan 2.2 LOW-noise UNet" }
+  },
+  "16": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "model": ["15", 0], "lora_name": "wan/Wan2.2-Lightning/Wan2.1-Distill-Loras/wan2.1_t2v_14b_lora_rank64_lightx2v_4step.safetensors", "strength_model": 1.0 },
+    "_meta": { "title": "LOW · lightx2v" }
+  },
+  "17": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "model": ["16", 0], "lora_name": "wan/Own/LoranceNew/LoranceNew.safetensors", "strength_model": 1.0 },
+    "_meta": { "title": "LOW · character slot" }
+  },
+  "20": {
+    "class_type": "EmptyHunyuanLatentVideo",
+    "inputs": { "width": 1080, "height": 1920, "length": 1, "batch_size": 1 },
+    "_meta": { "title": "Empty latent (batch = variations)" }
+  },
+  "30": {
+    "class_type": "KSamplerAdvanced",
+    "inputs": {
+      "model": ["12", 0],
+      "positive": ["5", 0],
+      "negative": ["6", 0],
+      "latent_image": ["20", 0],
+      "add_noise": "enable",
+      "noise_seed": 0,
+      "steps": 12,
+      "cfg": 1,
+      "sampler_name": "res_2s",
+      "scheduler": "beta57",
+      "start_at_step": 0,
+      "end_at_step": 4,
+      "return_with_leftover_noise": "enable"
+    },
+    "_meta": { "title": "KSampler HIGH (steps 0-4)" }
+  },
+  "31": {
+    "class_type": "KSamplerAdvanced",
+    "inputs": {
+      "model": ["17", 0],
+      "positive": ["5", 0],
+      "negative": ["6", 0],
+      "latent_image": ["30", 0],
+      "add_noise": "disable",
+      "noise_seed": 0,
+      "steps": 12,
+      "cfg": 1,
+      "sampler_name": "res_2s",
+      "scheduler": "beta57",
+      "start_at_step": 4,
+      "end_at_step": 12,
+      "return_with_leftover_noise": "disable"
+    },
+    "_meta": { "title": "KSampler LOW (steps 4-12)" }
+  },
+  "32": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["31", 0], "vae": ["7", 0] },
+    "_meta": { "title": "VAE decode" }
+  },
+  "40": {
+    "class_type": "SaveImage",
+    "inputs": { "images": ["32", 0], "filename_prefix": "char_t2i" },
+    "_meta": { "title": "Save" }
+  }
+}
