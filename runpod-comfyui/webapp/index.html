@@ -39,6 +39,16 @@ header{display:flex;align-items:center;gap:16px;padding:22px 34px;border-bottom:
 .brand{font-family:var(--serif);font-weight:500;font-size:20px;letter-spacing:.5px}
 .brand em{font-style:italic;color:var(--amber)}
 .tagline{font-size:12px;color:var(--faint);letter-spacing:2.5px;text-transform:uppercase;margin-left:2px}
+.nav{margin-left:32px;display:flex;gap:4px}
+.navitem{font-family:var(--sans);font-size:14.5px;color:var(--mut);background:transparent;border:0;
+  padding:8px 16px;border-radius:9px;cursor:pointer;transition:.2s;position:relative}
+.navitem:hover{color:var(--txt)}
+.navitem.on{color:var(--txt)}
+.navitem.on::after{content:"";position:absolute;left:16px;right:16px;bottom:-1px;height:2px;
+  background:var(--amber);border-radius:2px}
+.page{max-width:1180px;margin:0 auto;padding:26px 34px 80px}
+.page-head{display:flex;align-items:baseline;gap:16px;margin:8px 0 22px}
+.page-title{font-family:var(--serif);font-weight:500;font-size:30px;margin:0;letter-spacing:.3px}
 .compute{margin-left:auto;display:inline-flex;background:var(--panel);border:1px solid var(--line);
   border-radius:999px;padding:4px;gap:3px}
 .compute button{display:inline-flex;align-items:center;gap:7px;font-family:var(--sans);font-size:13px;
@@ -204,6 +214,22 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 .picker-grid figure{aspect-ratio:auto;height:200px}
 .picker-grid figure img{width:100%;height:100%;object-fit:cover;display:block}
 
+/* reel library */
+.reels-top{display:flex;gap:14px;flex-wrap:wrap;padding:18px;margin-bottom:22px;
+  background:linear-gradient(180deg,var(--panel),var(--ink2));border:1px solid var(--line);border-radius:14px}
+.reels-top .row{gap:10px}
+.reels-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px}
+.reel-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.reel-card video{width:100%;height:240px;object-fit:cover;display:block;background:#000}
+.reel-card .meta{padding:9px 11px}
+.reel-card .nm{font-size:12px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reel-card .sz{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:2px}
+.reel-card .acts{display:flex;gap:7px;padding:0 11px 11px}
+.reel-card .acts button{flex:1;border:0;border-radius:8px;padding:8px 0;font-size:12.5px;cursor:pointer}
+.reel-card .use{background:var(--amber);color:var(--ink);font-weight:600}
+.reel-card .save{background:#22282a;color:var(--accent2);border:1px solid var(--line)!important}
+.reel-card .del{background:#2a2230;color:var(--rose);border:1px solid var(--line)!important}
+
 /* lightbox */
 .lb{position:fixed;inset:0;z-index:30;background:rgba(6,6,8,.9);backdrop-filter:blur(8px);
   display:none;align-items:center;justify-content:center;flex-direction:column;padding:60px 80px}
@@ -232,6 +258,10 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <div class="brand">Atelier <em>Studio</em></div>
   </div>
   <div class="tagline">character forge</div>
+  <nav class="nav" id="nav">
+    <button class="navitem on" data-page="studio">Studio</button>
+    <button class="navitem" data-page="reels">Reels</button>
+  </nav>
   <div class="compute" id="compute">
     <button data-t="local" class="on"><span class="cl"></span>Local</button>
     <button data-t="cloud"><span class="cl"></span>Cloud</button>
@@ -240,6 +270,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   <div class="status"><span class="led" id="led"></span><span id="statusText">connecting…</span></div>
 </header>
 
+<div id="pageStudio">
 <div class="modes">
   <div class="seg">
     <button id="mVid" class="on" data-mode="i2i"><span class="k">i</span>Video → Character</button>
@@ -364,6 +395,28 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     </div>
   </aside>
 </main>
+</div><!-- /pageStudio -->
+
+<!-- reels page -->
+<div id="pageReels" class="page hide">
+  <div class="page-head">
+    <h1 class="page-title">⬗ Reel Library</h1>
+    <span class="hint" id="reelStatus"></span>
+  </div>
+  <div class="reels-top">
+    <div class="row">
+      <div class="sel" style="min-width:200px"><select id="reelFolder"></select></div>
+      <button class="go ghost" id="newFolderBtn">+ Folder</button>
+    </div>
+    <div class="row" style="flex:1">
+      <input id="reelUrl" placeholder="Paste an Instagram reel URL…"
+        style="flex:1;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 13px">
+      <button class="go" id="reelDlBtn" style="width:auto;padding:11px 22px">Download</button>
+    </div>
+  </div>
+  <div class="err" id="reelErr" style="padding:0 26px"></div>
+  <div class="reels-grid" id="reelGrid"></div>
+</div>
 
 <!-- result image viewer -->
 <div class="imgview" id="imgview"><img id="imgviewImg" alt=""></div>
@@ -511,12 +564,7 @@ $('#extractBtn').onclick=async()=>{
   try{
     const d=await(await fetch('/api/extract',{method:'POST',body:fd})).json();
     if(d.error){$('#extractErr').textContent=d.error;return;}
-    S.session=d.session;S.frame=null;S.frames=d.frames;refreshGo();
-    $('#frames').innerHTML=d.frames.map((u,i)=>`<figure data-i="${i}"><img src="${u}" loading="lazy"></figure>`).join('');
-    $('#pickerCount').textContent=`${d.frames.length} frames`;
-    $('#frameHint').textContent='';
-    $$('#frames figure').forEach(f=>f.onclick=()=>openLB(+f.dataset.i));
-    openPicker();
+    loadFrames(d.session, d.frames);
   }catch(e){$('#extractErr').textContent=String(e);}
   finally{$('#extractBtn').textContent=t;}
 };
@@ -524,6 +572,86 @@ $('#extractBtn').onclick=async()=>{
 // result viewer (click a generated image to enlarge)
 $('#imgview').onclick=()=>$('#imgview').classList.remove('on');
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#imgview').classList.remove('on');});
+
+// load a frames session into the picker (used by upload + reel library)
+function loadFrames(session, frames){
+  S.session=session;S.frame=null;S.frames=frames;refreshGo();
+  $('#frames').innerHTML=frames.map((u,i)=>`<figure data-i="${i}"><img src="${u}" loading="lazy"></figure>`).join('');
+  $('#pickerCount').textContent=`${frames.length} frames`;$('#frameHint').textContent='';
+  $$('#frames figure').forEach(f=>f.onclick=()=>openLB(+f.dataset.i));
+  openPicker();
+}
+
+// ===== page navigation =====
+function showPage(p){
+  $('#pageStudio').classList.toggle('hide',p!=='studio');
+  $('#pageReels').classList.toggle('hide',p!=='reels');
+  $$('#nav .navitem').forEach(b=>b.classList.toggle('on',b.dataset.page===p));
+  if(p==='reels')openReels();
+}
+$$('#nav .navitem').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
+
+// ===== Reel library (Cloudflare R2) =====
+async function openReels(){
+  $('#reelErr').textContent='';
+  const cfg=await(await fetch('/api/reels/config')).json();
+  if(!cfg.configured){$('#reelStatus').textContent='R2 not configured (set keys in .env)';
+    $('#reelGrid').innerHTML='';return;}
+  $('#reelStatus').textContent='bucket: '+cfg.bucket;
+  await loadReelFolders();
+}
+async function loadReelFolders(){
+  const d=await(await fetch('/api/reels/folders')).json();
+  if(d.error){$('#reelErr').textContent=d.error;return;}
+  const cur=$('#reelFolder').value;
+  $('#reelFolder').innerHTML='<option value="">(root)</option>'+
+    d.folders.map(f=>`<option value="${f}">${f}</option>`).join('');
+  if(cur)$('#reelFolder').value=cur;
+  $('#reelFolder').onchange=loadReels;
+  await loadReels();
+}
+async function loadReels(){
+  const folder=$('#reelFolder').value;
+  const d=await(await fetch('/api/reels/list?folder='+encodeURIComponent(folder))).json();
+  $('#reelGrid').innerHTML=(d.reels||[]).map(r=>`<div class="reel-card">
+    <video src="${r.url}" muted preload="metadata" onmouseover="this.play()" onmouseout="this.pause()"></video>
+    <div class="meta"><div class="nm" title="${r.name}">${r.name}</div><div class="sz">${r.size_mb} MB</div></div>
+    <div class="acts"><button class="use" data-key="${r.key}">Use</button>
+      <button class="save" data-key="${r.key}">↓ Save</button>
+      <button class="del" data-key="${r.key}">Delete</button></div></div>`).join('')
+    || '<p class="hint" style="padding:20px">No reels in this folder yet.</p>';
+  $$('#reelGrid .use').forEach(b=>b.onclick=()=>useReel(b.dataset.key));
+  $$('#reelGrid .save').forEach(b=>b.onclick=async()=>{
+    const d=await(await fetch('/api/reels/save-url?key='+encodeURIComponent(b.dataset.key))).json();
+    if(d.url)window.location.href=d.url;});
+  $$('#reelGrid .del').forEach(b=>b.onclick=async()=>{
+    await fetch('/api/reels/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:b.dataset.key})});
+    loadReels();});
+}
+$('#newFolderBtn').onclick=async()=>{
+  const name=prompt('New folder name:');if(!name)return;
+  await fetch('/api/reels/folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  await loadReelFolders();$('#reelFolder').value=name.trim();loadReels();
+};
+$('#reelDlBtn').onclick=async()=>{
+  const url=$('#reelUrl').value.trim();$('#reelErr').textContent='';
+  if(!url){$('#reelErr').textContent='Paste a reel URL.';return;}
+  const t=$('#reelDlBtn').textContent;$('#reelDlBtn').innerHTML='<span class="spin"></span>';$('#reelDlBtn').disabled=true;
+  try{
+    const d=await(await fetch('/api/reels/download',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url,folder:$('#reelFolder').value})})).json();
+    if(d.error){$('#reelErr').textContent=d.error;return;}
+    $('#reelUrl').value='';loadReels();
+  }catch(e){$('#reelErr').textContent=String(e);}
+  finally{$('#reelDlBtn').textContent=t;$('#reelDlBtn').disabled=false;}
+};
+async function useReel(key){
+  $('#reelErr').textContent='extracting frames…';
+  const d=await(await fetch('/api/reels/use',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({key,every:+$('#every').value||1})})).json();
+  if(d.error){$('#reelErr').textContent=d.error;return;}
+  showPage('studio');setMode('i2i');loadFrames(d.session,d.frames);
+}
 
 // frame picker popup
 function openPicker(){if(S.frames.length)$('#picker').classList.add('on');}

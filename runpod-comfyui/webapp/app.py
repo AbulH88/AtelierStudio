@@ -29,6 +29,21 @@ from flask import Flask, request, jsonify, send_from_directory, send_file
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import comfy_common  # noqa: E402
 
+
+def _load_env():  # tiny .env loader (no extra dependency)
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(p):
+        for line in open(p, encoding="utf-8"):
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+
+
+_load_env()
+import r2_store       # noqa: E402  (Cloudflare R2 reel library; reads env above)
+import yt_dlp         # noqa: E402  (Instagram reel downloader)
+
 ENDPOINT_ID = os.environ.get("RUNPOD_ENDPOINT_ID", "")
 API_KEY = os.environ.get("RUNPOD_API_KEY", "")
 RUNPOD_URL = f"https://api.runpod.ai/v2/{ENDPOINT_ID}/runsync"
@@ -150,26 +165,130 @@ def start_comfy():
         return jsonify({"error": str(e)}), 500
 
 
+def _extract_frames(vpath, every):
+    """Run ffmpeg on a saved video -> a frames session. Returns (session, urls)."""
+    session = uuid.uuid4().hex[:12]
+    sdir = os.path.join(FRAMES_DIR, session)
+    os.makedirs(sdir, exist_ok=True)
+    cmd = ["ffmpeg", "-y", "-i", vpath,
+           "-vf", f"select=not(mod(n\\,{every}))", "-vsync", "vfr",
+           "-q:v", "3", os.path.join(sdir, "%04d.jpg")]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        raise RuntimeError(res.stderr[-400:])
+    frames = sorted(f for f in os.listdir(sdir) if f.endswith(".jpg"))
+    return session, [f"/frames/{session}/{f}" for f in frames]
+
+
 @app.post("/api/extract")
 def extract():
     video = request.files.get("video")
     every = int(request.form.get("every", 10))
     if not video:
         return jsonify({"error": "No video uploaded."}), 400
-    session = uuid.uuid4().hex[:12]
-    sdir = os.path.join(FRAMES_DIR, session)
-    os.makedirs(sdir, exist_ok=True)
-    vpath = os.path.join(sdir, "src" + os.path.splitext(video.filename)[1])
-    video.save(vpath)
-    cmd = ["ffmpeg", "-y", "-i", vpath,
-           "-vf", f"select=not(mod(n\\,{every}))", "-vsync", "vfr",
-           "-q:v", "3", os.path.join(sdir, "%04d.jpg")]
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    if res.returncode != 0:
-        return jsonify({"error": "ffmpeg failed", "detail": res.stderr[-400:]}), 500
-    frames = sorted(f for f in os.listdir(sdir) if f.endswith(".jpg"))
-    return jsonify({"session": session,
-                    "frames": [f"/frames/{session}/{f}" for f in frames]})
+    tmp = os.path.join(FRAMES_DIR, "upload_" + uuid.uuid4().hex + os.path.splitext(video.filename)[1])
+    video.save(tmp)
+    try:
+        session, frames = _extract_frames(tmp, every)
+    except RuntimeError as e:
+        return jsonify({"error": "ffmpeg failed", "detail": str(e)}), 500
+    finally:
+        os.path.exists(tmp) and os.remove(tmp)
+    return jsonify({"session": session, "frames": frames})
+
+
+# ----------------------------- R2 reel library --------------------------------
+@app.get("/api/reels/config")
+def reels_config():
+    return jsonify({"configured": r2_store.configured(), "bucket": r2_store.BUCKET})
+
+
+@app.get("/api/reels/folders")
+def reels_folders():
+    try:
+        r2_store.ensure_bucket()
+        return jsonify({"folders": r2_store.list_folders()})
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+
+
+@app.post("/api/reels/folder")
+def reels_folder_create():
+    name = request.get_json(force=True).get("name", "").strip()
+    if not name:
+        return jsonify({"error": "Folder name required."}), 400
+    r2_store.create_folder(name)
+    return jsonify({"ok": True})
+
+
+@app.get("/api/reels/list")
+def reels_list():
+    folder = request.args.get("folder", "")
+    return jsonify({"reels": r2_store.list_reels(folder)})
+
+
+@app.post("/api/reels/download")
+def reels_download():
+    body = request.get_json(force=True)
+    url, folder = body.get("url", "").strip(), body.get("folder", "").strip()
+    if not url:
+        return jsonify({"error": "Paste a reel URL."}), 400
+    tmpdir = os.path.join(FRAMES_DIR, "dl_" + uuid.uuid4().hex)
+    os.makedirs(tmpdir, exist_ok=True)
+    try:
+        opts = {"outtmpl": os.path.join(tmpdir, "%(title).70s.%(ext)s"),
+                "format": "mp4/bestvideo+bestaudio/best", "merge_output_format": "mp4",
+                "quiet": True, "noplaylist": True}
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+        files = [f for f in os.listdir(tmpdir) if not f.startswith(".")]
+        if not files:
+            return jsonify({"error": "Download produced no file."}), 500
+        local = os.path.join(tmpdir, files[0])
+        key = (f"{folder}/" if folder else "") + files[0]
+        r2_store.upload(local, key)
+        return jsonify({"ok": True, "key": key, "name": files[0]})
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+    finally:
+        import shutil
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@app.get("/api/reels/save-url")
+def reels_save_url():
+    """Presigned URL that downloads the reel to the user's PC (attachment)."""
+    key = request.args.get("key", "")
+    if not key:
+        return jsonify({"error": "no key"}), 400
+    return jsonify({"url": r2_store.presign(key, download_name=key.split("/")[-1])})
+
+
+@app.post("/api/reels/delete")
+def reels_delete():
+    key = request.get_json(force=True).get("key", "")
+    if key:
+        r2_store.delete(key)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/reels/use")
+def reels_use():
+    """Pull a stored reel from R2 and extract frames so it can be used as the
+    reference video in Video->Character mode."""
+    body = request.get_json(force=True)
+    key, every = body.get("key", ""), int(body.get("every", 1))
+    if not key:
+        return jsonify({"error": "No reel selected."}), 400
+    tmp = os.path.join(FRAMES_DIR, "reel_" + uuid.uuid4().hex + ".mp4")
+    try:
+        r2_store.download_to(key, tmp)
+        session, frames = _extract_frames(tmp, every)
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+    finally:
+        os.path.exists(tmp) and os.remove(tmp)
+    return jsonify({"session": session, "frames": frames})
 
 
 @app.get("/frames/<session>/<name>")

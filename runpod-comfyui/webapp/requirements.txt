@@ -1,2 +1,4 @@
 flask
 requests
+boto3
+yt-dlp
