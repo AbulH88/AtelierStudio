@@ -16,6 +16,13 @@ import uuid
 
 import requests
 
+# Cloudflare Access service-token headers (set on the VPS so it can reach the
+# Access-protected ComfyUI tunnel; empty locally). Read from env at import.
+CF_HEADERS = {}
+if os.environ.get("CF_ACCESS_CLIENT_ID") and os.environ.get("CF_ACCESS_CLIENT_SECRET"):
+    CF_HEADERS = {"CF-Access-Client-Id": os.environ["CF_ACCESS_CLIENT_ID"],
+                  "CF-Access-Client-Secret": os.environ["CF_ACCESS_CLIENT_SECRET"]}
+
 NEGATIVE = ("色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，"
             "最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，"
             "画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，"
@@ -39,7 +46,7 @@ def upload_image(base, raw_bytes):
     """POST to /upload/image, return the stored filename ComfyUI's LoadImage uses."""
     files = {"image": (f"frame_{uuid.uuid4().hex}.png", io.BytesIO(raw_bytes), "image/png")}
     r = requests.post(f"{base}/upload/image", files={"image": files["image"]},
-                      data={"overwrite": "true"}, timeout=60)
+                      data={"overwrite": "true"}, headers=CF_HEADERS, timeout=60)
     r.raise_for_status()
     j = r.json()
     name = j["name"]
@@ -50,17 +57,17 @@ def run(base, graph, timeout=900):
     """Queue a graph, wait, return list of base64 PNGs via the /view API."""
     pid = requests.post(f"{base}/prompt",
                         json={"prompt": graph, "client_id": uuid.uuid4().hex},
-                        timeout=60).json()["prompt_id"]
+                        headers=CF_HEADERS, timeout=60).json()["prompt_id"]
     start = time.time()
     while time.time() - start < timeout:
-        hist = requests.get(f"{base}/history/{pid}", timeout=30).json()
+        hist = requests.get(f"{base}/history/{pid}", headers=CF_HEADERS, timeout=30).json()
         if pid in hist:
             imgs = []
             for out in hist[pid].get("outputs", {}).values():
                 for im in out.get("images", []):
                     v = requests.get(f"{base}/view", params={
                         "filename": im["filename"], "subfolder": im.get("subfolder", ""),
-                        "type": im.get("type", "output")}, timeout=60)
+                        "type": im.get("type", "output")}, headers=CF_HEADERS, timeout=60)
                     imgs.append(base64.b64encode(v.content).decode())
             return imgs
         time.sleep(1)

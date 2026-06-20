@@ -140,8 +140,9 @@ def health():
     """Report which compute targets are available so the UI can auto-pick."""
     local = False
     try:
-        requests.get(f"{LOCAL_COMFY}/system_stats", timeout=2)
-        local = True
+        r = requests.get(f"{LOCAL_COMFY}/system_stats",
+                         headers=comfy_common.CF_HEADERS, timeout=6)
+        local = r.status_code == 200
     except Exception:
         pass
     return jsonify({"local": local, "cloud": bool(ENDPOINT_ID and API_KEY)})
