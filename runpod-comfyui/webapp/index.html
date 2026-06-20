@@ -242,6 +242,11 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 .sb-item .sb-count{font-family:var(--mono);font-size:11px;color:var(--faint);
   background:var(--ink2);padding:2px 8px;border-radius:99px;flex:none}
 .sb-item.on .sb-count{background:rgba(233,184,100,.15);color:var(--amber)}
+.sb-item .sb-del{flex:none;width:20px;height:20px;border-radius:50%;display:none;
+  align-items:center;justify-content:center;font-size:11px;color:var(--rose);
+  background:rgba(217,139,122,.12);border:1px solid rgba(217,139,122,.3)}
+.sb-item:hover .sb-del{display:flex}
+.sb-item .sb-del:hover{background:rgba(217,139,122,.25)}
 .sb-bottom{padding:12px;border-top:1px solid var(--line)}
 .sb-bottom button{width:100%;padding:11px;border:1px dashed var(--line2);border-radius:11px;
   background:transparent;color:var(--mut);font-family:var(--sans);font-size:13.5px;cursor:pointer;transition:.2s}
@@ -717,13 +722,16 @@ function showPage(p){
 $$('#nav .navitem').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
 
 // ===== auth =====
+let IS_ADMIN=false;
 async function loadMe(){
   try{
     const d=await(await fetch('/api/me')).json();
     if(d.user){
-      $('#userChip').textContent=d.user+(d.role==='admin'?' · admin':'');
+      IS_ADMIN = d.role==='admin';
+      $('#userChip').textContent=d.user+(IS_ADMIN?' · admin':'');
       $('#logoutBtn').style.display='';
-      $('#navAdmin').classList.toggle('hide', d.role!=='admin');
+      $('#navAdmin').classList.toggle('hide', !IS_ADMIN);
+      $('#newFolderBtn').style.display = IS_ADMIN ? '' : 'none';  // only admins create folders
     }
   }catch(e){}
 }
@@ -773,10 +781,11 @@ async function loadReelFolders(){
     const label = f || 'All Reels';
     const icon = f ? '📁' : '🎬';
     const count = _folderCounts[f] ?? '';
+    const delBtn = (IS_ADMIN && f) ? `<span class="sb-del" data-delfolder="${f}" title="Delete folder">✕</span>` : '';
     return `<div class="sb-item${f===_activeFolder?' on':''}" data-folder="${f}">
       <span class="sb-icon">${icon}</span>
       <span class="sb-label">${label}</span>
-      <span class="sb-count" data-fc="${f}">${count}</span>
+      <span class="sb-count" data-fc="${f}">${count}</span>${delBtn}
     </div>`;
   }).join('');
   $$('#sidebarFolders .sb-item').forEach(el => {
@@ -785,6 +794,17 @@ async function loadReelFolders(){
       $$('#sidebarFolders .sb-item').forEach(x => x.classList.toggle('on', x === el));
       loadReels();
     };
+  });
+  $$('#sidebarFolders .sb-del').forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    const folder = b.dataset.delfolder;
+    if(!confirm(`Delete folder "${folder}" and all reels in it?`)) return;
+    const r = await(await fetch('/api/reels/folder/delete',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({folder})})).json();
+    if(r.error){alert(r.error);return;}
+    if(_activeFolder===folder) _activeFolder='';
+    delete _folderCounts[folder];
+    loadReelFolders();
   });
   await loadReels();
 }

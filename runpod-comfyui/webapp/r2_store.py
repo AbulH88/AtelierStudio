@@ -66,6 +66,18 @@ def delete(key):
     requests.delete(f"{PROXY_URL}/{_k(key)}", headers=H, timeout=30).raise_for_status()
 
 
+def delete_folder(folder):
+    """Delete every object under a folder prefix (incl. the .keep marker)."""
+    folder = folder.strip("/")
+    if not folder:
+        return
+    prefix = f"{folder}/"
+    r = requests.get(f"{PROXY_URL}/?list&prefix={quote(prefix, safe='/')}", headers=H, timeout=30)
+    r.raise_for_status()
+    for o in r.json().get("objects", []):
+        delete(o["key"])
+
+
 def stream(key):
     """Return a streaming requests.Response for the object (app proxies it)."""
     return requests.get(f"{PROXY_URL}/{_k(key)}", headers=H, stream=True, timeout=900)

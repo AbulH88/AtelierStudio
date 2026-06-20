@@ -362,11 +362,22 @@ def reels_folders():
 
 
 @app.post("/api/reels/folder")
+@admin_required
 def reels_folder_create():
     name = request.get_json(force=True).get("name", "").strip()
     if not name:
         return jsonify({"error": "Folder name required."}), 400
     r2_store.create_folder(name)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/reels/folder/delete")
+@admin_required
+def reels_folder_delete():
+    folder = request.get_json(force=True).get("folder", "").strip()
+    if not folder:
+        return jsonify({"error": "Folder required."}), 400
+    r2_store.delete_folder(folder)
     return jsonify({"ok": True})
 
 
