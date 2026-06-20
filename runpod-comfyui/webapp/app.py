@@ -140,9 +140,9 @@ def health():
     """Report which compute targets are available so the UI can auto-pick."""
     local = False
     try:
-        r = requests.get(f"{LOCAL_COMFY}/system_stats",
-                         headers=comfy_common.CF_HEADERS, timeout=6)
-        local = r.status_code == 200
+        r = requests.get(f"{LOCAL_COMFY}/system_stats", headers=comfy_common.CF_HEADERS,
+                         allow_redirects=False, timeout=6)
+        local = r.status_code == 200  # 302 (Access login) / 502 (tunnel down) => not ready
     except Exception:
         pass
     return jsonify({"local": local, "cloud": bool(ENDPOINT_ID and API_KEY)})
