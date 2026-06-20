@@ -12,6 +12,10 @@ runpod-comfyui/webapp/*.log
 !*.env.example
 runpod-comfyui/webapp/.env
 
+# Auth store + session secret (runtime, never commit)
+runpod-comfyui/webapp/users.json
+runpod-comfyui/webapp/.secret
+
 # OS
 Thumbs.db
 .DS_Store

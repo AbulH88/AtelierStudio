@@ -291,6 +291,24 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   .sb-item{margin-bottom:0}
 }
 
+/* auth / admin */
+.userchip{font-family:var(--mono);font-size:12px;color:var(--amber);background:rgba(233,184,100,.08);
+  border:1px solid var(--amber-dim);border-radius:999px;padding:5px 11px}
+.users-grid{display:grid;gap:10px}
+.user-row{display:flex;align-items:center;gap:14px;background:linear-gradient(180deg,var(--panel),var(--ink2));
+  border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.user-row .un{font-family:var(--sans);font-size:15px;font-weight:500}
+.user-row .badge{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line)}
+.badge.active{color:var(--good);border-color:var(--good)}
+.badge.pending{color:var(--amber);border-color:var(--amber-dim)}
+.badge.disabled{color:var(--rose);border-color:var(--rose)}
+.badge.admin{color:var(--accent2);border-color:var(--accent2)}
+.user-row .acts{margin-left:auto;display:flex;gap:7px}
+.user-row .acts button{border:1px solid var(--line);background:var(--ink2);color:var(--txt);
+  border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer}
+.user-row .acts button:hover{border-color:var(--amber-dim)}
+.user-row .acts .danger{color:var(--rose)}
+
 /* lightbox */
 .lb{position:fixed;inset:0;z-index:30;background:rgba(6,6,8,.9);backdrop-filter:blur(8px);
   display:none;align-items:center;justify-content:center;flex-direction:column;padding:60px 80px}
@@ -322,6 +340,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   <nav class="nav" id="nav">
     <button class="navitem on" data-page="studio">Studio</button>
     <button class="navitem" data-page="reels">Reels</button>
+    <button class="navitem hide" data-page="admin" id="navAdmin">Admin</button>
   </nav>
   <div class="compute" id="compute">
     <button data-t="local" class="on"><span class="cl"></span>Local</button>
@@ -330,6 +349,8 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   <button id="startComfy" class="startbtn hide">▶ Start ComfyUI</button>
   <button id="stopComfy" class="stopbtn hide">■ Stop ComfyUI</button>
   <div class="status"><span class="led" id="led"></span><span id="statusText">connecting…</span></div>
+  <span class="userchip" id="userChip"></span>
+  <button class="startbtn" id="logoutBtn" style="display:none">Logout</button>
 </header>
 
 <div id="pageStudio">
@@ -492,6 +513,12 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
       <div class="reels-grid" id="reelGrid"></div>
     </div>
   </div>
+</div>
+
+<!-- admin page -->
+<div id="pageAdmin" class="page hide">
+  <div class="page-head"><h1 class="page-title">Users</h1><span class="hint" id="adminHint"></span></div>
+  <div class="users-grid" id="usersGrid"></div>
 </div>
 
 <!-- result image viewer -->
@@ -682,10 +709,47 @@ function loadFrames(session, frames){
 function showPage(p){
   $('#pageStudio').classList.toggle('hide',p!=='studio');
   $('#pageReels').classList.toggle('hide',p!=='reels');
+  $('#pageAdmin').classList.toggle('hide',p!=='admin');
   $$('#nav .navitem').forEach(b=>b.classList.toggle('on',b.dataset.page===p));
   if(p==='reels')openReels();
+  if(p==='admin')openAdmin();
 }
 $$('#nav .navitem').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
+
+// ===== auth =====
+async function loadMe(){
+  try{
+    const d=await(await fetch('/api/me')).json();
+    if(d.user){
+      $('#userChip').textContent=d.user+(d.role==='admin'?' · admin':'');
+      $('#logoutBtn').style.display='';
+      $('#navAdmin').classList.toggle('hide', d.role!=='admin');
+    }
+  }catch(e){}
+}
+$('#logoutBtn').onclick=async()=>{ await fetch('/api/logout',{method:'POST'}); location.href='/login'; };
+
+async function openAdmin(){
+  const d=await(await fetch('/api/users')).json();
+  if(d.error){$('#usersGrid').innerHTML='<p class="hint">'+d.error+'</p>';return;}
+  $('#adminHint').textContent=d.users.length+' users';
+  $('#usersGrid').innerHTML=d.users.map(u=>{
+    const acts=[];
+    if(u.status!=='active')acts.push(`<button data-u="${u.username}" data-a="activate">Activate</button>`);
+    if(u.status==='active')acts.push(`<button data-u="${u.username}" data-a="disable">Disable</button>`);
+    if(u.role!=='admin')acts.push(`<button data-u="${u.username}" data-a="make-admin">Make admin</button>`);
+    acts.push(`<button class="danger" data-u="${u.username}" data-a="delete">Delete</button>`);
+    return `<div class="user-row"><span class="un">${u.username}</span>
+      <span class="badge ${u.status}">${u.status}</span>
+      ${u.role==='admin'?'<span class="badge admin">admin</span>':''}
+      <span class="acts">${acts.join('')}</span></div>`;
+  }).join('');
+  $$('#usersGrid .acts button').forEach(b=>b.onclick=async()=>{
+    if(b.dataset.a==='delete'&&!confirm('Delete '+b.dataset.u+'?'))return;
+    const r=await(await fetch(`/api/users/${encodeURIComponent(b.dataset.u)}/${b.dataset.a}`,{method:'POST'})).json();
+    if(r.error)alert(r.error); openAdmin();
+  });
+}
 
 // ===== Reel library (Cloudflare R2) — Sidebar + Content =====
 let _activeFolder = '';
@@ -863,6 +927,7 @@ $('#stopGen').onclick=async()=>{
   }
 };
 
+loadMe();
 loadConfig();
 loadHealth();
 setInterval(loadHealth, 20000);

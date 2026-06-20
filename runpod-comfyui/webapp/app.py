@@ -23,7 +23,10 @@ import sys
 import uuid
 
 import requests
-from flask import Flask, request, jsonify, send_from_directory, send_file, Response
+from functools import wraps
+from flask import (Flask, request, jsonify, send_from_directory, send_file, Response,
+                   session, redirect)
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # import the shared workflow logic from the repo root (one level up)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -58,6 +61,151 @@ FRAMES_DIR = os.path.join(os.path.dirname(__file__), "frames")
 os.makedirs(FRAMES_DIR, exist_ok=True)
 
 app = Flask(__name__, static_folder=None)
+
+# ----------------------------- auth / login gate ------------------------------
+import json as _json  # noqa: E402
+HERE = os.path.dirname(os.path.abspath(__file__))
+USERS_FILE = os.path.join(HERE, "users.json")
+SECRET_FILE = os.path.join(HERE, ".secret")
+
+
+def _secret():
+    s = os.environ.get("FLASK_SECRET")
+    if s:
+        return s
+    if os.path.exists(SECRET_FILE):
+        return open(SECRET_FILE).read().strip()
+    s = uuid.uuid4().hex + uuid.uuid4().hex
+    open(SECRET_FILE, "w").write(s)
+    return s
+
+
+app.secret_key = _secret()
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
+                  PERMANENT_SESSION_LIFETIME=60 * 60 * 24 * 14)
+
+
+def load_users():
+    return _json.load(open(USERS_FILE, encoding="utf-8")) if os.path.exists(USERS_FILE) else {}
+
+
+def save_users(u):
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        _json.dump(u, f, indent=2)
+
+
+# endpoints reachable without being logged in
+OPEN_ENDPOINTS = {"login_page", "api_login", "api_signup"}
+
+
+@app.before_request
+def _gate():
+    if request.endpoint in OPEN_ENDPOINTS:
+        return
+    user = session.get("user")
+    users = load_users()
+    if not user or user not in users or users[user]["status"] != "active":
+        if user:
+            session.clear()
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "auth required"}), 401
+        return redirect("/login")
+
+
+def admin_required(fn):
+    @wraps(fn)
+    def w(*a, **k):
+        u = session.get("user")
+        if not u or load_users().get(u, {}).get("role") != "admin":
+            return jsonify({"error": "admin only"}), 403
+        return fn(*a, **k)
+    return w
+
+
+@app.get("/login")
+def login_page():
+    return send_file(os.path.join(HERE, "login.html"))
+
+
+@app.post("/api/login")
+def api_login():
+    b = request.get_json(force=True)
+    u = b.get("username", "").strip().lower()
+    users = load_users()
+    rec = users.get(u)
+    if not rec or not check_password_hash(rec["password"], b.get("password", "")):
+        return jsonify({"error": "Invalid username or password."}), 401
+    if rec["status"] != "active":
+        msg = "Account is pending admin approval." if rec["status"] == "pending" else "Account is disabled."
+        return jsonify({"error": msg}), 403
+    session.permanent = True
+    session["user"] = u
+    return jsonify({"ok": True, "role": rec["role"]})
+
+
+@app.post("/api/signup")
+def api_signup():
+    b = request.get_json(force=True)
+    u = b.get("username", "").strip().lower()
+    p = b.get("password", "")
+    if not u or not p:
+        return jsonify({"error": "Username and password required."}), 400
+    users = load_users()
+    if u in users:
+        return jsonify({"error": "That username is taken."}), 400
+    first = len(users) == 0   # the very first account becomes the admin
+    users[u] = {"password": generate_password_hash(p),
+                "role": "admin" if first else "user",
+                "status": "active" if first else "pending"}
+    save_users(users)
+    return jsonify({"ok": True, "first": first, "status": users[u]["status"]})
+
+
+@app.post("/api/logout")
+def api_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/me")
+def api_me():
+    u = session.get("user")
+    return jsonify({"user": u, "role": load_users().get(u, {}).get("role")})
+
+
+@app.get("/api/users")
+@admin_required
+def api_users():
+    users = load_users()
+    return jsonify({"users": [{"username": k, "role": v["role"], "status": v["status"]}
+                              for k, v in sorted(users.items())]})
+
+
+@app.post("/api/users/<name>/<action>")
+@admin_required
+def api_user_action(name, action):
+    users = load_users()
+    name = name.lower()
+    if name not in users:
+        return jsonify({"error": "no such user"}), 404
+    admins = sum(1 for v in users.values() if v["role"] == "admin")
+    if action == "activate":
+        users[name]["status"] = "active"
+    elif action == "disable":
+        if users[name]["role"] == "admin" and admins <= 1:
+            return jsonify({"error": "cannot disable the last admin"}), 400
+        users[name]["status"] = "disabled"
+    elif action == "make-admin":
+        users[name]["role"] = "admin"
+    elif action == "delete":
+        if users[name]["role"] == "admin" and admins <= 1:
+            return jsonify({"error": "cannot delete the last admin"}), 400
+        del users[name]
+    else:
+        return jsonify({"error": "unknown action"}), 400
+    save_users(users)
+    return jsonify({"ok": True})
+
 
 # Root of your loras folder (used only to LIST checkpoints; paths sent to ComfyUI
 # stay relative to this, so they work identically local & cloud).
