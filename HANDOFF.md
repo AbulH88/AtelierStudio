@@ -84,11 +84,14 @@ stored in Cloudflare R2. Built from `runpod-serverless-build-plan.md`.
 - Local: T2I and I2I generations on the 5090 (images returned, no errors).
 - VPS: app running, reels folder create/list via Worker, R2 reachable.
 
+## Public URL (DONE)
+- **https://studio.thecristinaadam.com** is live (Cloudflare-proxied, Full SSL). DNS A → 192.3.81.151.
+  nginx vhost: `/www/server/panel/vhost/nginx/studio.thecristinaadam.com.conf` (listen 80+443, shared
+  cert `/etc/ssl/cristina/`, proxy_pass 127.0.0.1:8000, client_max_body_size 300m, 900s timeouts).
+
 ## TODO / next steps
-1. **Expose the studio on a public subdomain** (e.g. `studio.thecristinaadam.com`): add DNS A →
-   192.3.81.151 (via CF API/token), add an aaPanel nginx vhost reverse-proxying to 127.0.0.1:8000,
-   SSL (mirror an existing site conf in `/www/server/panel/vhost/nginx/`). Don't break existing sites.
-2. **Confirm CF Access service token** gets the VPS through to ComfyUI (re-test as above).
+1. **Confirm VPS→ComfyUI** end-to-end: an IP-bypass Access policy for 192.3.81.151 lets the VPS through
+   (verified 502 = past Access, tunnel/home-ComfyUI was down). Re-test with home ComfyUI + tunnel up → expect 200.
 3. **Start/Stop ComfyUI remotely**: current buttons run a local `.bat` (only works when app is on the
    same PC). For VPS, build a small **home agent** behind the tunnel/Access, or go manual/always-on.
 4. **RunPod cloud path**: create endpoint + (network volume or baked models), set `RUNPOD_*` in VPS .env.
