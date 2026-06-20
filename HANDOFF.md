@@ -72,6 +72,14 @@ stored in Cloudflare R2. Built from `runpod-serverless-build-plan.md`.
   (likely Cloudflare WARP/AV interception). So test R2/Worker from the **VPS**, not locally. Local
   ComfyUI generation still works fine on the home PC.
 
+## Auth / login gate
+- All routes require login (`before_request` gate). `webapp/login.html` = sign-in / request-access page.
+- **First signup auto-becomes admin (active); everyone else = pending** until an admin activates them.
+- Admin page (nav item, admin-only) lists users → activate / disable / make-admin / delete.
+- Users stored in `webapp/users.json` (werkzeug-hashed passwords); session secret in `webapp/.secret`.
+  Both gitignored. On the VPS, `users.json` was wiped at handoff so the owner's first signup = admin.
+- API: `/api/login`, `/api/signup`, `/api/logout`, `/api/me`, `/api/users`, `/api/users/<name>/<action>`.
+
 ## What's verified working
 - Local: T2I and I2I generations on the 5090 (images returned, no errors).
 - VPS: app running, reels folder create/list via Worker, R2 reachable.
