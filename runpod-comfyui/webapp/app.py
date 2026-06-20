@@ -357,5 +357,55 @@ def generate():
     return jsonify({"images": out.get("images", []), "seed": out.get("seed")})
 
 
+@app.post("/api/stop-comfy")
+def stop_comfy():
+    """Find the process listening on the LOCAL_COMFY port and terminate it."""
+    import urllib.parse
+    import psutil
+    try:
+        parsed = urllib.parse.urlparse(LOCAL_COMFY)
+        port = parsed.port
+        if not port:
+            return jsonify({"error": "Could not parse port from LOCAL_COMFY_URL"}), 400
+        
+        pids_killed = []
+        for conn in psutil.net_connections(kind='inet'):
+            if conn.laddr.port == port and conn.status == 'LISTEN':
+                pid = conn.pid
+                if pid:
+                    try:
+                        proc = psutil.Process(pid)
+                        for child in proc.children(recursive=True):
+                            child.kill()
+                        proc.kill()
+                        pids_killed.append(pid)
+                    except Exception as pe:
+                        print(f"Error killing PID {pid}: {pe}")
+        
+        if pids_killed:
+            return jsonify({"ok": True, "killed": pids_killed})
+        else:
+            return jsonify({"ok": False, "message": "ComfyUI is not running or port is free."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/interrupt")
+def interrupt_generation():
+    """Cancel / interrupt the current image generation in ComfyUI."""
+    target = request.get_json(force=True).get("target", "local")
+    if target == "local":
+        try:
+            r = requests.post(f"{LOCAL_COMFY}/interrupt", timeout=3)
+            return jsonify({"ok": True, "status": r.status_code})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    else:
+        # RunPod sync request doesn't have an interrupt endpoint we can access easily this way,
+        # but we return success to allow UI state to reset.
+        return jsonify({"ok": True, "message": "Cloud interrupt not supported for sync execution"})
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+

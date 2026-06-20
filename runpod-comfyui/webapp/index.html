@@ -62,6 +62,11 @@ header{display:flex;align-items:center;gap:16px;padding:22px 34px;border-bottom:
   font-family:var(--sans);font-size:12.5px;padding:7px 13px;border-radius:999px;cursor:pointer;transition:.2s}
 .startbtn:hover{background:rgba(233,184,100,.18)}
 .startbtn:disabled{opacity:.6;cursor:wait}
+.stopbtn{background:rgba(217,139,122,.1);border:1px solid rgba(217,139,122,.3);color:var(--rose);
+  font-family:var(--sans);font-size:12.5px;padding:7px 13px;border-radius:999px;cursor:pointer;transition:.2s}
+.stopbtn:hover{background:rgba(217,139,122,.18)}
+.stopbtn:disabled{opacity:.6;cursor:wait}
+
 .status{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--mut);
   font-family:var(--mono)}
 .led{width:8px;height:8px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 0 rgba(127,200,160,0)}
@@ -323,6 +328,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <button data-t="cloud"><span class="cl"></span>Cloud</button>
   </div>
   <button id="startComfy" class="startbtn hide">▶ Start ComfyUI</button>
+  <button id="stopComfy" class="stopbtn hide">■ Stop ComfyUI</button>
   <div class="status"><span class="led" id="led"></span><span id="statusText">connecting…</span></div>
 </header>
 
@@ -446,7 +452,10 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           <div class="sw on" id="randSw" title="random"></div>
         </div>
       </div>
-      <button class="go" id="go" disabled>Develop</button>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="go" id="go" style="flex:1;margin:0" disabled>Develop</button>
+        <button class="go hide" id="stopGen" style="flex:none;width:50px;margin:0;background:rgba(217,139,122,.15);border-color:rgba(217,139,122,.3);color:var(--rose)" title="Stop Generation">✕</button>
+      </div>
       <div class="err" id="genErr"></div>
     </div>
   </aside>
@@ -535,6 +544,7 @@ async function loadHealth(){
   S.target = h.local ? 'local' : (h.cloud ? 'cloud' : 'local');
   document.querySelectorAll('#compute button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.target));
   $('#startComfy').classList.toggle('hide', h.local);   // hide once ComfyUI is up
+  $('#stopComfy').classList.toggle('hide', !h.local);
   updateStatus();
 }
 
@@ -545,6 +555,25 @@ $('#startComfy').onclick=async()=>{
   const t=setInterval(async()=>{ await loadHealth();
     if(S.avail.local){clearInterval(t);$('#startComfy').textContent='▶ Start ComfyUI';$('#startComfy').disabled=false;}
   },5000);
+};
+
+$('#stopComfy').onclick=async()=>{
+  if(!confirm("Are you sure you want to stop/shutdown ComfyUI?")) return;
+  $('#stopComfy').textContent='stopping…';$('#stopComfy').disabled=true;
+  try{
+    const r=await fetch('/api/stop-comfy',{method:'POST'});
+    const d=await r.json();
+    if(d.ok){
+      $('#statusText').textContent='ComfyUI stopped';
+    }else{
+      alert(d.message || "Failed to stop ComfyUI");
+    }
+  }catch(e){
+    alert("Error stopping ComfyUI: "+e);
+  }finally{
+    $('#stopComfy').textContent='■ Stop ComfyUI';$('#stopComfy').disabled=false;
+    await loadHealth();
+  }
 };
 function updateStatus(){
   const ok=S.avail[S.target];
@@ -801,6 +830,7 @@ $('#go').onclick=async()=>{
     body.caption_prompt=$('#captionPrompt').value.trim();}
   else{body.prompt=$('#prompt').value.trim();}
   const t=$('#go').textContent;$('#go').innerHTML='<span class="spin"></span>developing…';$('#go').disabled=true;
+  $('#stopGen').classList.remove('hide');
   $('#empty').innerHTML='<div class="g">developing…</div><p class="hint">First run wakes the GPU (~60s).</p>';
   $('#empty').classList.remove('hide');$('#results').innerHTML='';
   try{
@@ -811,7 +841,26 @@ $('#go').onclick=async()=>{
     $('#seedTag').textContent='seed '+d.seed;
     $$('#results img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.src;$('#imgview').classList.add('on');});
   }catch(e){$('#genErr').textContent=String(e);$('#empty').innerHTML='<div class="g">error</div>';}
-  finally{$('#go').textContent=t;$('#go').disabled=false;refreshGo();}
+  finally{
+    $('#go').textContent=t;$('#go').disabled=false;
+    $('#stopGen').classList.add('hide');
+    refreshGo();
+  }
+};
+
+$('#stopGen').onclick=async()=>{
+  $('#stopGen').disabled=true;
+  try{
+    const r=await fetch('/api/interrupt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:S.target})});
+    const d=await r.json();
+    if(d.ok){
+      $('#empty').innerHTML='<div class="g">interrupted</div>';
+    }
+  }catch(e){
+    console.error("Interrupt failed:", e);
+  }finally{
+    $('#stopGen').disabled=false;
+  }
 };
 
 loadConfig();
