@@ -23,7 +23,7 @@ import sys
 import uuid
 
 import requests
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, request, jsonify, send_from_directory, send_file, Response
 
 # import the shared workflow logic from the repo root (one level up)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -256,13 +256,30 @@ def reels_download():
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-@app.get("/api/reels/save-url")
-def reels_save_url():
-    """Presigned URL that downloads the reel to the user's PC (attachment)."""
+@app.get("/api/reels/media")
+def reels_media():
+    """Proxy a reel from the R2 Worker so the browser can preview/download it
+    without ever seeing the Worker secret."""
     key = request.args.get("key", "")
     if not key:
         return jsonify({"error": "no key"}), 400
-    return jsonify({"url": r2_store.presign(key, download_name=key.split("/")[-1])})
+    up = r2_store.stream(key)
+    if up.status_code != 200:
+        return ("not found", up.status_code)
+    headers = {"Content-Type": "video/mp4"}
+    if request.args.get("download"):
+        headers["Content-Disposition"] = f'attachment; filename="{key.split("/")[-1]}"'
+    return Response(up.iter_content(65536), headers=headers)
+
+
+@app.get("/api/reels/save-url")
+def reels_save_url():
+    """Return a same-origin URL that downloads the reel to the user's PC."""
+    key = request.args.get("key", "")
+    if not key:
+        return jsonify({"error": "no key"}), 400
+    from urllib.parse import quote
+    return jsonify({"url": f"/api/reels/media?key={quote(key)}&download=1"})
 
 
 @app.post("/api/reels/delete")
