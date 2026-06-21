@@ -1,6 +1,19 @@
 # Atelier Character Studio — Handoff
 
-Last updated by Claude (Opus 4.8). Read this first, then `runpod-serverless-build-plan.md` for original intent.
+Last updated by Claude (Opus 4.8). Read this first, then **`PLAN-openrouter-vision.md`**
+(the approved NEXT task) and `runpod-serverless-build-plan.md` for original intent.
+
+## ⏭️ NEXT TASK (approved, not started): replace QwenVL with OpenRouter vision
+See **`PLAN-openrouter-vision.md`** for the full, approved plan. Summary: drop the on-GPU
+QwenVL caption node; describe images via an OpenRouter vision model in the app backend,
+with UI controls (style preset, body shape, clothing) + an OpenRouter model dropdown +
+a Text/Image toggle for T2I + editable prompt in both modes. Needs an **OpenRouter API
+key** from the user. Do this BEFORE RunPod (it shrinks the cloud footprint by ~9 GB).
+
+## Source control
+- GitHub: **https://github.com/AbulH88/AtelierStudio**, primary branch **`main`** (pushed).
+- `dev` and `master` are stale duplicates of `main` — use `main` going forward.
+- After changes: `git push origin main`. No secrets are tracked (verified); only `.env.example`.
 
 ## What this is
 A web app that runs custom **Wan 2.2 ComfyUI** character workflows for ~3 people, on
@@ -12,8 +25,9 @@ stored in Cloudflare R2. Built from `runpod-serverless-build-plan.md`.
   BOTH the local web app and the RunPod handler so they behave identically. Sends
   **Cloudflare Access** headers (`CF_ACCESS_*` env) on every ComfyUI call.
 - `workflow_i2i.json` — Video→Character: frame → QwenVL auto-caption → Wan 2.2 I2I + LoRAs.
-- `workflow_t2i.json` — Text→Character: two-stage Wan 2.2 (high/low noise) + LoRAs. **Fixed
-  schedule (12 steps, 0→4 / 4→12); steps/denoise NOT user-editable here — do not change.**
+- `workflow_t2i.json` — Text→Character: **single low-noise sampler, `start_at_step=4`,
+  lightx2v v2 distill @0.6, BF16 model** (rebuilt to match the real wf2 exactly — the
+  earlier two-stage version produced confetti noise; do NOT revert to two-stage).
 - `handler.py` — RunPod serverless entrypoint (thin wrapper over comfy_common). For the cloud path.
 - `Dockerfile`, `start.sh` — RunPod image (ComfyUI + KJNodes + RES4LYF + QwenVL-Mod + sageattention).
 - `Start_Studio.bat` — one-click local launch (web app + opens browser).
@@ -97,27 +111,42 @@ stored in Cloudflare R2. Built from `runpod-serverless-build-plan.md`.
 - API: `/api/login`, `/api/signup`, `/api/logout`, `/api/me`, `/api/users`, `/api/users/<name>/<action>`.
 
 ## What's verified working
-- Local: T2I and I2I generations on the 5090 (images returned, no errors).
-- VPS: app running behind login gate, reels (R2 via Worker), VPS→ComfyUI = 200 (Access IP-bypass).
-- Remote start: VPS → tunnel → home agent → ComfyUI booted on the 5090 (confirmed ~20s).
+- Local: T2I (clean, matches wf2) and I2I generations on the 5090.
+- VPS: app behind login gate, reels (R2 via Worker), VPS→ComfyUI = 200 (Access IP-bypass).
+- Remote start/stop: VPS → tunnel → home agent → ComfyUI on the 5090.
+- **Gallery**: every generation saved to R2 `gallery/<character>/`, grouped page (like Reels).
+- **Live progress**: home agent listens to ComfyUI WS (shared client id `atelier-progress`),
+  VPS proxies `/api/progress`; Studio shows a progress bar + step count.
+- **Batch chunking**: `comfy_common.generate(max_batch=2)` loops big variation counts to
+  avoid OOM (fixed the 8-variations crash).
 
 ## Public URL (DONE)
 - **https://studio.thecristinaadam.com** is live (Cloudflare-proxied, Full SSL). DNS A → 192.3.81.151.
   nginx vhost: `/www/server/panel/vhost/nginx/studio.thecristinaadam.com.conf` (listen 80+443, shared
   cert `/etc/ssl/cristina/`, proxy_pass 127.0.0.1:8000, client_max_body_size 300m, 900s timeouts).
 
-## TODO / next steps
-1. **RunPod cloud path** (NEXT): create a serverless endpoint + models (network volume vs baked image),
-   set `RUNPOD_ENDPOINT_ID` / `RUNPOD_API_KEY` in the VPS `.env` so the Cloud toggle works (always-on
-   without the home PC). The handler/Dockerfile/workflows already exist; `comfy_common.generate` is the
-   cloud path. See `runpod-serverless-build-plan.md`.
-2. Make sure the home agent auto-starts on the PC (`Install_Agent_Autostart.bat`) so remote start always works.
-3. Optional: protect agent.thecristinaadam.com with an Access app (VPS-IP bypass) for defense-in-depth.
-4. Optional: real IG reel download test with cookies set.
+## TODO / next steps (in order)
+1. **OpenRouter vision describe** — replace QwenVL. Full approved plan in
+   **`PLAN-openrouter-vision.md`**. Needs an OpenRouter API key. Do this first.
+2. **Add the user's VIDEO-gen workflow** — they have 1 video wf to add as a new mode.
+   Get the wf JSON + input/output spec. Decide **local-only vs cloud-too** (changes RunPod
+   sizing). Video display infra is half-built (Reels handles video preview/R2). Adding it
+   before RunPod locks the full model list so RunPod is built once.
+3. **RunPod cloud path** — make the Cloud toggle work. Recommended: T2I first, GPU **L40S
+   48 GB** (High stock), RunPod builds the image from the GitHub repo, models on a
+   **network volume** (public models from HuggingFace via a temp pod; private LoRAs from
+   `H:\ConfiuiModels`). Set `RUNPOD_ENDPOINT_ID`/`RUNPOD_API_KEY` in VPS `.env`. The
+   RunPod MCP is connected; account is empty (no volumes/endpoints). `handler.py` +
+   `Dockerfile` + workflows already exist; `comfy_common.generate` is the cloud path.
+4. Optional: protect agent.thecristinaadam.com with an Access app (VPS-IP bypass).
+5. Optional: real IG reel download test with cookies set.
 
 ## Operational notes
 - Start home ComfyUI from the site: log in → "Start ComfyUI" (calls the agent). Stop likewise.
+- Home agent auto-starts at logon via a launcher in the Windows Startup folder
+  (`...\Start Menu\Programs\Startup\AtelierHomeAgent.bat` → runs `home_agent/Start_Agent.bat`).
 - Cloudflare API token ("For Claude") may be expired — only needed to re-do CF infra, not runtime.
 
 ## Branches
-- Work on `dev`, merge to `master` (main). Both currently up to date with the home-agent commit.
+- **`main`** is primary (on GitHub: AbulH88/AtelierStudio). `dev`/`master` are stale
+  duplicates — work on `main` and `git push origin main`.
