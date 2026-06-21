@@ -62,6 +62,22 @@ stored in Cloudflare R2. Built from `runpod-serverless-build-plan.md`.
 - The browser never sees the secret — `/api/reels/media` proxies previews/downloads through the app.
 - Worker source is inline in the deploy (not in repo). To redeploy/edit it, use the CF API
   (account `ea51aa6cf4958fdf86555ce6ca27bf48`, workers.dev subdomain `cristina-studio`).
+- Reel features: download filenames include `%(id)s` (fixes reels overwriting each other);
+  **search filter + sort** in the library; **folders are admin-only** (create + delete);
+  **Instagram login** = admin pastes `cookies.txt` (stored `webapp/ig_cookies.txt`, gitignored),
+  yt-dlp uses it (`cookiefile`) for account-required reels. API: `/api/reels/cookies[/status|/clear]`,
+  `/api/reels/folder/delete`. UI is mobile-responsive (breakpoint <=680px).
+
+## Home agent — remote Start/Stop ComfyUI (DONE)
+- `runpod-comfyui/home_agent/agent.py`: tiny Flask service on the home PC (127.0.0.1:8190) with
+  `/status` `/start` `/stop`, secured by `x-agent-secret`. Published via the SAME cloudflared tunnel
+  as **agent.thecristinaadam.com** (added ingress `agent->localhost:8190` + DNS CNAME via API).
+- The VPS app's `/api/start-comfy` & `/api/stop-comfy` call the agent when `AGENT_URL` is set (in VPS
+  `.env`: `AGENT_URL`, `AGENT_SECRET`); locally they fall back to subprocess/psutil.
+- On the home PC: run `home_agent/Start_Agent.bat` (gitignored, holds the secret) or
+  `Install_Agent_Autostart.bat` once to auto-start at logon. Verified end-to-end (VPS start → 5090 up).
+- NOTE: the agent hostname is protected only by the bearer secret (no Access app). Strong secret; fine
+  for start/stop. Add an Access app + VPS-IP bypass later if you want defense-in-depth.
 
 ## Cloudflare access for agents
 - A broad **Cloudflare API token** (`cfat_...`, "For Claude", expires soon) was used for zone/Access/Workers/R2.
@@ -82,7 +98,8 @@ stored in Cloudflare R2. Built from `runpod-serverless-build-plan.md`.
 
 ## What's verified working
 - Local: T2I and I2I generations on the 5090 (images returned, no errors).
-- VPS: app running, reels folder create/list via Worker, R2 reachable.
+- VPS: app running behind login gate, reels (R2 via Worker), VPS→ComfyUI = 200 (Access IP-bypass).
+- Remote start: VPS → tunnel → home agent → ComfyUI booted on the 5090 (confirmed ~20s).
 
 ## Public URL (DONE)
 - **https://studio.thecristinaadam.com** is live (Cloudflare-proxied, Full SSL). DNS A → 192.3.81.151.
@@ -90,12 +107,17 @@ stored in Cloudflare R2. Built from `runpod-serverless-build-plan.md`.
   cert `/etc/ssl/cristina/`, proxy_pass 127.0.0.1:8000, client_max_body_size 300m, 900s timeouts).
 
 ## TODO / next steps
-1. **Confirm VPS→ComfyUI** end-to-end: an IP-bypass Access policy for 192.3.81.151 lets the VPS through
-   (verified 502 = past Access, tunnel/home-ComfyUI was down). Re-test with home ComfyUI + tunnel up → expect 200.
-3. **Start/Stop ComfyUI remotely**: current buttons run a local `.bat` (only works when app is on the
-   same PC). For VPS, build a small **home agent** behind the tunnel/Access, or go manual/always-on.
-4. **RunPod cloud path**: create endpoint + (network volume or baked models), set `RUNPOD_*` in VPS .env.
-5. Optional: real IG reel download test (yt-dlp may need an Instagram cookies file for private/age-gated).
+1. **RunPod cloud path** (NEXT): create a serverless endpoint + models (network volume vs baked image),
+   set `RUNPOD_ENDPOINT_ID` / `RUNPOD_API_KEY` in the VPS `.env` so the Cloud toggle works (always-on
+   without the home PC). The handler/Dockerfile/workflows already exist; `comfy_common.generate` is the
+   cloud path. See `runpod-serverless-build-plan.md`.
+2. Make sure the home agent auto-starts on the PC (`Install_Agent_Autostart.bat`) so remote start always works.
+3. Optional: protect agent.thecristinaadam.com with an Access app (VPS-IP bypass) for defense-in-depth.
+4. Optional: real IG reel download test with cookies set.
+
+## Operational notes
+- Start home ComfyUI from the site: log in → "Start ComfyUI" (calls the agent). Stop likewise.
+- Cloudflare API token ("For Claude") may be expired — only needed to re-do CF infra, not runtime.
 
 ## Branches
-- Work on `dev`, merge to `master` (main). Both currently at the Worker-proxy commit.
+- Work on `dev`, merge to `master` (main). Both currently up to date with the home-agent commit.
