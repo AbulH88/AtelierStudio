@@ -261,9 +261,16 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   border-radius:10px;padding:11px 14px;font-family:var(--sans);font-size:14px}
 .reels-top-bar input[type=text]:focus{outline:none;border-color:var(--amber-dim);box-shadow:0 0 0 3px rgba(233,184,100,.10)}
 .reels-top-bar input[type=text]::placeholder{color:var(--faint)}
-.reels-content-head{display:flex;align-items:baseline;gap:14px;margin-bottom:20px}
+.reels-content-head{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap}
 .reels-content-head h3{margin:0;font-family:var(--serif);font-weight:500;font-size:22px}
 .reels-content-head .rc-count{font-family:var(--mono);font-size:12px;color:var(--faint)}
+.reel-search{margin-left:auto;background:var(--ink2);border:1px solid var(--line);color:var(--txt);
+  border-radius:10px;padding:9px 12px;font-family:var(--sans);font-size:13.5px;width:200px}
+.reel-search:focus{outline:none;border-color:var(--amber-dim)}
+.reel-sort{background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:10px;
+  padding:9px 12px;font-family:var(--sans);font-size:13.5px;cursor:pointer}
+.reel-sort:focus{outline:none;border-color:var(--amber-dim)}
+@media(max-width:680px){.reel-search{margin-left:0;width:100%}}
 
 /* reel cards */
 .reels-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:18px}
@@ -556,6 +563,13 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
       <div class="reels-content-head">
         <h3 id="reelFolderTitle">All Reels</h3>
         <span class="rc-count" id="reelCount"></span>
+        <input type="text" id="reelSearch" class="reel-search" placeholder="🔎 Filter reels…">
+        <select id="reelSort" class="reel-sort">
+          <option value="name">Name A–Z</option>
+          <option value="name_desc">Name Z–A</option>
+          <option value="size">Largest</option>
+          <option value="size_asc">Smallest</option>
+        </select>
       </div>
       <div class="reels-grid" id="reelGrid"></div>
     </div>
@@ -869,26 +883,42 @@ async function loadReelFolders(){
   await loadReels();
 }
 
+let _reels = [];
 async function loadReels(){
   const folder = _activeFolder;
-  const title = folder || 'All Reels';
-  $('#reelFolderTitle').textContent = title;
+  $('#reelFolderTitle').textContent = folder || 'All Reels';
   const d=await(await fetch('/api/reels/list?folder='+encodeURIComponent(folder))).json();
-  const reels = d.reels || [];
-  _folderCounts[folder] = reels.length;
-  // update count badge in sidebar
+  _reels = d.reels || [];
+  _folderCounts[folder] = _reels.length;
   const badge = $(`.sb-count[data-fc="${folder}"]`);
-  if(badge) badge.textContent = reels.length;
-  $('#reelCount').textContent = reels.length + (reels.length === 1 ? ' reel' : ' reels');
+  if(badge) badge.textContent = _reels.length;
+  renderReelGrid();
+}
 
-  if(!reels.length){
+function renderReelGrid(){
+  const q = ($('#reelSearch').value || '').trim().toLowerCase();
+  const sort = $('#reelSort').value;
+  const cmp = {
+    name:(a,b)=>a.name.localeCompare(b.name),
+    name_desc:(a,b)=>b.name.localeCompare(a.name),
+    size:(a,b)=>b.size_mb-a.size_mb,
+    size_asc:(a,b)=>a.size_mb-b.size_mb,
+  }[sort] || ((a,b)=>a.name.localeCompare(b.name));
+  const list = _reels.filter(r=>r.name.toLowerCase().includes(q)).sort(cmp);
+  $('#reelCount').textContent = list.length + (list.length===1?' reel':' reels') + (q?` of ${_reels.length}`:'');
+
+  if(!_reels.length){
     $('#reelGrid').innerHTML = `<div class="reels-empty" style="grid-column:1/-1">
-      <div class="re-icon">📂</div>
-      <p>${folder ? 'This folder is empty.' : 'No reels yet.'}</p>
+      <div class="re-icon">📂</div><p>${_activeFolder ? 'This folder is empty.' : 'No reels yet.'}</p>
       <p>Paste a reel URL above to get started.</p></div>`;
     return;
   }
-  $('#reelGrid').innerHTML = reels.map(r => `<div class="reel-card">
+  if(!list.length){
+    $('#reelGrid').innerHTML = `<div class="reels-empty" style="grid-column:1/-1">
+      <div class="re-icon">🔎</div><p>No reels match “${q}”.</p></div>`;
+    return;
+  }
+  $('#reelGrid').innerHTML = list.map(r => `<div class="reel-card">
     <video src="${r.url}" muted preload="metadata" onmouseover="this.play()" onmouseout="this.pause();this.currentTime=0"></video>
     <div class="meta"><div class="nm" title="${r.name}">${r.name}</div><div class="sz">${r.size_mb} MB</div></div>
     <div class="acts"><button class="use" data-key="${r.key}">Use</button>
@@ -903,6 +933,8 @@ async function loadReels(){
     await fetch('/api/reels/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:b.dataset.key})});
     loadReels();});
 }
+$('#reelSearch').oninput=renderReelGrid;
+$('#reelSort').onchange=renderReelGrid;
 
 $('#newFolderBtn').onclick=async()=>{
   const name=prompt('New folder name:');if(!name)return;
