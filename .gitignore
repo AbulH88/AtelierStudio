@@ -24,3 +24,6 @@ runpod-comfyui/home_agent/agent.log
 # OS
 Thumbs.db
 .DS_Store
+
+# character catalog cache (fetched from ComfyUI)
+runpod-comfyui/webapp/.catalog.json

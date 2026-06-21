@@ -264,13 +264,60 @@ def _list_variants(folder):
     return out
 
 
-def build_characters():
+CATALOG_CACHE = os.path.join(HERE, ".catalog.json")
+
+
+def _comfy_loras():
+    """Live LoRA list from ComfyUI (works on the VPS via the tunnel)."""
+    r = requests.get(f"{LOCAL_COMFY}/object_info/LoraLoaderModelOnly",
+                     headers=comfy_common.CF_HEADERS, timeout=8)
+    r.raise_for_status()
+    d = r.json()
+    return d[list(d.keys())[0]]["input"]["required"]["lora_name"][0]
+
+
+def _group_characters(loras):
+    norm = [l.replace("\\", "/") for l in loras]
     res = []
     for d in CHAR_DEFS:
-        variants = _list_variants(d["folder"])
+        folder = d["folder"].rstrip("/") + "/"
+        variants = []
+        for p in norm:
+            if p.lower().startswith(folder.lower()):
+                label = os.path.splitext(p[len(folder):])[0] or p.split("/")[-1]
+                variants.append({"label": label, "path": p})
         if variants:
+            variants.sort(key=lambda v: (bool(_STEP.search(v["label"])), v["label"]))
             res.append({"key": d["key"], "label": d["label"], "variants": variants})
     return res
+
+
+def build_characters():
+    # Prefer the live ComfyUI LoRA list (the VPS has no H: drive to scan); cache it
+    # so the dropdown still fills if ComfyUI is briefly down.
+    try:
+        res = _group_characters(_comfy_loras())
+        if res:
+            try:
+                with open(CATALOG_CACHE, "w", encoding="utf-8") as f:
+                    _json.dump(res, f)
+            except Exception:
+                pass
+            return res
+    except Exception:
+        pass
+    # fallback: local filesystem scan (home dev)
+    fs = [{"key": d["key"], "label": d["label"], "variants": v}
+          for d in CHAR_DEFS for v in [_list_variants(d["folder"])] if v]
+    if fs:
+        return fs
+    # last resort: previously cached catalog
+    if os.path.exists(CATALOG_CACHE):
+        try:
+            return _json.load(open(CATALOG_CACHE, encoding="utf-8"))
+        except Exception:
+            pass
+    return []
 HELPERS = [
     {"key": "lightx2v", "label": "Lightning", "path": "wan/Wan2.2-Lightning/Wan2.1-Distill-Loras/wan2.1_t2v_14b_lora_rank64_lightx2v_4step.safetensors", "default": True, "strength": 1.0},
     {"key": "lenovo",   "label": "Realism",   "path": "wan/WanRealisomLora/Lenovo.safetensors", "default": True, "strength": 1.0},
