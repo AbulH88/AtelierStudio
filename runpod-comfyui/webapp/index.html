@@ -332,6 +332,15 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   .lb-nav.prev{left:6px}.lb-nav.next{right:6px}
 }
 
+/* gallery */
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+.gal-card{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--panel)}
+.gal-card img{width:100%;display:block;cursor:zoom-in}
+.gal-card .gdel{position:absolute;top:7px;right:7px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line2);
+  background:rgba(12,12,14,.75);color:var(--rose);cursor:pointer;display:none;font-size:12px;line-height:1}
+.gal-card:hover .gdel{display:block}
+@media(max-width:680px){.gallery-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
+
 /* instagram cookies */
 .igdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--faint);margin-right:7px;vertical-align:middle}
 .igdot.on{background:var(--good);box-shadow:0 0 7px var(--good)}
@@ -392,6 +401,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   <div class="tagline">character forge</div>
   <nav class="nav" id="nav">
     <button class="navitem on" data-page="studio">Studio</button>
+    <button class="navitem" data-page="gallery">Gallery</button>
     <button class="navitem" data-page="reels">Reels</button>
     <button class="navitem hide" data-page="admin" id="navAdmin">Admin</button>
   </nav>
@@ -572,6 +582,23 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         </select>
       </div>
       <div class="reels-grid" id="reelGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- gallery page -->
+<div id="pageGallery" class="hide">
+  <div class="reels-layout">
+    <aside class="reels-sidebar">
+      <div class="sb-head"><h2>🖼 Gallery</h2><div class="sb-stats" id="galStatus"></div></div>
+      <div class="sb-folders" id="galGroups"></div>
+    </aside>
+    <div class="reels-content">
+      <div class="reels-content-head">
+        <h3 id="galGroupTitle">All Images</h3>
+        <span class="rc-count" id="galCount"></span>
+      </div>
+      <div class="gallery-grid" id="galGrid"></div>
     </div>
   </div>
 </div>
@@ -790,9 +817,11 @@ function loadFrames(session, frames){
 function showPage(p){
   $('#pageStudio').classList.toggle('hide',p!=='studio');
   $('#pageReels').classList.toggle('hide',p!=='reels');
+  $('#pageGallery').classList.toggle('hide',p!=='gallery');
   $('#pageAdmin').classList.toggle('hide',p!=='admin');
   $$('#nav .navitem').forEach(b=>b.classList.toggle('on',b.dataset.page===p));
   if(p==='reels')openReels();
+  if(p==='gallery')openGallery();
   if(p==='admin')openAdmin();
 }
 $$('#nav .navitem').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
@@ -1041,6 +1070,36 @@ $('#stopGen').onclick=async()=>{
     $('#stopGen').disabled=false;
   }
 };
+
+// ===== Gallery =====
+let _galGroup='';
+function _galName(g){return g==='misc'?'Misc':g.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
+async function openGallery(){
+  $('#galStatus').textContent='';
+  let d={}; try{ d=await(await fetch('/api/gallery/groups')).json(); }catch(e){}
+  if(d.error)$('#galStatus').textContent=d.error;
+  const groups=['',...(d.groups||[])];
+  $('#galGroups').innerHTML=groups.map(g=>`<div class="sb-item${g===_galGroup?' on':''}" data-g="${g}">
+    <span class="sb-icon">${g?'👤':'🖼'}</span><span class="sb-label">${g?_galName(g):'All Images'}</span></div>`).join('');
+  $$('#galGroups .sb-item').forEach(el=>el.onclick=()=>{_galGroup=el.dataset.g;
+    $$('#galGroups .sb-item').forEach(x=>x.classList.toggle('on',x===el));loadGallery();});
+  await loadGallery();
+}
+async function loadGallery(){
+  $('#galGroupTitle').textContent=_galGroup?_galName(_galGroup):'All Images';
+  const d=await(await fetch('/api/gallery/list?group='+encodeURIComponent(_galGroup))).json();
+  const imgs=d.images||[];
+  $('#galCount').textContent=imgs.length+(imgs.length===1?' image':' images');
+  if(!imgs.length){$('#galGrid').innerHTML='<div class="reels-empty" style="grid-column:1/-1"><div class="re-icon">🖼</div><p>No images yet — generate something in Studio.</p></div>';return;}
+  $('#galGrid').innerHTML=imgs.map(im=>`<div class="gal-card">
+    <img src="${im.url}" loading="lazy" data-url="${im.url}">
+    <button class="gdel" data-key="${im.key}" title="Delete">✕</button></div>`).join('');
+  $$('#galGrid img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.dataset.url;$('#imgview').classList.add('on');});
+  $$('#galGrid .gdel').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Delete this image?'))return;
+    await fetch('/api/gallery/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:b.dataset.key})});
+    loadGallery();});
+}
 
 // ===== Instagram cookies (admin) =====
 async function igStatus(){

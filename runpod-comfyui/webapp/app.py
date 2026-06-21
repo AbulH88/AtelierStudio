@@ -20,6 +20,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import uuid
 
 import requests
@@ -514,16 +515,20 @@ def reels_download():
 
 
 @app.get("/api/reels/media")
+@app.get("/api/media")
 def reels_media():
-    """Proxy a reel from the R2 Worker so the browser can preview/download it
-    without ever seeing the Worker secret."""
+    """Proxy any R2 object (reel video or gallery image) so the browser can
+    preview/download it without ever seeing the Worker secret."""
     key = request.args.get("key", "")
     if not key:
         return jsonify({"error": "no key"}), 400
     up = r2_store.stream(key)
     if up.status_code != 200:
         return ("not found", up.status_code)
-    headers = {"Content-Type": "video/mp4"}
+    ext = key.lower().rsplit(".", 1)[-1]
+    ct = ("video/mp4" if ext in ("mp4", "mov", "webm")
+          else "image/png" if ext == "png" else "image/jpeg")
+    headers = {"Content-Type": ct}
     if request.args.get("download"):
         headers["Content-Disposition"] = f'attachment; filename="{key.split("/")[-1]}"'
     return Response(up.iter_content(65536), headers=headers)
@@ -629,7 +634,55 @@ def generate():
 
     if not out or "error" in out:
         return jsonify({"error": (out or {}).get("error", "No output from worker.")}), 500
-    return jsonify({"images": out.get("images", []), "seed": out.get("seed")})
+
+    images = out.get("images", [])
+    _save_to_gallery(inp, images, out.get("seed"))   # persist results (best-effort)
+    return jsonify({"images": images, "seed": out.get("seed")})
+
+
+def _gallery_group(inp):
+    p = (inp.get("character_lora_path") or "").replace("\\", "/").lower()
+    for d in CHAR_DEFS:
+        if p.startswith(d["folder"].rstrip("/").lower() + "/"):
+            return d["key"]
+    return "misc"
+
+
+def _save_to_gallery(inp, images, seed):
+    if not images:
+        return
+    group = _gallery_group(inp)
+    ts = int(time.time())
+    for i, b64 in enumerate(images):
+        try:
+            r2_store.upload_bytes(f"gallery/{group}/{ts}_{seed}_{i}.png", base64.b64decode(b64))
+        except Exception:
+            pass
+
+
+@app.get("/api/gallery/groups")
+def gallery_groups():
+    try:
+        return jsonify({"groups": r2_store.list_dirs("gallery/")})
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}", "groups": []}), 200
+
+
+@app.get("/api/gallery/list")
+def gallery_list():
+    group = request.args.get("group", "")
+    prefix = f"gallery/{group}/" if group else "gallery/"
+    imgs = r2_store.list_objs(prefix)
+    imgs.sort(key=lambda x: x["name"], reverse=True)   # newest first
+    return jsonify({"images": imgs})
+
+
+@app.post("/api/gallery/delete")
+def gallery_delete():
+    key = request.get_json(force=True).get("key", "")
+    if key.startswith("gallery/"):
+        r2_store.delete(key)
+    return jsonify({"ok": True})
 
 
 @app.post("/api/stop-comfy")

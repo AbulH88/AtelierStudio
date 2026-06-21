@@ -62,6 +62,33 @@ def upload(local_path, key):
         requests.put(f"{PROXY_URL}/{_k(key)}", headers=H, data=f, timeout=900).raise_for_status()
 
 
+def upload_bytes(key, data):
+    requests.put(f"{PROXY_URL}/{_k(key)}", headers=H, data=data, timeout=300).raise_for_status()
+
+
+def list_dirs(prefix):
+    """Sub-'folders' (common prefixes) directly under `prefix`."""
+    r = requests.get(f"{PROXY_URL}/?list&prefix={quote(prefix, safe='/')}&delimiter=/",
+                     headers=H, timeout=30)
+    r.raise_for_status()
+    return sorted(p.rstrip("/").split("/")[-1] for p in r.json().get("prefixes", []))
+
+
+def list_objs(prefix, media_route="/api/media"):
+    """Objects under `prefix` with a same-origin media URL."""
+    r = requests.get(f"{PROXY_URL}/?list&prefix={quote(prefix, safe='/')}", headers=H, timeout=30)
+    r.raise_for_status()
+    out = []
+    for o in r.json().get("objects", []):
+        key = o["key"]
+        if key.endswith("/.keep"):
+            continue
+        out.append({"key": key, "name": key.split("/")[-1],
+                    "size_mb": round(o["size"] / 1e6, 2),
+                    "url": f"{media_route}?key={quote(key, safe='')}"})
+    return out
+
+
 def delete(key):
     requests.delete(f"{PROXY_URL}/{_k(key)}", headers=H, timeout=30).raise_for_status()
 
