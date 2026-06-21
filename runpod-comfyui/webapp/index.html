@@ -655,7 +655,10 @@ async function loadHealth(){
 
 $('#startComfy').onclick=async()=>{
   $('#startComfy').textContent='starting…';$('#startComfy').disabled=true;
-  try{ await fetch('/api/start-comfy',{method:'POST'}); }catch(e){}
+  try{
+    const d=await(await fetch('/api/start-comfy',{method:'POST'})).json();
+    if(d.error){alert(d.error);$('#startComfy').textContent='▶ Start ComfyUI';$('#startComfy').disabled=false;return;}
+  }catch(e){alert('Error starting ComfyUI: '+e);$('#startComfy').textContent='▶ Start ComfyUI';$('#startComfy').disabled=false;return;}
   $('#statusText').textContent='ComfyUI starting… (~1–2 min)';
   const t=setInterval(async()=>{ await loadHealth();
     if(S.avail.local){clearInterval(t);$('#startComfy').textContent='▶ Start ComfyUI';$('#startComfy').disabled=false;}

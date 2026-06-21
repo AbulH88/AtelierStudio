@@ -40,7 +40,7 @@ def comfy_up():
 def status():
     if not authed():
         return jsonify({"error": "unauthorized"}), 401
-    return jsonify({"running": comfy_up()})
+    return jsonify({"ok": True, "running": comfy_up()})
 
 
 @app.post("/start")
@@ -48,12 +48,12 @@ def start():
     if not authed():
         return jsonify({"error": "unauthorized"}), 401
     if comfy_up():
-        return jsonify({"already": True})
+        return jsonify({"ok": True, "already": True})
     bat = os.path.join(COMFY_DIR, COMFY_BAT)
     if not os.path.exists(bat):
         return jsonify({"error": f"launch script not found: {bat}"}), 500
     subprocess.Popen(["cmd", "/c", "start", "", COMFY_BAT], cwd=COMFY_DIR)
-    return jsonify({"started": True})
+    return jsonify({"ok": True, "started": True})
 
 
 @app.post("/stop")
@@ -65,7 +65,8 @@ def stop():
             if f":{COMFY_PORT}" in ln and "LISTENING" in ln}
     for pid in pids:
         subprocess.run(f"taskkill /F /PID {pid}", shell=True)
-    return jsonify({"stopped": True, "killed": list(pids)})
+    return jsonify({"ok": True, "stopped": True, "killed": list(pids),
+                    "message": "Stopped." if pids else "ComfyUI was not running."})
 
 
 if __name__ == "__main__":
