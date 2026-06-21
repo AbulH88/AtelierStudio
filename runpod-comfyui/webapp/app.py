@@ -54,7 +54,7 @@ API_KEY = os.environ.get("RUNPOD_API_KEY", "")
 RUNPOD_URL = f"https://api.runpod.ai/v2/{ENDPOINT_ID}/runsync"
 LOCAL_COMFY = os.environ.get("LOCAL_COMFY_URL", "http://127.0.0.1:8189")  # matches Windows_Run_GPU.bat
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.0-flash-exp:free")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-flash")
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # So the app can start ComfyUI for you when it's not running.
@@ -737,16 +737,16 @@ def get_openrouter_models():
         
         models.sort(key=lambda x: x["name"])
         
-        gemini_free = "google/gemini-2.0-flash-exp:free"
-        models = [m for m in models if m["id"] != gemini_free]
-        models.insert(0, {"id": gemini_free, "name": "Gemini 2.0 Flash (free)"})
+        gemini_default = "google/gemini-2.5-flash"
+        models = [m for m in models if m["id"] != gemini_default]
+        models.insert(0, {"id": gemini_default, "name": "Gemini 2.5 Flash"})
         
         _MODELS_CACHE["list"] = models
         _MODELS_CACHE["timestamp"] = now
         return jsonify({"models": models})
     except Exception as e:
         fallbacks = [
-            {"id": "google/gemini-2.0-flash-exp:free", "name": "Gemini 2.0 Flash (free)"},
+            {"id": "google/gemini-2.5-flash", "name": "Gemini 2.5 Flash"},
             {"id": "google/gemini-pro-vision", "name": "Gemini Pro Vision"},
             {"id": "meta-llama/llama-3.2-11b-vision-instruct:free", "name": "Llama 3.2 11B Vision (free)"},
             {"id": "meta-llama/llama-3.2-90b-vision-instruct", "name": "Llama 3.2 90B Vision"},
