@@ -36,9 +36,8 @@ I2I = {"load_image": "1", "qwen": "2", "face_concat": "4", "negative": "6",
        "ksampler": "30"}
 I2I_HELPERS = ["lora_h1", "lora_h2"]
 
-T2I = {"positive": "5", "negative": "6",
-       "h_lightx2v": "11", "h_char": "12", "l_lightx2v": "16", "l_char": "17",
-       "latent": "20", "ks_high": "30", "ks_low": "31"}
+T2I = {"positive": "5", "negative": "6", "char": "12",
+       "latent": "20", "ksampler": "30"}
 
 
 # --- low-level ComfyUI API ----------------------------------------------------
@@ -116,15 +115,11 @@ def _build_t2i(graph, inp, seed):
     graph[nm["latent"]]["inputs"]["width"] = int(inp.get("width", 1080))
     graph[nm["latent"]]["inputs"]["height"] = int(inp.get("height", 1920))
     graph[nm["latent"]]["inputs"]["batch_size"] = max(1, int(inp.get("variations", 1)))
-    # T2I keeps the workflow's fixed two-stage schedule (steps/denoise NOT exposed)
-    for ks in (nm["ks_high"], nm["ks_low"]):
-        graph[ks]["inputs"]["noise_seed"] = seed
-    char, cs = inp.get("character_lora_path"), inp.get("character_strength", 1.0)
-    _set_lora(graph, nm["h_char"], char, cs)
-    _set_lora(graph, nm["l_char"], char, cs)
-    lx = next((h for h in inp.get("helper_loras", []) if "lightx2v" in (h.get("path") or "")), None)
-    _set_lora(graph, nm["h_lightx2v"], lx["path"] if lx else None, (lx or {}).get("strength", 1.0))
-    _set_lora(graph, nm["l_lightx2v"], lx["path"] if lx else None, (lx or {}).get("strength", 1.0))
+    graph[nm["ksampler"]]["inputs"]["noise_seed"] = seed
+    # only the character LoRA is injected; lightx2v + sampler schedule are fixed
+    # in the workflow to match wf2 exactly (single low-noise sampler, start@4)
+    _set_lora(graph, nm["char"], inp.get("character_lora_path"),
+              inp.get("character_strength", 1.0))
     return graph
 
 
