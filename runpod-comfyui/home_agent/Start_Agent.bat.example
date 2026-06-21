@@ -1,0 +1,11 @@
+@echo off
+REM Copy this to Start_Agent.bat and fill in your AGENT_SECRET (must match the
+REM AGENT_SECRET in the VPS webapp/.env). Keep Start_Agent.bat private (gitignored).
+
+set AGENT_SECRET=PUT_YOUR_AGENT_SECRET_HERE
+set COMFY_DIR=I:\@home\jimi\Documents\ComfyUI_V82
+set COMFY_BAT=Windows_Run_GPU.bat
+
+cd /d "%~dp0"
+echo Home agent running on 127.0.0.1:8190  (published via cloudflared as agent.thecristinaadam.com)
+python agent.py

@@ -17,6 +17,10 @@ runpod-comfyui/webapp/users.json
 runpod-comfyui/webapp/.secret
 runpod-comfyui/webapp/ig_cookies.txt
 
+# Home agent (contains the agent secret) + its log
+runpod-comfyui/home_agent/Start_Agent.bat
+runpod-comfyui/home_agent/agent.log
+
 # OS
 Thumbs.db
 .DS_Store

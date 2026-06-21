@@ -57,6 +57,11 @@ WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COMFY_DIR = os.environ.get("COMFY_DIR", "I:/@home/jimi/Documents/ComfyUI_V82")
 COMFY_BAT = os.environ.get("COMFY_BAT", "Windows_Run_GPU.bat")
 
+# Home agent — when set (on the VPS), start/stop go through it instead of a local
+# subprocess (the VPS can't launch programs on the home PC directly).
+AGENT_URL = os.environ.get("AGENT_URL", "").rstrip("/")
+AGENT_SECRET = os.environ.get("AGENT_SECRET", "")
+
 FRAMES_DIR = os.path.join(os.path.dirname(__file__), "frames")
 os.makedirs(FRAMES_DIR, exist_ok=True)
 
@@ -300,9 +305,19 @@ def health():
     return jsonify({"local": local, "cloud": bool(ENDPOINT_ID and API_KEY)})
 
 
+def _agent(path):
+    r = requests.post(f"{AGENT_URL}{path}", headers={"x-agent-secret": AGENT_SECRET}, timeout=30)
+    return jsonify(r.json()), r.status_code
+
+
 @app.post("/api/start-comfy")
 def start_comfy():
-    """Launch the local ComfyUI (Windows_Run_GPU.bat) if it isn't already up."""
+    """Start ComfyUI — via the home agent on the VPS, or a local subprocess locally."""
+    if AGENT_URL:
+        try:
+            return _agent("/start")
+        except Exception as e:
+            return jsonify({"error": f"home agent unreachable: {e}"}), 502
     try:
         requests.get(f"{LOCAL_COMFY}/system_stats", timeout=2)
         return jsonify({"already": True})
@@ -572,7 +587,12 @@ def generate():
 
 @app.post("/api/stop-comfy")
 def stop_comfy():
-    """Find the process listening on the LOCAL_COMFY port and terminate it."""
+    """Stop ComfyUI — via the home agent on the VPS, or locally via psutil."""
+    if AGENT_URL:
+        try:
+            return _agent("/stop")
+        except Exception as e:
+            return jsonify({"error": f"home agent unreachable: {e}"}), 502
     import urllib.parse
     import psutil
     try:
