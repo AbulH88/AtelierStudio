@@ -287,8 +287,8 @@ CHAR_DEFS = [
 ]
 
 HELPER_DEFS = [
-    {"key": "lightning", "label": "Lightning", "folder": "wan/Wan2.2-Lightning"},
-    {"key": "realism",   "label": "Realism",   "folder": "wan/WanRealisomLora"},
+    {"key": "lightning", "label": "Lightning", "folder": "wan/WanLightning"},
+    {"key": "realism",   "label": "Realism",   "folder": "wan/WanRealism"},
 ]
 
 _STEP = re.compile(r"step\d+|-\d{6}$", re.I)   # checkpoint-iteration markers
