@@ -26,7 +26,7 @@
   },
   "11": {
     "class_type": "LoraLoaderModelOnly",
-    "inputs": { "model": ["10", 0], "lora_name": "wan/Wan2.2-Lightning/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank128_bf16.safetensors", "strength_model": 0.6 },
+    "inputs": { "model": ["10", 0], "lora_name": "wan/WanLightning/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank128_bf16/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank128_bf16.safetensors", "strength_model": 0.6 },
     "_meta": { "title": "lightx2v v2 distill (0.6)" }
   },
   "12": {

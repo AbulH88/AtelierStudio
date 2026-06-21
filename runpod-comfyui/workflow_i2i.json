@@ -39,7 +39,7 @@
   },
   "11": {
     "class_type": "LoraLoaderModelOnly",
-    "inputs": { "model": ["14", 0], "lora_name": "wan/Wan2.2-Lightning/Wan2.1-Distill-Loras/wan2.1_t2v_14b_lora_rank64_lightx2v_4step.safetensors", "strength_model": 1.0 },
+    "inputs": { "model": ["14", 0], "lora_name": "wan/WanLightning/Wan2.1-Distill-Loras/wan2.1_t2v_14b_lora_rank64_lightx2v_4step/wan2.1_t2v_14b_lora_rank64_lightx2v_4step.safetensors", "strength_model": 1.0 },
     "_meta": { "title": "LoRA helper: lightx2v" }
   },
   "12": {
