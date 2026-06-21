@@ -53,6 +53,8 @@ ENDPOINT_ID = os.environ.get("RUNPOD_ENDPOINT_ID", "")
 API_KEY = os.environ.get("RUNPOD_API_KEY", "")
 RUNPOD_URL = f"https://api.runpod.ai/v2/{ENDPOINT_ID}/runsync"
 LOCAL_COMFY = os.environ.get("LOCAL_COMFY_URL", "http://127.0.0.1:8189")  # matches Windows_Run_GPU.bat
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.0-flash-exp:free")
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # So the app can start ComfyUI for you when it's not running.
@@ -634,6 +636,7 @@ def _build_input(body):
         "height": int(body.get("height", 1920)),
         "steps": int(body.get("steps", 8)),
         "seed": int(body.get("seed", 0)),
+        "prompt": body.get("prompt", "").strip(),
     }
     if inp["mode"] == "i2i":
         session, frame_name = body["session"], body["frame"]
@@ -641,10 +644,167 @@ def _build_input(body):
         with open(fpath, "rb") as f:
             inp["image_b64"] = base64.b64encode(f.read()).decode()
         inp["denoise"] = float(body.get("denoise", 0.65))
-        inp["caption_prompt"] = body.get("caption_prompt", "").strip()
-    else:
-        inp["prompt"] = body.get("prompt", "").strip()
     return inp
+
+
+def _describe_instruction(params):
+    preset = params.get("style_preset") or "Amateur"
+    body_shape = params.get("body_shape")
+    clothing = (params.get("clothing_note") or "").strip()
+    
+    body_str = ""
+    if body_shape:
+        body_str = " Curvy hourglass figure with a defined narrow waist, full bust, and wide hips."
+        
+    clothing_str = ""
+    if clothing:
+        clothing_str = f" The clothing is: {clothing}."
+        
+    style_str = f" Style preset: {preset} photo."
+    
+    return (
+        "Describe the clothing, background setting, pose, and lighting in one paragraph."
+        f"{style_str}{body_str}{clothing_str}"
+        " Ignore any faces, hair, identity, skin tone, text, signs, logos, or tattoos."
+        " Write it as a single flowing description paragraph without headings or bullet points."
+    )
+
+
+def describe_image(image_b64, params, model=None):
+    if not OPENROUTER_API_KEY:
+        raise ValueError("OpenRouter API Key not set.")
+    
+    model = model or OPENROUTER_MODEL
+    instruction = _describe_instruction(params)
+    
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": instruction
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_b64}"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    
+    r = requests.post("https://openrouter.ai/api/v1/chat/completions",
+                      headers=headers, json=payload, timeout=60)
+    r.raise_for_status()
+    res = r.json()
+    choices = res.get("choices", [])
+    if not choices:
+        raise ValueError(f"No choices returned from OpenRouter. Full response: {res}")
+    return choices[0]["message"]["content"].strip()
+
+
+_MODELS_CACHE = {"timestamp": 0, "list": []}
+
+@app.get("/api/openrouter/models")
+def get_openrouter_models():
+    now = time.time()
+    if now - _MODELS_CACHE["timestamp"] < 3600 and _MODELS_CACHE["list"]:
+        return jsonify({"models": _MODELS_CACHE["list"]})
+        
+    try:
+        r = requests.get("https://openrouter.ai/api/v1/models", timeout=10)
+        r.raise_for_status()
+        data = r.json().get("data", [])
+        models = []
+        for m in data:
+            modalities = m.get("architecture", {}).get("input_modalities", [])
+            m_id = m.get("id", "").lower()
+            if "image" in modalities or "vision" in m_id or "vl" in m_id or "gemini" in m_id or "pixtral" in m_id or "llama-3.2-" in m_id:
+                models.append({
+                    "id": m["id"],
+                    "name": m.get("name") or m["id"]
+                })
+        
+        models.sort(key=lambda x: x["name"])
+        
+        gemini_free = "google/gemini-2.0-flash-exp:free"
+        models = [m for m in models if m["id"] != gemini_free]
+        models.insert(0, {"id": gemini_free, "name": "Gemini 2.0 Flash (free)"})
+        
+        _MODELS_CACHE["list"] = models
+        _MODELS_CACHE["timestamp"] = now
+        return jsonify({"models": models})
+    except Exception as e:
+        fallbacks = [
+            {"id": "google/gemini-2.0-flash-exp:free", "name": "Gemini 2.0 Flash (free)"},
+            {"id": "google/gemini-pro-vision", "name": "Gemini Pro Vision"},
+            {"id": "meta-llama/llama-3.2-11b-vision-instruct:free", "name": "Llama 3.2 11B Vision (free)"},
+            {"id": "meta-llama/llama-3.2-90b-vision-instruct", "name": "Llama 3.2 90B Vision"},
+            {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini"},
+        ]
+        return jsonify({"models": fallbacks})
+
+
+@app.post("/api/describe")
+def api_describe():
+    model = OPENROUTER_MODEL
+    style_preset = "Amateur"
+    body_shape = False
+    clothing_note = ""
+    image_b64 = None
+    
+    if request.files and "image" in request.files:
+        f = request.files["image"]
+        img_bytes = f.read()
+        image_b64 = base64.b64encode(img_bytes).decode()
+        
+        model = request.form.get("openrouter_model") or model
+        style_preset = request.form.get("style_preset") or style_preset
+        body_shape = request.form.get("body_shape") == "true"
+        clothing_note = request.form.get("clothing_note") or clothing_note
+    else:
+        body = request.get_json(force=True, silent=True) or {}
+        model = body.get("openrouter_model") or model
+        style_preset = body.get("style_preset") or style_preset
+        body_shape = bool(body.get("body_shape"))
+        clothing_note = body.get("clothing_note") or clothing_note
+        
+        session = body.get("session")
+        frame_name = body.get("frame")
+        
+        if session and frame_name:
+            fpath = os.path.join(FRAMES_DIR, session, frame_name)
+            if os.path.exists(fpath):
+                with open(fpath, "rb") as f:
+                    image_b64 = base64.b64encode(f.read()).decode()
+            else:
+                return jsonify({"error": "Frame not found."}), 404
+                
+    if not image_b64:
+        return jsonify({"error": "No image file or frame session/name provided."}), 400
+        
+    params = {
+        "style_preset": style_preset,
+        "body_shape": body_shape,
+        "clothing_note": clothing_note,
+    }
+    
+    try:
+        prompt = describe_image(image_b64, params, model)
+        return jsonify({"prompt": prompt})
+    except Exception as e:
+        return jsonify({"error": f"OpenRouter call failed: {e}"}), 500
+
 
 
 @app.get("/api/progress")
@@ -672,6 +832,18 @@ def generate():
         return jsonify({"error": "Type a prompt for text mode."}), 400
 
     inp = _build_input(body)
+
+    if inp["mode"] == "i2i" and not inp["prompt"]:
+        params = {
+            "style_preset": body.get("style_preset", ""),
+            "body_shape": bool(body.get("body_shape")),
+            "clothing_note": body.get("clothing_note", ""),
+        }
+        model = body.get("openrouter_model") or OPENROUTER_MODEL
+        try:
+            inp["prompt"] = describe_image(inp["image_b64"], params, model)
+        except Exception as e:
+            return jsonify({"error": f"Auto-describe failed: {e}"}), 500
 
     try:
         if target == "local":

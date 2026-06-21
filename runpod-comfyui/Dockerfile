@@ -27,8 +27,7 @@ RUN git clone https://github.com/kijai/ComfyUI-KJNodes.git && \
     pip install -r ComfyUI-KJNodes/requirements.txt || true
 RUN git clone https://github.com/ClownsharkBatwing/RES4LYF.git && \
     pip install -r RES4LYF/requirements.txt || true
-RUN git clone https://github.com/huchukato/ComfyUI-QwenVL-Mod.git && \
-    pip install -r ComfyUI-QwenVL-Mod/requirements.txt || true
+
 
 # Sage attention (PathchSageAttentionKJ). May take a while to build.
 RUN pip install sageattention || echo "WARN: sageattention install failed; set node to auto/off"

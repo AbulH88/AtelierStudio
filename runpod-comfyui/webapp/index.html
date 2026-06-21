@@ -640,6 +640,14 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
             <button class="go ghost" id="browseBtn">Browse frames ↗</button>
           </div>
         </div>
+        
+        <div class="i2i-prompt-container hide" id="i2iPromptContainer" style="margin-top:16px; border-top: 1px solid var(--line); padding-top: 16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+            <label class="lab" style="font-weight:600">Scene Description</label>
+            <button class="go ghost" id="i2iDescribeBtn" style="width:auto; padding:6px 12px; font-size:12px; margin:0" type="button">🪄 Describe with AI</button>
+          </div>
+          <textarea id="i2iPrompt" placeholder="Describe the scene/outfit, or click Describe with AI..." style="min-height:90px; width:100%; box-sizing:border-box; background:var(--ink2); border:1px solid var(--line); color:var(--txt); border-radius:10px; padding:10px; font-size:14px; resize:vertical; font-family:var(--sans)"></textarea>
+        </div>
         <p class="hint" id="frameHint" style="margin:12px 0 0"></p>
       </div>
     </section>
@@ -648,6 +656,23 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <section class="card d1 hide" id="paneText">
       <div class="hd"><span class="step">1</span><h2>Describe the scene</h2><span class="sub">t2i</span></div>
       <div class="bd">
+        <div class="seg" style="margin-bottom:14px; max-width:280px">
+          <button id="t2iTextModeBtn" class="on" style="padding:6px 12px; font-size:13px" type="button">Text Prompt</button>
+          <button id="t2iImageModeBtn" style="padding:6px 12px; font-size:13px" type="button">Image Input</button>
+        </div>
+        
+        <div id="t2iImageUploadArea" class="hide" style="margin-bottom:16px; border:1px dashed var(--line2); border-radius:12px; padding:16px; text-align:center; background:rgba(255,255,255,0.01)">
+          <div id="t2iDrop" style="cursor:pointer; padding:12px">
+            <span style="font-size:24px; color:var(--faint)">📁</span>
+            <p style="margin:6px 0; font-size:13.5px">Click to upload reference image</p>
+          </div>
+          <input type="file" id="t2iImageFile" accept="image/*" class="hide">
+          <div id="t2iImagePreviewContainer" class="hide" style="margin-top:10px; position:relative; display:inline-block">
+            <img id="t2iImagePreview" style="max-height:150px; border-radius:8px; display:block; margin: 0 auto">
+            <button id="t2iDescribeBtn" class="go" style="width:auto; margin:10px auto 0; padding:8px 16px; font-size:13px" type="button">🪄 Describe with AI</button>
+          </div>
+        </div>
+
         <textarea id="prompt" placeholder="e.g. standing on a rooftop at blue hour, fitted black blazer, gold necklace, city skyline behind, editorial photoshoot lighting…"></textarea>
         <p class="hint" style="margin:10px 0 0">Your character's identity comes from the LoRA — describe the outfit, pose & setting.</p>
       </div>
@@ -709,10 +734,36 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <div class="lab">Steps · detail <input type="number" class="numin" id="stVal" min="1" max="60" step="1" value="8"></div>
         <input type="range" id="steps" min="4" max="24" step="1" value="8">
       </div>
-      <div class="field" id="captionField">
-        <div class="lab">Caption guidance · optional</div>
-        <textarea id="captionPrompt" style="min-height:74px;font-size:13.5px"
-          placeholder="Leave empty = auto-describe. Or steer it, e.g. 'focus on the outfit and pose, ignore the background'"></textarea>
+      <!-- OpenRouter Vision Settings -->
+      <div class="field" id="visionModelField">
+        <div class="lab">Vision Model</div>
+        <div class="sel">
+          <select id="openrouterModel">
+            <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash (free)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" id="stylePresetField">
+        <div class="lab">Style Preset</div>
+        <div class="sel">
+          <select id="stylePreset">
+            <option value="Amateur">Amateur</option>
+            <option value="Cinematic">Cinematic</option>
+            <option value="Editorial">Editorial</option>
+            <option value="Studio">Studio</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" id="bodyShapeField">
+        <div class="lab">Steer Body Shape</div>
+        <div class="seedrow" style="margin-top:4px">
+          <span class="hint" style="font-size:12px;color:var(--mut)">Curvy hourglass & waist emphasis</span>
+          <div class="sw" id="bodyShapeSw" title="hourglass shape"></div>
+        </div>
+      </div>
+      <div class="field" id="clothingNoteField">
+        <div class="lab">Clothing Note</div>
+        <input type="text" id="clothingNote" placeholder="e.g. leather jacket, red dress..." style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px;font-family:var(--sans);font-size:13.5px">
       </div>
       <div class="field">
         <div class="lab">Helper LoRAs</div>
@@ -963,7 +1014,6 @@ function setMode(m){
   // Steps + Denoise only apply to I2I; T2I uses its fixed workflow schedule
   $('#denoiseField').classList.toggle('hide',m!=='i2i');
   $('#stepsField').classList.toggle('hide',m!=='i2i');
-  $('#captionField').classList.toggle('hide',m!=='i2i');
   refreshGo();
 }
 $('#mVid').onclick=()=>setMode('i2i');$('#mTxt').onclick=()=>setMode('t2i');
@@ -1266,6 +1316,7 @@ $('#lbPick').onclick=()=>{
   $('#pickedImg').src=S.frames[S.lbIndex];
   $('#pickedName').textContent='Selected · '+S.frame;
   $('#picked').classList.remove('hide');
+  $('#i2iPromptContainer').classList.remove('hide');
   $$('#frames figure').forEach(x=>x.classList.toggle('sel',+x.dataset.i===S.lbIndex));
   $('#lb').classList.remove('on');$('#picker').classList.remove('on');refreshGo();
 };
@@ -1281,10 +1332,20 @@ $('#go').onclick=async()=>{
     .map(t=>({key:t.dataset.key,strength:+t.querySelector('input').value}));
   const body={target:S.target,mode:S.mode,character_lora_path:$('#variant').value,character_strength:+$('#csVal').value,
     variations:S.variations,width:S.aspect.width,height:S.aspect.height,steps:+$('#stVal').value,
-    seed:S.rand?0:(+$('#seed').value||0),helper_loras:helpers};
-  if(S.mode==='i2i'){body.session=S.session;body.frame=S.frame;body.denoise=+$('#dnVal').value;
-    body.caption_prompt=$('#captionPrompt').value.trim();}
-  else{body.prompt=$('#prompt').value.trim();}
+    seed:S.rand?0:(+$('#seed').value||0),helper_loras:helpers,
+    openrouter_model:$('#openrouterModel').value,
+    style_preset:$('#stylePreset').value,
+    body_shape:S_bodyShape,
+    clothing_note:$('#clothingNote').value.trim()};
+  if(S.mode==='i2i'){
+    body.session=S.session;
+    body.frame=S.frame;
+    body.denoise=+$('#dnVal').value;
+    body.prompt=$('#i2iPrompt').value.trim();
+  }
+  else{
+    body.prompt=$('#prompt').value.trim();
+  }
   const t=$('#go').textContent;$('#go').innerHTML='<span class="spin"></span>developing…';$('#go').disabled=true;
   $('#stopGen').classList.remove('hide');
   $('#empty').innerHTML='<div class="g">developing…</div><p class="hint">First run wakes the GPU (~60s).</p>';
@@ -1696,6 +1757,131 @@ $('#igClear').onclick=async()=>{
   await fetch('/api/reels/cookies/clear',{method:'POST'});
   $('#igMsg').className='msg';$('#igMsg').textContent='Removed.';igStatus();
 };
+
+// ===== OpenRouter Vision =====
+let S_bodyShape = false;
+$('#bodyShapeSw').onclick = () => {
+  S_bodyShape = !S_bodyShape;
+  $('#bodyShapeSw').classList.toggle('on', S_bodyShape);
+};
+
+async function loadVisionModels() {
+  try {
+    const r = await fetch('/api/openrouter/models');
+    const d = await r.json();
+    if (d.models && d.models.length) {
+      $('#openrouterModel').innerHTML = d.models.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+    }
+  } catch (e) {
+    console.error("Failed to load vision models:", e);
+  }
+}
+
+// T2I Input Mode Toggles
+$('#t2iTextModeBtn').onclick = () => {
+  $('#t2iTextModeBtn').classList.add('on');
+  $('#t2iImageModeBtn').classList.remove('on');
+  $('#t2iImageUploadArea').classList.add('hide');
+};
+$('#t2iImageModeBtn').onclick = () => {
+  $('#t2iImageModeBtn').classList.add('on');
+  $('#t2iTextModeBtn').classList.remove('on');
+  $('#t2iImageUploadArea').classList.remove('hide');
+};
+
+$('#t2iDrop').onclick = () => $('#t2iImageFile').click();
+
+$('#t2iImageFile').onchange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    $('#t2iImagePreview').src = evt.target.result;
+    $('#t2iImagePreviewContainer').classList.remove('hide');
+  };
+  reader.readAsDataURL(file);
+};
+
+$('#t2iDescribeBtn').onclick = async (e) => {
+  e.preventDefault();
+  const fileInput = $('#t2iImageFile');
+  if (!fileInput.files || !fileInput.files[0]) {
+    alert("Please upload an image first.");
+    return;
+  }
+  
+  const btn = $('#t2iDescribeBtn');
+  const oldText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "🪄 Describing...";
+  
+  const formData = new FormData();
+  formData.append("image", fileInput.files[0]);
+  formData.append("openrouter_model", $('#openrouterModel').value);
+  formData.append("style_preset", $('#stylePreset').value);
+  formData.append("body_shape", S_bodyShape);
+  formData.append("clothing_note", $('#clothingNote').value.trim());
+  
+  try {
+    const r = await fetch('/api/describe', {
+      method: 'POST',
+      body: formData
+    });
+    const d = await r.json();
+    if (d.error) {
+      alert("AI Description failed: " + d.error);
+    } else if (d.prompt) {
+      $('#prompt').value = d.prompt;
+    }
+  } catch (err) {
+    alert("AI Description failed: " + err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+};
+
+// I2I Describe Event
+$('#i2iDescribeBtn').onclick = async (e) => {
+  e.preventDefault();
+  if (!S.session || !S.frame) {
+    alert("Please select a frame first.");
+    return;
+  }
+  const btn = $('#i2iDescribeBtn');
+  const oldText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "🪄 Describing...";
+  
+  try {
+    const r = await fetch('/api/describe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session: S.session,
+        frame: S.frame,
+        openrouter_model: $('#openrouterModel').value,
+        style_preset: $('#stylePreset').value,
+        body_shape: S_bodyShape,
+        clothing_note: $('#clothingNote').value.trim()
+      })
+    });
+    const d = await r.json();
+    if (d.error) {
+      alert("AI Description failed: " + d.error);
+    } else if (d.prompt) {
+      $('#i2iPrompt').value = d.prompt;
+    }
+  } catch (err) {
+    alert("AI Description failed: " + err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+};
+
+loadVisionModels();
 
 initReelSortChips();
 initGalSortChips();
