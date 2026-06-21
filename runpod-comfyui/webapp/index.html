@@ -296,6 +296,47 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   .sb-item{margin-bottom:0}
 }
 
+/* ---- mobile ---- */
+@media(max-width:680px){
+  header{padding:12px 14px;gap:8px 10px;flex-wrap:wrap}
+  .tagline{display:none}
+  .brand{font-size:17px}
+  .nav{margin-left:auto;order:2}
+  .navitem{padding:7px 12px;font-size:13.5px}
+  .compute{margin-left:0;order:3}
+  .status{order:4}
+  .userchip{order:5}
+  #logoutBtn,#startComfy,#stopComfy{order:6}
+  main{padding:16px 14px 56px;gap:18px}
+  .page{padding:16px 14px 56px}
+  .page-title{font-size:24px}
+  .rail{position:static;top:auto}
+  .card .bd,.card .hd{padding:16px}
+  .modes{padding:16px 0 2px}
+  .seg button{padding:9px 16px;font-size:13px}
+  .reels-top-bar{flex-wrap:wrap}
+  .reels-top-bar input{flex:1 1 100%}
+  .results{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  .reels-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .picker-grid{grid-template-columns:repeat(auto-fill,minmax(92px,1fr));padding:16px}
+  .user-row{flex-wrap:wrap;gap:8px}
+  .user-row .acts{margin-left:0;width:100%}
+  .lb{padding:40px 16px}
+  .lb-nav.prev{left:6px}.lb-nav.next{right:6px}
+}
+
+/* instagram cookies */
+.igdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--faint);margin-right:7px;vertical-align:middle}
+.igdot.on{background:var(--good);box-shadow:0 0 7px var(--good)}
+.ig-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;max-width:540px;width:100%}
+.ig-card h2{font-family:var(--serif);font-weight:500;font-size:21px;margin:0 0 8px}
+.ig-card textarea{width:100%;min-height:150px;margin-top:12px;background:var(--ink2);border:1px solid var(--line);
+  color:var(--txt);border-radius:10px;padding:12px;font-family:var(--mono);font-size:12px;resize:vertical}
+.ig-card textarea:focus{outline:none;border-color:var(--amber-dim)}
+.ig-actions{display:flex;gap:10px;margin-top:14px}
+.msg{margin-top:12px;font-size:13px;font-family:var(--mono);min-height:16px}
+.msg.err{color:var(--rose)}.msg.ok{color:var(--good)}
+
 /* auth / admin */
 .userchip{font-family:var(--mono);font-size:12px;color:var(--amber);background:rgba(233,184,100,.08);
   border:1px solid var(--amber-dim);border-radius:999px;padding:5px 11px}
@@ -509,6 +550,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
       <div class="reels-top-bar">
         <input type="text" id="reelUrl" placeholder="Paste an Instagram reel URL…">
         <button class="go" id="reelDlBtn" style="width:auto;padding:11px 24px;font-size:14px">Download</button>
+        <button class="go ghost hide" id="igBtn" style="width:auto;padding:11px 16px;font-size:13px"><span class="igdot" id="igDot"></span>Instagram</button>
       </div>
       <div class="err" id="reelErr"></div>
       <div class="reels-content-head">
@@ -524,6 +566,23 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 <div id="pageAdmin" class="page hide">
   <div class="page-head"><h1 class="page-title">Users</h1><span class="hint" id="adminHint"></span></div>
   <div class="users-grid" id="usersGrid"></div>
+</div>
+
+<!-- instagram cookies modal -->
+<div class="imgview" id="igModal" style="cursor:default">
+  <div class="ig-card">
+    <h2>Instagram account</h2>
+    <p class="hint">Some reels need a logged-in session. Install a browser extension like
+      <b>“Get cookies.txt LOCALLY”</b>, open instagram.com while logged in, export, and paste the
+      file contents here.</p>
+    <textarea id="igCookies" placeholder="# Netscape HTTP Cookie File&#10;.instagram.com  TRUE  /  TRUE ..."></textarea>
+    <div class="ig-actions">
+      <button class="go" id="igSave" style="width:auto">Save</button>
+      <button class="go ghost" id="igClear" style="width:auto">Remove</button>
+      <button class="go ghost" id="igClose" style="width:auto">Close</button>
+    </div>
+    <div class="msg" id="igMsg"></div>
+  </div>
 </div>
 
 <!-- result image viewer -->
@@ -732,6 +791,7 @@ async function loadMe(){
       $('#logoutBtn').style.display='';
       $('#navAdmin').classList.toggle('hide', !IS_ADMIN);
       $('#newFolderBtn').style.display = IS_ADMIN ? '' : 'none';  // only admins create folders
+      $('#igBtn').classList.toggle('hide', !IS_ADMIN);            // only admins manage IG login
     }
   }catch(e){}
 }
@@ -945,6 +1005,27 @@ $('#stopGen').onclick=async()=>{
   }finally{
     $('#stopGen').disabled=false;
   }
+};
+
+// ===== Instagram cookies (admin) =====
+async function igStatus(){
+  try{ const d=await(await fetch('/api/reels/cookies/status')).json();
+    $('#igDot').classList.toggle('on', !!d.set); }catch(e){}
+}
+$('#igBtn').onclick=()=>{ $('#igMsg').textContent=''; $('#igModal').classList.add('on'); igStatus(); };
+$('#igClose').onclick=()=>$('#igModal').classList.remove('on');
+$('#igModal').onclick=e=>{ if(e.target.id==='igModal')$('#igModal').classList.remove('on'); };
+$('#igSave').onclick=async()=>{
+  const text=$('#igCookies').value.trim();
+  if(!text){$('#igMsg').className='msg err';$('#igMsg').textContent='Paste your cookies.txt contents.';return;}
+  const d=await(await fetch('/api/reels/cookies',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})})).json();
+  if(d.error){$('#igMsg').className='msg err';$('#igMsg').textContent=d.error;return;}
+  $('#igMsg').className='msg ok';$('#igMsg').textContent='Saved — logged-in downloads enabled.';
+  $('#igCookies').value='';igStatus();
+};
+$('#igClear').onclick=async()=>{
+  await fetch('/api/reels/cookies/clear',{method:'POST'});
+  $('#igMsg').className='msg';$('#igMsg').textContent='Removed.';igStatus();
 };
 
 loadMe();

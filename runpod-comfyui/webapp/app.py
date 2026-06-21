@@ -60,6 +60,10 @@ COMFY_BAT = os.environ.get("COMFY_BAT", "Windows_Run_GPU.bat")
 FRAMES_DIR = os.path.join(os.path.dirname(__file__), "frames")
 os.makedirs(FRAMES_DIR, exist_ok=True)
 
+# Instagram cookies (Netscape cookies.txt) for yt-dlp — lets it download
+# account-required reels. Admin-managed, gitignored.
+COOKIES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ig_cookies.txt")
+
 app = Flask(__name__, static_folder=None)
 
 # ----------------------------- auth / login gate ------------------------------
@@ -381,6 +385,35 @@ def reels_folder_delete():
     return jsonify({"ok": True})
 
 
+@app.get("/api/reels/cookies/status")
+def reels_cookies_status():
+    return jsonify({"set": os.path.exists(COOKIES_FILE)})
+
+
+@app.post("/api/reels/cookies")
+@admin_required
+def reels_cookies_set():
+    text = ""
+    if request.files.get("cookies"):
+        text = request.files["cookies"].read().decode("utf-8", "replace")
+    elif request.is_json:
+        text = request.get_json(force=True).get("text", "")
+    text = text.strip()
+    if "\t" not in text and "instagram" not in text.lower():
+        return jsonify({"error": "That doesn't look like a cookies.txt export."}), 400
+    with open(COOKIES_FILE, "w", encoding="utf-8") as f:
+        f.write(text + "\n")
+    return jsonify({"ok": True})
+
+
+@app.post("/api/reels/cookies/clear")
+@admin_required
+def reels_cookies_clear():
+    if os.path.exists(COOKIES_FILE):
+        os.remove(COOKIES_FILE)
+    return jsonify({"ok": True})
+
+
 @app.get("/api/reels/list")
 def reels_list():
     folder = request.args.get("folder", "")
@@ -396,9 +429,12 @@ def reels_download():
     tmpdir = os.path.join(FRAMES_DIR, "dl_" + uuid.uuid4().hex)
     os.makedirs(tmpdir, exist_ok=True)
     try:
-        opts = {"outtmpl": os.path.join(tmpdir, "%(title).70s.%(ext)s"),
+        # %(id)s keeps every reel unique so they never overwrite each other
+        opts = {"outtmpl": os.path.join(tmpdir, "%(title).50s_%(id)s.%(ext)s"),
                 "format": "mp4/bestvideo+bestaudio/best", "merge_output_format": "mp4",
                 "quiet": True, "noplaylist": True}
+        if os.path.exists(COOKIES_FILE):   # logged-in download for account-required reels
+            opts["cookiefile"] = COOKIES_FILE
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
         files = [f for f in os.listdir(tmpdir) if not f.startswith(".")]
