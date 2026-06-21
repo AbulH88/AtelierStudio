@@ -20,6 +20,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 import uuid
 
@@ -62,6 +63,46 @@ COMFY_BAT = os.environ.get("COMFY_BAT", "Windows_Run_GPU.bat")
 # subprocess (the VPS can't launch programs on the home PC directly).
 AGENT_URL = os.environ.get("AGENT_URL", "").rstrip("/")
 AGENT_SECRET = os.environ.get("AGENT_SECRET", "")
+
+# --- live generation progress ------------------------------------------------
+# Shared client id: the VPS submits /prompt with it and the home agent's WS
+# listens with it, so ComfyUI routes step-progress to the agent. On the VPS we
+# poll the agent's /progress (WS through the tunnel 502s); locally we listen direct.
+CLIENT_ID = "atelier-progress"
+PROGRESS = {"running": False, "value": 0, "max": 0}
+
+
+def _ws_loop():
+    try:
+        import websocket  # websocket-client
+    except Exception:
+        return
+    ws_url = (LOCAL_COMFY.replace("https://", "wss://").replace("http://", "ws://")
+              + f"/ws?clientId={CLIENT_ID}")
+    while True:
+        try:
+            conn = websocket.create_connection(ws_url, timeout=40)
+            while True:
+                msg = conn.recv()
+                if not isinstance(msg, str):
+                    continue
+                d = _json.loads(msg)
+                t, data = d.get("type"), d.get("data", {})
+                if t == "progress":
+                    PROGRESS.update(running=True, value=data.get("value", 0), max=data.get("max", 0))
+                elif t == "execution_start":
+                    PROGRESS.update(running=True, value=0, max=0)
+                elif t == "executing" and data.get("node") is None:
+                    PROGRESS.update(running=False, value=0, max=0)
+                elif t in ("execution_success", "execution_error", "execution_interrupted"):
+                    PROGRESS.update(running=False, value=0, max=0)
+        except Exception:
+            PROGRESS.update(running=False)
+            time.sleep(3)
+
+
+if not AGENT_URL:   # local dev: listen directly; on the VPS the agent does it
+    threading.Thread(target=_ws_loop, daemon=True).start()
 
 FRAMES_DIR = os.path.join(os.path.dirname(__file__), "frames")
 os.makedirs(FRAMES_DIR, exist_ok=True)
@@ -606,6 +647,18 @@ def _build_input(body):
     return inp
 
 
+@app.get("/api/progress")
+def api_progress():
+    if AGENT_URL:
+        try:
+            r = requests.get(f"{AGENT_URL}/progress",
+                             headers={"x-agent-secret": AGENT_SECRET}, timeout=8)
+            return jsonify(r.json()), r.status_code
+        except Exception:
+            return jsonify({"running": False, "value": 0, "max": 0})
+    return jsonify(PROGRESS)
+
+
 @app.post("/api/generate")
 def generate():
     body = request.get_json(force=True)
@@ -622,7 +675,7 @@ def generate():
 
     try:
         if target == "local":
-            out = comfy_common.generate(LOCAL_COMFY, WORKFLOW_DIR, inp)
+            out = comfy_common.generate(LOCAL_COMFY, WORKFLOW_DIR, inp, client_id=CLIENT_ID)
         else:
             if not (ENDPOINT_ID and API_KEY):
                 return jsonify({"error": "Cloud not configured (set RunPod env vars)."}), 500
@@ -683,6 +736,56 @@ def gallery_delete():
     if key.startswith("gallery/"):
         r2_store.delete(key)
     return jsonify({"ok": True})
+
+
+@app.post("/api/gallery/bulk-delete")
+def gallery_bulk_delete():
+    keys = request.get_json(force=True).get("keys", [])
+    for key in keys:
+        if key.startswith("gallery/"):
+            try:
+                r2_store.delete(key)
+            except Exception:
+                pass
+    return jsonify({"ok": True})
+
+
+@app.post("/api/gallery/bulk-download")
+def gallery_bulk_download():
+    import io
+    import zipfile
+    keys = request.get_json(force=True).get("keys", [])
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for key in keys:
+            if key.startswith("gallery/"):
+                try:
+                    r = r2_store.stream(key)
+                    r.raise_for_status()
+                    data = r.content
+                    filename = key.split("/")[-1]
+                    zip_file.writestr(filename, data)
+                except Exception as e:
+                    print(f"Error zipping {key}: {e}")
+    zip_buffer.seek(0)
+    return send_file(
+        zip_buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name="gallery_images.zip"
+    )
+
+
+@app.post("/api/gallery/delete-group")
+def gallery_delete_group():
+    group = request.get_json(force=True).get("group", "")
+    if group:
+        try:
+            r2_store.delete_folder(f"gallery/{group}")
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    return jsonify({"ok": True})
+
 
 
 @app.post("/api/stop-comfy")

@@ -332,14 +332,203 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   .lb-nav.prev{left:6px}.lb-nav.next{right:6px}
 }
 
+/* generation progress bar */
+.genbar{width:min(280px,70%);height:6px;border-radius:6px;background:var(--line2);margin:14px auto 0;overflow:hidden}
+.genbar span{display:block;height:100%;background:linear-gradient(90deg,var(--amber-dim),var(--amber));
+  border-radius:6px;transition:width .3s ease}
+
 /* gallery */
 .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
-.gal-card{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--panel)}
+.gal-card{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--panel);transition:all .2s ease}
 .gal-card img{width:100%;display:block;cursor:zoom-in}
 .gal-card .gdel{position:absolute;top:7px;right:7px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line2);
   background:rgba(12,12,14,.75);color:var(--rose);cursor:pointer;display:none;font-size:12px;line-height:1}
 .gal-card:hover .gdel{display:block}
 @media(max-width:680px){.gallery-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
+
+.gal-card .gcheck {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: 1px solid var(--line2);
+  background: rgba(12, 12, 14, 0.8);
+  cursor: pointer;
+  z-index: 5;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.gal-card .gcheck input {
+  cursor: pointer;
+  margin: 0;
+  accent-color: var(--amber);
+}
+.gal-card:hover .gcheck, .gal-card.selected .gcheck {
+  display: flex;
+}
+.gal-card.selected {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px var(--amber-dim);
+}
+
+.gal-bulk-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(18, 18, 22, 0.95);
+  border: 1px solid var(--line2);
+  border-radius: 16px;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8), 0 0 0 1px rgba(233,184,100,0.15);
+  backdrop-filter: blur(12px);
+  z-index: 100;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.gal-bulk-bar.hide {
+  transform: translate(-50%, 100px);
+  opacity: 0;
+  pointer-events: none;
+}
+.gal-bulk-bar .bulk-count {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  color: var(--amber);
+  font-weight: 600;
+}
+
+.sb-item .sb-dl {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--good);
+  background: rgba(127, 200, 160, 0.12);
+  border: 1px solid rgba(127, 200, 160, 0.3);
+  margin-right: 4px;
+}
+.sb-item:hover .sb-dl {
+  display: flex;
+}
+.sb-item .sb-dl:hover {
+  background: rgba(127, 200, 160, 0.25);
+}
+
+/* Modern Filter bar */
+.reels-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(180deg, var(--panel), var(--ink2));
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.reels-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.reels-search-wrap .search-icon {
+  position: absolute;
+  left: 14px;
+  font-size: 16px;
+  color: var(--faint);
+  pointer-events: none;
+}
+.reel-search-modern {
+  width: 100%;
+  background: var(--ink2);
+  border: 1px solid var(--line);
+  color: var(--txt);
+  border-radius: 10px;
+  padding: 11px 14px 11px 40px;
+  font-family: var(--sans);
+  font-size: 14.5px;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+.reel-search-modern:focus {
+  outline: none;
+  border-color: var(--amber-dim);
+  box-shadow: 0 0 0 3px rgba(233,184,100,0.1);
+  background: rgba(255,255,255,0.01);
+}
+.search-clear {
+  position: absolute;
+  right: 14px;
+  background: transparent;
+  border: none;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+.search-clear:hover {
+  color: var(--txt);
+  background: rgba(255,255,255,0.05);
+}
+.sort-chips-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.sort-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--faint);
+  font-family: var(--mono);
+}
+.sort-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sort-chip {
+  background: var(--ink2);
+  border: 1px solid var(--line);
+  color: var(--mut);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-family: var(--sans);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.sort-chip:hover {
+  border-color: var(--line2);
+  color: var(--txt);
+}
+.sort-chip.active {
+  background: rgba(233,184,100,0.08);
+  border-color: var(--amber-dim);
+  color: var(--amber);
+  font-weight: 500;
+  box-shadow: 0 0 10px -3px rgba(233,184,100,0.2);
+}
+
 
 /* instagram cookies */
 .igdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--faint);margin-right:7px;vertical-align:middle}
@@ -573,13 +762,22 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
       <div class="reels-content-head">
         <h3 id="reelFolderTitle">All Reels</h3>
         <span class="rc-count" id="reelCount"></span>
-        <input type="text" id="reelSearch" class="reel-search" placeholder="🔎 Filter reels…">
-        <select id="reelSort" class="reel-sort">
-          <option value="name">Name A–Z</option>
-          <option value="name_desc">Name Z–A</option>
-          <option value="size">Largest</option>
-          <option value="size_asc">Smallest</option>
-        </select>
+      </div>
+      <div class="reels-filter-bar">
+        <div class="reels-search-wrap">
+          <span class="search-icon">🔎</span>
+          <input type="text" id="reelSearch" class="reel-search-modern" placeholder="Search reels by name...">
+          <button id="clearReelSearch" class="search-clear hide">✕</button>
+        </div>
+        <div class="sort-chips-container">
+          <span class="sort-label">Sort:</span>
+          <div class="sort-chips" id="reelSortChips">
+            <button class="sort-chip active" data-sort="name">A–Z</button>
+            <button class="sort-chip" data-sort="name_desc">Z–A</button>
+            <button class="sort-chip" data-sort="size">Largest</button>
+            <button class="sort-chip" data-sort="size_asc">Smallest</button>
+          </div>
+        </div>
       </div>
       <div class="reels-grid" id="reelGrid"></div>
     </div>
@@ -598,7 +796,36 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <h3 id="galGroupTitle">All Images</h3>
         <span class="rc-count" id="galCount"></span>
       </div>
+      <div class="reels-filter-bar">
+        <div class="reels-search-wrap">
+          <span class="search-icon">🔎</span>
+          <input type="text" id="galSearch" class="reel-search-modern" placeholder="Search gallery by name...">
+          <button id="clearGalSearch" class="search-clear hide">✕</button>
+        </div>
+        <div class="sort-chips-container">
+          <span class="sort-label">Sort:</span>
+          <div class="sort-chips" id="galSortChips">
+            <button class="sort-chip active" data-sort="newest">Newest First</button>
+            <button class="sort-chip" data-sort="oldest">Oldest First</button>
+            <button class="sort-chip" data-sort="name">A–Z</button>
+            <button class="sort-chip" data-sort="name_desc">Z–A</button>
+          </div>
+          <label class="select-all-label" id="galSelectAllLabel" style="margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--mut); cursor: pointer; user-select: none;">
+            <input type="checkbox" id="galSelectAll" style="accent-color: var(--amber); cursor: pointer;"> Select All
+          </label>
+        </div>
+      </div>
+      
+      <!-- floating bulk bar -->
+      <div class="gal-bulk-bar hide" id="galBulkBar">
+        <span class="bulk-count" id="galBulkCount">0 selected</span>
+        <button id="galBulkDlBtn" class="use" style="width:auto;padding:8px 16px;font-size:13px">↓ Download</button>
+        <button id="galBulkDelBtn" class="del" style="width:auto;padding:8px 16px;font-size:13px">✕ Delete</button>
+        <button id="galBulkCancelBtn" class="save" style="width:auto;padding:8px 16px;font-size:13px">Cancel</button>
+      </div>
+
       <div class="gallery-grid" id="galGrid"></div>
+
     </div>
   </div>
 </div>
@@ -927,9 +1154,21 @@ async function loadReels(){
   renderReelGrid();
 }
 
+let _reelSortMode = 'name';
+
+function initReelSortChips() {
+  $$('#reelSortChips .sort-chip').forEach(chip => {
+    chip.onclick = () => {
+      $$('#reelSortChips .sort-chip').forEach(c => c.classList.toggle('active', c === chip));
+      _reelSortMode = chip.dataset.sort;
+      renderReelGrid();
+    };
+  });
+}
+
 function renderReelGrid(){
   const q = ($('#reelSearch').value || '').trim().toLowerCase();
-  const sort = $('#reelSort').value;
+  const sort = _reelSortMode;
   const cmp = {
     name:(a,b)=>a.name.localeCompare(b.name),
     name_desc:(a,b)=>b.name.localeCompare(a.name),
@@ -965,8 +1204,17 @@ function renderReelGrid(){
     await fetch('/api/reels/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:b.dataset.key})});
     loadReels();});
 }
-$('#reelSearch').oninput=renderReelGrid;
-$('#reelSort').onchange=renderReelGrid;
+
+$('#clearReelSearch').onclick = () => {
+  $('#reelSearch').value = '';
+  $('#clearReelSearch').classList.add('hide');
+  renderReelGrid();
+};
+$('#reelSearch').oninput = () => {
+  $('#clearReelSearch').classList.toggle('hide', !$('#reelSearch').value);
+  renderReelGrid();
+};
+
 
 $('#newFolderBtn').onclick=async()=>{
   const name=prompt('New folder name:');if(!name)return;
@@ -1041,15 +1289,26 @@ $('#go').onclick=async()=>{
   $('#stopGen').classList.remove('hide');
   $('#empty').innerHTML='<div class="g">developing…</div><p class="hint">First run wakes the GPU (~60s).</p>';
   $('#empty').classList.remove('hide');$('#results').innerHTML='';
+  const poll=setInterval(async()=>{
+    if($('#empty').classList.contains('hide'))return;
+    try{ const p=await(await fetch('/api/progress')).json();
+      if(p.running && p.max>0){
+        const pct=Math.round(p.value/p.max*100);
+        $('#empty').innerHTML=`<div class="g">developing… ${p.value}/${p.max}</div>
+          <div class="genbar"><span style="width:${pct}%"></span></div>`;
+      }
+    }catch(e){}
+  },1200);
   try{
     const d=await(await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
-    if(d.error){$('#genErr').textContent=d.error;$('#empty').innerHTML='<div class="g">failed</div>';return;}
+    if(d.error){$('#genErr').textContent=d.error;$('#empty').innerHTML='<div class="g">failed</div><p class="hint">'+d.error+'</p>';return;}
     $('#empty').classList.add('hide');
     $('#results').innerHTML=d.images.map((b,i)=>`<figure style="animation-delay:${i*.07}s"><img src="data:image/png;base64,${b}"></figure>`).join('');
     $('#seedTag').textContent='seed '+d.seed;
     $$('#results img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.src;$('#imgview').classList.add('on');});
   }catch(e){$('#genErr').textContent=String(e);$('#empty').innerHTML='<div class="g">error</div>';}
   finally{
+    clearInterval(poll);
     $('#go').textContent=t;$('#go').disabled=false;
     $('#stopGen').classList.add('hide');
     refreshGo();
@@ -1073,33 +1332,349 @@ $('#stopGen').onclick=async()=>{
 
 // ===== Gallery =====
 let _galGroup='';
+let _galImages=[];
+let _galSelected=new Set();
+let _galSearch='';
+let _galSort='newest';
+let _lastSelectedKey=null;
+
 function _galName(g){return g==='misc'?'Misc':g.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
+
 async function openGallery(){
   $('#galStatus').textContent='';
+  _galSelected.clear();
+  updateBulkBar();
   let d={}; try{ d=await(await fetch('/api/gallery/groups')).json(); }catch(e){}
   if(d.error)$('#galStatus').textContent=d.error;
   const groups=['',...(d.groups||[])];
-  $('#galGroups').innerHTML=groups.map(g=>`<div class="sb-item${g===_galGroup?' on':''}" data-g="${g}">
-    <span class="sb-icon">${g?'👤':'🖼'}</span><span class="sb-label">${g?_galName(g):'All Images'}</span></div>`).join('');
-  $$('#galGroups .sb-item').forEach(el=>el.onclick=()=>{_galGroup=el.dataset.g;
-    $$('#galGroups .sb-item').forEach(x=>x.classList.toggle('on',x===el));loadGallery();});
+  $('#galGroups').innerHTML=groups.map(g=>{
+    const name = g ? _galName(g) : 'All Images';
+    const active = g === _galGroup ? ' on' : '';
+    const dlBtn = g ? `<span class="sb-dl" data-dlgroup="${g}" title="Download group (zip)">↓</span>` : '';
+    const delBtn = (IS_ADMIN && g) ? `<span class="sb-del" data-delgroup="${g}" title="Delete group">✕</span>` : '';
+    return `<div class="sb-item${active}" data-g="${g}">
+      <span class="sb-icon">${g?'👤':'🖼'}</span><span class="sb-label">${name}</span>
+      ${dlBtn}${delBtn}
+    </div>`;
+  }).join('');
+
+  $$('#galGroups .sb-item').forEach(el=>{
+    el.onclick=(e)=>{
+      // Only select group if not clicking download/delete buttons
+      if(e.target.classList.contains('sb-dl') || e.target.classList.contains('sb-del')) return;
+      _galGroup=el.dataset.g;
+      $$('#galGroups .sb-item').forEach(x=>x.classList.toggle('on',x===el));
+      _galSelected.clear();
+      loadGallery();
+    };
+  });
+
+  $$('#galGroups .sb-dl').forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    const group = b.dataset.dlgroup;
+    try {
+      $('#galStatus').textContent = 'Fetching group list...';
+      const d = await(await fetch('/api/gallery/list?group=' + encodeURIComponent(group))).json();
+      const imgs = d.images || [];
+      if (!imgs.length) {
+        alert("This group has no images.");
+        $('#galStatus').textContent = '';
+        return;
+      }
+      const keys = imgs.map(im => im.key);
+      
+      $('#galStatus').textContent = 'Zipping group...';
+      const r = await fetch('/api/gallery/bulk-download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keys })
+      });
+      if (!r.ok) throw new Error("Server error " + r.status);
+      const blob = await r.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gallery_group_${group}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      $('#galStatus').textContent = '';
+    } catch (e) {
+      alert("Group download failed: " + e);
+      $('#galStatus').textContent = '';
+    }
+  });
+
+  $$('#galGroups .sb-del').forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    const group = b.dataset.delgroup;
+    if (!confirm(`Are you sure you want to delete the group "${_galName(group)}" and all images in it?`)) return;
+    try {
+      const r = await fetch('/api/gallery/delete-group', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ group })
+      });
+      const d = await r.json();
+      if (d.ok) {
+        if (_galGroup === group) _galGroup = '';
+        for (const k of _galSelected) {
+          if (k.startsWith(`gallery/${group}/`)) {
+            _galSelected.delete(k);
+          }
+        }
+        await openGallery();
+      }
+    } catch (e) {
+      alert("Delete group failed: " + e);
+    }
+  });
+
   await loadGallery();
 }
+
 async function loadGallery(){
   $('#galGroupTitle').textContent=_galGroup?_galName(_galGroup):'All Images';
   const d=await(await fetch('/api/gallery/list?group='+encodeURIComponent(_galGroup))).json();
-  const imgs=d.images||[];
-  $('#galCount').textContent=imgs.length+(imgs.length===1?' image':' images');
-  if(!imgs.length){$('#galGrid').innerHTML='<div class="reels-empty" style="grid-column:1/-1"><div class="re-icon">🖼</div><p>No images yet — generate something in Studio.</p></div>';return;}
-  $('#galGrid').innerHTML=imgs.map(im=>`<div class="gal-card">
-    <img src="${im.url}" loading="lazy" data-url="${im.url}">
-    <button class="gdel" data-key="${im.key}" title="Delete">✕</button></div>`).join('');
-  $$('#galGrid img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.dataset.url;$('#imgview').classList.add('on');});
-  $$('#galGrid .gdel').forEach(b=>b.onclick=async()=>{
-    if(!confirm('Delete this image?'))return;
-    await fetch('/api/gallery/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:b.dataset.key})});
-    loadGallery();});
+  _galImages=d.images||[];
+  renderGallery();
 }
+
+function renderGallery() {
+  const q = _galSearch.trim().toLowerCase();
+  
+  let list = _galImages.filter(im => {
+    return im.name.toLowerCase().includes(q) || im.key.toLowerCase().includes(q);
+  });
+  
+  if (_galSort === 'newest') {
+    list.sort((a, b) => b.name.localeCompare(a.name));
+  } else if (_galSort === 'oldest') {
+    list.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (_galSort === 'name') {
+    list.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (_galSort === 'name_desc') {
+    list.sort((a, b) => b.name.localeCompare(a.name));
+  }
+  
+  $('#galCount').textContent = list.length + (list.length === 1 ? ' image' : ' images') + (q ? ` of ${_galImages.length}` : '');
+  
+  if (!list.length) {
+    $('#galGrid').innerHTML = '<div class="reels-empty" style="grid-column:1/-1"><div class="re-icon">🖼</div><p>No matching images found.</p></div>';
+    updateBulkBar();
+    return;
+  }
+  
+  $('#galGrid').innerHTML = list.map((im, idx) => {
+    const isSel = _galSelected.has(im.key);
+    const selClass = isSel ? ' selected' : '';
+    const checked = isSel ? 'checked' : '';
+    return `<div class="gal-card${selClass}" data-key="${im.key}" data-index="${idx}">
+      <div class="gcheck"><input type="checkbox" ${checked} data-key="${im.key}"></div>
+      <img src="${im.url}" loading="lazy" data-url="${im.url}">
+      <button class="gdel" data-key="${im.key}" title="Delete">✕</button>
+    </div>`;
+  }).join('');
+  
+  $$('#galGrid img').forEach(im => {
+    im.onclick = (e) => {
+      $('#imgviewImg').src = im.dataset.url;
+      $('#imgview').classList.add('on');
+    };
+  });
+  
+  $$('#galGrid .gdel').forEach(b => {
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm('Delete this image?')) return;
+      await fetch('/api/gallery/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: b.dataset.key })
+      });
+      _galSelected.delete(b.dataset.key);
+      await loadGallery();
+    };
+  });
+  
+  $$('#galGrid .gcheck input').forEach(cb => {
+    cb.onclick = (e) => {
+      e.stopPropagation();
+      toggleSelect(cb.dataset.key, cb.checked, e.shiftKey);
+    };
+  });
+  
+  $$('#galGrid .gcheck').forEach(chk => {
+    chk.onclick = (e) => {
+      e.stopPropagation();
+    };
+  });
+
+  updateBulkBar();
+}
+
+function toggleSelect(key, checked, shiftKey) {
+  if (checked) {
+    if (shiftKey && _lastSelectedKey) {
+      const cards = Array.from($$('#galGrid .gal-card'));
+      const idx1 = cards.findIndex(c => c.dataset.key === _lastSelectedKey);
+      const idx2 = cards.findIndex(c => c.dataset.key === key);
+      if (idx1 !== -1 && idx2 !== -1) {
+        const start = Math.min(idx1, idx2);
+        const end = Math.max(idx1, idx2);
+        for (let i = start; i <= end; i++) {
+          const k = cards[i].dataset.key;
+          _galSelected.add(k);
+        }
+      }
+    } else {
+      _galSelected.add(key);
+    }
+    _lastSelectedKey = key;
+  } else {
+    _galSelected.delete(key);
+    _lastSelectedKey = null;
+  }
+  
+  const cards = $$('#galGrid .gal-card');
+  cards.forEach(c => {
+    const k = c.dataset.key;
+    const isSel = _galSelected.has(k);
+    c.classList.toggle('selected', isSel);
+    const cb = c.querySelector('.gcheck input');
+    if (cb) cb.checked = isSel;
+  });
+  
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const cnt = _galSelected.size;
+  const bar = $('#galBulkBar');
+  if (cnt > 0) {
+    $('#galBulkCount').textContent = `${cnt} selected`;
+    bar.classList.remove('hide');
+  } else {
+    bar.classList.add('hide');
+  }
+  
+  const selectAllCb = $('#galSelectAll');
+  if (selectAllCb) {
+    const renderedCards = $$('#galGrid .gal-card');
+    const renderedKeys = Array.from(renderedCards).map(c => c.dataset.key);
+    if (renderedKeys.length === 0) {
+      selectAllCb.checked = false;
+      selectAllCb.disabled = true;
+    } else {
+      selectAllCb.disabled = false;
+      selectAllCb.checked = renderedKeys.every(k => _galSelected.has(k));
+    }
+  }
+}
+
+$('#galSelectAll').onchange = (e) => {
+  const checked = e.target.checked;
+  const cards = $$('#galGrid .gal-card');
+  cards.forEach(c => {
+    const k = c.dataset.key;
+    if (checked) {
+      _galSelected.add(k);
+    } else {
+      _galSelected.delete(k);
+    }
+    c.classList.toggle('selected', checked);
+    const cb = c.querySelector('.gcheck input');
+    if (cb) cb.checked = checked;
+  });
+  updateBulkBar();
+};
+
+$('#galBulkCancelBtn').onclick = () => {
+  _galSelected.clear();
+  const cards = $$('#galGrid .gal-card');
+  cards.forEach(c => {
+    c.classList.remove('selected');
+    const cb = c.querySelector('.gcheck input');
+    if (cb) cb.checked = false;
+  });
+  updateBulkBar();
+};
+
+$('#galBulkDelBtn').onclick = async () => {
+  const cnt = _galSelected.size;
+  if (cnt === 0) return;
+  if (!confirm(`Delete ${cnt} selected image(s)?`)) return;
+  
+  const keys = Array.from(_galSelected);
+  try {
+    const r = await fetch('/api/gallery/bulk-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keys })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      _galSelected.clear();
+      await loadGallery();
+    }
+  } catch (e) {
+    alert("Delete failed: " + e);
+  }
+};
+
+$('#galBulkDlBtn').onclick = async () => {
+  const cnt = _galSelected.size;
+  if (cnt === 0) return;
+  
+  const keys = Array.from(_galSelected);
+  try {
+    $('#galStatus').textContent = 'Zipping files...';
+    const r = await fetch('/api/gallery/bulk-download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keys })
+    });
+    if (!r.ok) throw new Error("Server error " + r.status);
+    const blob = await r.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gallery_${_galGroup || 'all'}_${Date.now()}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    $('#galStatus').textContent = '';
+  } catch (e) {
+    alert("Download failed: " + e);
+    $('#galStatus').textContent = '';
+  }
+};
+
+function initGalSortChips() {
+  $$('#galSortChips .sort-chip').forEach(chip => {
+    chip.onclick = () => {
+      $$('#galSortChips .sort-chip').forEach(c => c.classList.toggle('active', c === chip));
+      _galSort = chip.dataset.sort;
+      renderGallery();
+    };
+  });
+}
+
+$('#clearGalSearch').onclick = () => {
+  $('#galSearch').value = '';
+  _galSearch = '';
+  $('#clearGalSearch').classList.add('hide');
+  renderGallery();
+};
+
+$('#galSearch').oninput = () => {
+  _galSearch = $('#galSearch').value;
+  $('#clearGalSearch').classList.toggle('hide', !_galSearch);
+  renderGallery();
+};
+
 
 // ===== Instagram cookies (admin) =====
 async function igStatus(){
@@ -1122,6 +1697,8 @@ $('#igClear').onclick=async()=>{
   $('#igMsg').className='msg';$('#igMsg').textContent='Removed.';igStatus();
 };
 
+initReelSortChips();
+initGalSortChips();
 loadMe();
 loadConfig();
 loadHealth();

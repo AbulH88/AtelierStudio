@@ -52,10 +52,11 @@ def upload_image(base, raw_bytes):
     return f"{j['subfolder']}/{name}" if j.get("subfolder") else name
 
 
-def run(base, graph, timeout=900):
-    """Queue a graph, wait, return list of base64 PNGs via the /view API."""
+def run(base, graph, timeout=900, client_id=None):
+    """Queue a graph, wait, return list of base64 PNGs via the /view API.
+    client_id lets a WS listener (the web app) receive progress for this job."""
     pid = requests.post(f"{base}/prompt",
-                        json={"prompt": graph, "client_id": uuid.uuid4().hex},
+                        json={"prompt": graph, "client_id": client_id or uuid.uuid4().hex},
                         headers=CF_HEADERS, timeout=60).json()["prompt_id"]
     start = time.time()
     while time.time() - start < timeout:
@@ -124,21 +125,31 @@ def _build_t2i(graph, inp, seed):
 
 
 # --- high level ---------------------------------------------------------------
-def generate(base, workflow_dir, inp):
-    """Build + run the right workflow against the ComfyUI at `base`. Returns
-    {"images": [...b64...], "seed": int}."""
+def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
+    """Build + run the right workflow against ComfyUI. Large variation counts are
+    split into chunks of `max_batch` (looped) to avoid VRAM OOM on big batches.
+    Returns {"images": [...b64...], "seed": int}."""
     mode = inp.get("mode", "i2i")
-    with open(os.path.join(workflow_dir, f"workflow_{mode}.json"), encoding="utf-8") as f:
-        graph = json.load(f)
+    wf_path = os.path.join(workflow_dir, f"workflow_{mode}.json")
     seed = int(inp.get("seed", 0)) or int.from_bytes(os.urandom(4), "big")
+    total = max(1, int(inp.get("variations", 1)))
 
+    frame_name = None
     if mode == "i2i":
         frame_name = upload_image(base, base64.b64decode(inp["image_b64"]))
-        graph = _build_i2i(graph, inp, seed, frame_name)
-    else:
-        graph = _build_t2i(graph, inp, seed)
 
-    images = run(base, graph)
+    images, done = [], 0
+    while done < total:
+        chunk = min(max_batch, total - done)
+        with open(wf_path, encoding="utf-8") as f:
+            graph = json.load(f)
+        sub = dict(inp, variations=chunk)
+        cseed = seed + done   # distinct seed per chunk so variations differ
+        graph = (_build_i2i(graph, sub, cseed, frame_name) if mode == "i2i"
+                 else _build_t2i(graph, sub, cseed))
+        images += run(base, graph, client_id=client_id)
+        done += chunk
+
     if not images:
         return {"error": "No image produced — check ComfyUI node errors / model paths."}
     return {"images": images, "seed": seed}

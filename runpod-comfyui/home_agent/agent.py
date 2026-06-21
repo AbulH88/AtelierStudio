@@ -9,8 +9,11 @@ Run via Start_Agent.bat (which sets AGENT_SECRET). Binds to 127.0.0.1 only —
 the outside world reaches it solely through the Cloudflare tunnel + the secret.
 """
 
+import json
 import os
 import subprocess
+import threading
+import time
 import urllib.request
 
 from flask import Flask, request, jsonify
@@ -34,6 +37,49 @@ def comfy_up():
         return True
     except Exception:
         return False
+
+
+# --- live progress: listen to ComfyUI's WS locally with the shared client id ---
+CLIENT_ID = "atelier-progress"
+PROGRESS = {"running": False, "value": 0, "max": 0}
+
+
+def _ws_loop():
+    try:
+        import websocket  # websocket-client
+    except Exception:
+        return
+    url = COMFY_URL.replace("http://", "ws://").replace("https://", "wss://") + f"/ws?clientId={CLIENT_ID}"
+    while True:
+        try:
+            conn = websocket.create_connection(url, timeout=40)
+            while True:
+                m = conn.recv()
+                if not isinstance(m, str):
+                    continue
+                d = json.loads(m)
+                t, data = d.get("type"), d.get("data", {})
+                if t == "progress":
+                    PROGRESS.update(running=True, value=data.get("value", 0), max=data.get("max", 0))
+                elif t == "execution_start":
+                    PROGRESS.update(running=True, value=0, max=0)
+                elif t == "executing" and data.get("node") is None:
+                    PROGRESS.update(running=False, value=0, max=0)
+                elif t in ("execution_success", "execution_error", "execution_interrupted"):
+                    PROGRESS.update(running=False, value=0, max=0)
+        except Exception:
+            PROGRESS.update(running=False)
+            time.sleep(3)
+
+
+threading.Thread(target=_ws_loop, daemon=True).start()
+
+
+@app.get("/progress")
+def progress():
+    if not authed():
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify(PROGRESS)
 
 
 @app.get("/status")
