@@ -284,7 +284,11 @@ CHAR_DEFS = [
     {"key": "sindy",       "label": "Sindy",         "folder": "wan/Own/Sindy"},
     {"key": "olivia",      "label": "Olivia",        "folder": "wan/Own/Olivia"},
     {"key": "newccdd",     "label": "NewCCDD",       "folder": "wan/Own/NewCCDD"},
-    {"key": "siren",       "label": "Siren",         "folder": "wan/Own/siren2.2_LowOnly"},
+]
+
+HELPER_DEFS = [
+    {"key": "lightning", "label": "Lightning", "folder": "wan/Wan2.2-Lightning"},
+    {"key": "realism",   "label": "Realism",   "folder": "wan/WanRealisomLora"},
 ]
 
 _STEP = re.compile(r"step\d+|-\d{6}$", re.I)   # checkpoint-iteration markers
@@ -362,10 +366,52 @@ def build_characters():
         except Exception:
             pass
     return []
-HELPERS = [
-    {"key": "lightx2v", "label": "Lightning", "path": "wan/Wan2.2-Lightning/Wan2.1-Distill-Loras/wan2.1_t2v_14b_lora_rank64_lightx2v_4step.safetensors", "default": True, "strength": 1.0},
-    {"key": "lenovo",   "label": "Realism",   "path": "wan/WanRealisomLora/Lenovo.safetensors", "default": True, "strength": 1.0},
-]
+
+
+def build_helpers():
+    comfy_list = []
+    try:
+        comfy_list = _comfy_loras()
+    except Exception:
+        pass
+        
+    res = []
+    for d in HELPER_DEFS:
+        variants = []
+        if comfy_list:
+            norm = [l.replace("\\", "/") for l in comfy_list]
+            folder = d["folder"].rstrip("/") + "/"
+            for p in norm:
+                if p.lower().startswith(folder.lower()):
+                    label = os.path.splitext(p[len(folder):])[0] or p.split("/")[-1]
+                    variants.append({"label": label or p, "path": p})
+        
+        if not variants:
+            variants = _list_variants(d["folder"])
+            
+        variants.sort(key=lambda v: (bool(_STEP.search(v["label"])), v["label"]))
+        
+        default_path = ""
+        if variants:
+            if d["key"] == "lightning":
+                matching = [v for v in variants if "light" in v["label"].lower() or "distill" in v["label"].lower()]
+                default_path = matching[0]["path"] if matching else variants[0]["path"]
+            elif d["key"] == "realism":
+                matching = [v for v in variants if "lenovo" in v["label"].lower() or "real" in v["label"].lower()]
+                default_path = matching[0]["path"] if matching else variants[0]["path"]
+            else:
+                default_path = variants[0]["path"]
+                
+        res.append({
+            "key": d["key"],
+            "label": d["label"],
+            "variants": variants,
+            "default_path": default_path,
+            "strength": 1.0,
+            "default": True
+        })
+    return res
+
 ASPECTS = [
     {"key": "portrait",  "label": "Portrait · 9:16", "width": 1080, "height": 1920},
     {"key": "square",    "label": "Square · 1:1",    "width": 1080, "height": 1080},
@@ -380,7 +426,7 @@ def index():
 
 @app.get("/api/config")
 def config():
-    return jsonify({"characters": build_characters(), "helpers": HELPERS, "aspects": ASPECTS})
+    return jsonify({"characters": build_characters(), "helpers": build_helpers(), "aspects": ASPECTS})
 
 
 @app.get("/api/health")
@@ -619,18 +665,14 @@ def frame(session, name):
     return send_from_directory(os.path.join(FRAMES_DIR, session), name)
 
 
-def _lora_path(key, table):
-    return next((x["path"] for x in table if x["key"] == key), None)
-
-
 def _build_input(body):
     """Translate the UI body into the worker input dict (same shape local & cloud)."""
     inp = {
         "mode": body.get("mode", "i2i"),
         "character_lora_path": body.get("character_lora_path", ""),
         "character_strength": float(body.get("character_strength", 1.0)),
-        "helper_loras": [{"path": _lora_path(h["key"], HELPERS), "strength": float(h.get("strength", 1.0))}
-                         for h in body.get("helper_loras", []) if _lora_path(h["key"], HELPERS)],
+        "helper_loras": [{"path": h.get("path", ""), "strength": float(h.get("strength", 1.0))}
+                         for h in body.get("helper_loras", []) if h.get("path")],
         "variations": int(body.get("variations", 1)),
         "width": int(body.get("width", 1080)),
         "height": int(body.get("height", 1920)),
@@ -729,7 +771,7 @@ def get_openrouter_models():
         for m in data:
             modalities = m.get("architecture", {}).get("input_modalities", [])
             m_id = m.get("id", "").lower()
-            if "image" in modalities or "vision" in m_id or "vl" in m_id or "gemini" in m_id or "pixtral" in m_id or "llama-3.2-" in m_id:
+            if "image" in modalities or "vision" in m_id or "vl" in m_id or "gemini" in m_id or "pixtral" in m_id or "llama-3.2-" in m_id or "deepseek" in m_id:
                 models.append({
                     "id": m["id"],
                     "name": m.get("name") or m["id"]
@@ -747,6 +789,8 @@ def get_openrouter_models():
     except Exception as e:
         fallbacks = [
             {"id": "google/gemini-2.5-flash", "name": "Gemini 2.5 Flash"},
+            {"id": "deepseek/deepseek-chat", "name": "DeepSeek V3 (Chat)"},
+            {"id": "deepseek/deepseek-r1", "name": "DeepSeek R1 (Reasoning)"},
             {"id": "google/gemini-pro-vision", "name": "Gemini Pro Vision"},
             {"id": "meta-llama/llama-3.2-11b-vision-instruct:free", "name": "Llama 3.2 11B Vision (free)"},
             {"id": "meta-llama/llama-3.2-90b-vision-instruct", "name": "Llama 3.2 90B Vision"},

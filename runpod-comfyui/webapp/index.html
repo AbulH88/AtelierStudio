@@ -1035,11 +1035,27 @@ async function loadConfig(){
       S.aspect={key:b.dataset.key,width:+b.dataset.w,height:+b.dataset.h};}});
   $('#cw').oninput=$('#ch').oninput=()=>{if(S.aspect.key==='custom')
     S.aspect={key:'custom',width:+$('#cw').value,height:+$('#ch').value};};
-  $('#helpers').innerHTML=c.helpers.map(h=>`<div class="tog" data-key="${h.key}">
-     <span class="nm">${h.label}</span><div class="rt">
-     <input type="number" value="${h.strength}" step="0.05" min="0" max="1.5">
-     <div class="sw ${h.default?'on':''}"></div></div></div>`).join('');
-  $$('#helpers .sw').forEach(sw=>sw.onclick=()=>sw.classList.toggle('on'));
+  $('#helpers').innerHTML = c.helpers.map(h => {
+    const options = h.variants && h.variants.length
+      ? h.variants.map(v => `<option value="${v.path}" ${v.path === h.default_path ? 'selected' : ''}>${v.label}</option>`).join('')
+      : `<option value="">No checkpoints found</option>`;
+      
+    return `<div class="tog" data-key="${h.key}" style="align-items: flex-start; padding: 12px 0;">
+      <div style="display:flex; flex-direction:column; gap:6px; flex: 1; min-width: 0; padding-right: 12px;">
+        <span class="nm" style="font-weight: 500;">${h.label}</span>
+        <div class="sel" style="width: 100%;">
+          <select class="helper-select" style="padding: 6px 28px 6px 10px; font-size: 12.5px; border-radius: 8px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${options}
+          </select>
+        </div>
+      </div>
+      <div class="rt" style="margin-top: 24px;">
+        <input type="number" value="${h.strength}" step="0.05" min="0" max="1.5" style="width: 50px; padding: 4px; border-radius: 6px;">
+        <div class="sw ${h.default ? 'on' : ''}"></div>
+      </div>
+    </div>`;
+  }).join('');
+  $$('#helpers .sw').forEach(sw => sw.onclick = () => sw.classList.toggle('on'));
 }
 
 // variations chips
@@ -1328,8 +1344,12 @@ document.addEventListener('keydown',e=>{if(!$('#lb').classList.contains('on'))re
 
 $('#go').onclick=async()=>{
   $('#genErr').textContent='';
-  const helpers=$$('#helpers .tog').filter(t=>t.querySelector('.sw').classList.contains('on'))
-    .map(t=>({key:t.dataset.key,strength:+t.querySelector('input').value}));
+  const helpers = $$('#helpers .tog').filter(t => t.querySelector('.sw').classList.contains('on'))
+    .map(t => ({
+      key: t.dataset.key,
+      path: t.querySelector('.helper-select').value,
+      strength: +t.querySelector('input').value
+    }));
   const body={target:S.target,mode:S.mode,character_lora_path:$('#variant').value,character_strength:+$('#csVal').value,
     variations:S.variations,width:S.aspect.width,height:S.aspect.height,steps:+$('#stVal').value,
     seed:S.rand?0:(+$('#seed').value||0),helper_loras:helpers,
