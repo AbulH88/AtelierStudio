@@ -56,7 +56,7 @@ header{display:flex;align-items:center;gap:16px;padding:22px 34px;border-bottom:
 .compute button .cl{width:7px;height:7px;border-radius:50%;background:var(--faint);transition:.2s}
 .compute button.on{background:#23222a;color:var(--txt)}
 .compute button.on .cl{background:var(--good);box-shadow:0 0 8px var(--good)}
-.compute button.off{opacity:.4;cursor:not-allowed}
+.compute button.off{opacity:.5;cursor:pointer}
 .compute button.off .cl{background:var(--rose);box-shadow:none}
 .startbtn{background:rgba(233,184,100,.1);border:1px solid var(--amber-dim);color:var(--amber);
   font-family:var(--sans);font-size:12.5px;padding:7px 13px;border-radius:999px;cursor:pointer;transition:.2s}
@@ -1124,7 +1124,8 @@ async function loadHealth(){
   document.querySelectorAll('#compute button').forEach(b=>{
     const t=b.dataset.t, ok=h[t];
     b.classList.toggle('off',!ok);
-    b.onclick=ok?()=>{S.target=t;document.querySelectorAll('#compute button').forEach(x=>x.classList.toggle('on',x===b));_lastTarget=t;updateStatus();onTargetChange();}:null;
+    // always clickable — clicking Cloud while unconfigured reveals the setup card
+    b.onclick=()=>{S.target=t;document.querySelectorAll('#compute button').forEach(x=>x.classList.toggle('on',x===b));_lastTarget=t;updateStatus();onTargetChange();};
   });
   // prefer local when ComfyUI is on, else cloud
   if(_lastTarget===null) S.target = h.local ? 'local' : (h.cloud ? 'cloud' : 'local');
