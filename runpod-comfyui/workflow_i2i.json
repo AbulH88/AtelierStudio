@@ -40,17 +40,12 @@
   "11": {
     "class_type": "LoraLoaderModelOnly",
     "inputs": { "model": ["14", 0], "lora_name": "wan/WanLightning/Wan2.1-Distill-Loras/wan2.1_t2v_14b_lora_rank64_lightx2v_4step/wan2.1_t2v_14b_lora_rank64_lightx2v_4step.safetensors", "strength_model": 1.0 },
-    "_meta": { "title": "LoRA helper: lightx2v" }
-  },
-  "12": {
-    "class_type": "LoraLoaderModelOnly",
-    "inputs": { "model": ["11", 0], "lora_name": "wan/WanRealisomLora/Lenovo.safetensors", "strength_model": 1.0 },
-    "_meta": { "title": "LoRA helper: Lenovo" }
+    "_meta": { "title": "LoRA: lightx2v (LOCKED, required)" }
   },
   "13": {
     "class_type": "LoraLoaderModelOnly",
-    "inputs": { "model": ["12", 0], "lora_name": "wan/Own/LoranceNew/LoranceNew.safetensors", "strength_model": 1.0 },
-    "_meta": { "title": "LoRA character slot" }
+    "inputs": { "model": ["11", 0], "lora_name": "wan/Own/LoranceNew/LoranceNew.safetensors", "strength_model": 1.0 },
+    "_meta": { "title": "LoRA character slot (handler rewires model in via extra LoRAs)" }
   },
   "20": {
     "class_type": "ImageResizeKJv2",

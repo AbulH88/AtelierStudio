@@ -28,17 +28,19 @@ NEGATIVE = ("色调艳丽，过曝，静态，细节模糊不清，字幕，风�
             "画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，"
             "杂乱的背景，三条腿，背景人很多，倒着走, censored, sunburnt skin, rashy skin, red cheeks")
 
-FACE_PREFIX = "ing2lorance, "   # trigger word prepended to the QwenVL caption (i2i)
+FACE_PREFIX = "ing2lorance, "   # trigger word prepended to the description (i2i)
 
-
-I2I = {"load_image": "1", "positive": "5", "negative": "6",
-       "lora_h1": "11", "lora_h2": "12", "lora_char": "13",
+# Both workflows keep a LOCKED Lightning (lightx2v) LoRA baked in — i2i uses the
+# 4-step rank64 @1.0, t2i the v2 distill rank128 @0.6 (do NOT change t2i: it must
+# match wf2 exactly). User-chosen extra LoRAs are injected as a dynamic chain
+# between that locked Lightning node (`lora_after`) and the character node (`char`),
+# so any number of LoRAs from the wan/ folder can be stacked in either mode.
+I2I = {"load_image": "1", "positive": "5", "negative": "6", "char": "13",
        "resize": "20", "noise_aug": "21", "repeat_latent": "23",
-       "ksampler": "30"}
-I2I_HELPERS = ["lora_h1", "lora_h2"]
+       "ksampler": "30", "lora_after": "11"}
 
 T2I = {"positive": "5", "negative": "6", "char": "12",
-       "latent": "20", "ksampler": "30"}
+       "latent": "20", "ksampler": "30", "lora_after": "11"}
 
 
 # --- low-level ComfyUI API ----------------------------------------------------
@@ -75,6 +77,18 @@ def run(base, graph, timeout=900, client_id=None):
     raise TimeoutError("ComfyUI timed out")
 
 
+def _prompt_with_trigger(inp):
+    """Prepend the character trigger word to the positive prompt. The UI sends
+    `trigger` (default 'ing2lorance', editable per character); fall back to that
+    default when absent (e.g. the RunPod handler). Empty trigger = no prefix."""
+    trig = inp.get("trigger")
+    if trig is None:
+        trig = "ing2lorance"
+    trig = trig.strip().strip(",").strip()
+    body = inp.get("prompt", "") or ""
+    return (trig + ", " + body) if trig else body
+
+
 def _set_lora(graph, nid, path, strength):
     n = graph[nid]["inputs"]
     if path:
@@ -82,6 +96,36 @@ def _set_lora(graph, nid, path, strength):
         n["strength_model"] = float(strength)
     else:
         n["strength_model"] = 0.0
+
+
+def _apply_lightning(graph, node_id, lt):
+    """Override the (otherwise locked) Lightning lightx2v node from the UI — a
+    {"path","strength"} dict. If nothing is sent, the workflow JSON default
+    (the mode-correct lightx2v) stays untouched."""
+    if lt and (lt.get("path") or "").strip():
+        _set_lora(graph, node_id, lt["path"].strip(), lt.get("strength", 1.0))
+
+
+def _apply_extra_loras(graph, after_id, char_id, loras):
+    """Insert a dynamic chain of user-chosen LoRAs between the locked Lightning
+    node (`after_id`) and the character node (`char_id`). Each entry is
+    {"path": "wan/...safetensors", "strength": float}. Entries without a path are
+    skipped. The character node's model input is rewired to the last LoRA (or to
+    `after_id` directly when no extra LoRAs are chosen)."""
+    prev = [after_id, 0]
+    for i, lo in enumerate(loras or []):
+        path = (lo.get("path") or "").strip()
+        if not path:
+            continue
+        nid = f"ulora_{i}"
+        graph[nid] = {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {"model": prev, "lora_name": path,
+                       "strength_model": float(lo.get("strength", 1.0))},
+            "_meta": {"title": f"Extra LoRA {i + 1}"},
+        }
+        prev = [nid, 0]
+    graph[char_id]["inputs"]["model"] = prev
 
 
 # --- graph builders -----------------------------------------------------------
@@ -95,27 +139,28 @@ def _build_i2i(graph, inp, seed, frame_name):
     graph[nm["ksampler"]]["inputs"]["steps"] = max(4, int(inp.get("steps", 8)))
     graph[nm["noise_aug"]]["inputs"]["seed"] = seed
     graph[nm["repeat_latent"]]["inputs"]["amount"] = max(1, int(inp.get("variations", 1)))
-    graph[nm["positive"]]["inputs"]["text"] = FACE_PREFIX + inp.get("prompt", "")
+    graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
     graph[nm["negative"]]["inputs"]["text"] = NEGATIVE
-    _set_lora(graph, nm["lora_char"], inp.get("character_lora_path"),
+    _apply_lightning(graph, nm["lora_after"], inp.get("lightning"))
+    _apply_extra_loras(graph, nm["lora_after"], nm["char"], inp.get("extra_loras", []))
+    _set_lora(graph, nm["char"], inp.get("character_lora_path"),
               inp.get("character_strength", 1.0))
-    helpers = inp.get("helper_loras", [])
-    for i, slot in enumerate(I2I_HELPERS):
-        h = helpers[i] if i < len(helpers) else None
-        _set_lora(graph, nm[slot], h["path"] if h else None, (h or {}).get("strength", 1.0))
     return graph
 
 
 def _build_t2i(graph, inp, seed):
     nm = T2I
-    graph[nm["positive"]]["inputs"]["text"] = inp.get("prompt", "")
+    graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
     graph[nm["negative"]]["inputs"]["text"] = NEGATIVE
     graph[nm["latent"]]["inputs"]["width"] = int(inp.get("width", 1080))
     graph[nm["latent"]]["inputs"]["height"] = int(inp.get("height", 1920))
     graph[nm["latent"]]["inputs"]["batch_size"] = max(1, int(inp.get("variations", 1)))
     graph[nm["ksampler"]]["inputs"]["noise_seed"] = seed
-    # only the character LoRA is injected; lightx2v + sampler schedule are fixed
-    # in the workflow to match wf2 exactly (single low-noise sampler, start@4)
+    # sampler schedule is fixed to match wf2 (single low-noise, start@4). Lightning
+    # defaults to v2 distill @0.6 but is now tweakable from the UI; extra LoRAs
+    # stack after it.
+    _apply_lightning(graph, nm["lora_after"], inp.get("lightning"))
+    _apply_extra_loras(graph, nm["lora_after"], nm["char"], inp.get("extra_loras", []))
     _set_lora(graph, nm["char"], inp.get("character_lora_path"),
               inp.get("character_strength", 1.0))
     return graph

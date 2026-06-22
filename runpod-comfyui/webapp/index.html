@@ -579,6 +579,57 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 .lb-nav.prev{left:24px}.lb-nav.next{right:24px}
 .lb-foot{position:absolute;bottom:30px}
 .lb-pick{width:auto;padding:13px 34px}
+
+/* ===== sticky notes board ===== */
+.board-wrap{max-width:1180px;margin:0 auto;padding:26px 34px 90px}
+.board-head{display:flex;align-items:baseline;gap:14px;margin:6px 0 20px}
+.board-head h1{font-family:var(--serif);font-weight:500;font-size:30px;margin:0;letter-spacing:.3px}
+.board-head .sub{font-size:12.5px;color:var(--faint);font-family:var(--mono)}
+/* composer */
+.note-compose{background:linear-gradient(180deg,var(--panel),var(--ink2));border:1px solid var(--line);
+  border-radius:16px;padding:16px 18px;margin-bottom:30px;box-shadow:var(--shadow)}
+.note-compose textarea{min-height:70px;margin:0}
+.nc-row{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap}
+.nc-colors{display:flex;gap:7px}
+.nc-sw{width:24px;height:24px;border-radius:7px;cursor:pointer;border:2px solid transparent;transition:.15s}
+.nc-sw:hover{transform:scale(1.12)}
+.nc-sw.on{border-color:var(--txt);box-shadow:0 0 0 2px var(--ink)}
+.nc-attach{background:var(--ink2);border:1px solid var(--line);color:var(--mut);border-radius:10px;
+  padding:9px 14px;cursor:pointer;font-size:13px;transition:.18s;display:inline-flex;gap:7px;align-items:center}
+.nc-attach:hover{border-color:var(--amber-dim);color:var(--amber)}
+.nc-spacer{flex:1}
+.nc-thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.nc-thumb{position:relative;width:72px;height:72px;border-radius:9px;overflow:hidden;border:1px solid var(--line2);background:var(--ink)}
+.nc-thumb img,.nc-thumb video{width:100%;height:100%;object-fit:cover;display:block}
+.nc-thumb .rm{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;border:0;
+  background:rgba(12,12,14,.8);color:var(--rose);font-size:11px;cursor:pointer;line-height:1}
+.nc-thumb .vtag{position:absolute;bottom:2px;left:3px;font-size:9px;color:#fff;background:rgba(0,0,0,.6);border-radius:4px;padding:0 4px}
+/* board grid */
+.notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:22px;align-items:start}
+.sticky{position:relative;border-radius:4px;padding:18px 16px 14px;color:#26210f;
+  box-shadow:0 12px 26px -14px rgba(0,0,0,.7);transition:transform .22s cubic-bezier(.2,.7,.2,1),box-shadow .22s;
+  transform:rotate(var(--rot,-1.5deg));font-family:var(--sans)}
+.sticky:hover{transform:rotate(0deg) translateY(-4px);box-shadow:0 20px 40px -16px rgba(0,0,0,.8);z-index:2}
+.sticky::before{content:"";position:absolute;top:-9px;left:50%;transform:translateX(-50%) rotate(-2deg);
+  width:74px;height:20px;background:rgba(236,231,223,.5);border:1px solid rgba(255,255,255,.25);border-radius:2px;
+  box-shadow:0 2px 5px rgba(0,0,0,.18)}
+.st-yellow{background:#f7e26b}.st-amber{background:#f0b65a}.st-rose{background:#f2a6a0}
+.st-green{background:#bfe08a}.st-blue{background:#a8cdf0}.st-purple{background:#cdb6ef}
+.sticky .st-media{margin:0 0 10px;border-radius:5px;overflow:hidden;border:1px solid rgba(0,0,0,.12)}
+.sticky .st-media img,.sticky .st-media video{width:100%;display:block;max-height:280px;object-fit:cover;background:#0003}
+.sticky .st-text{font-size:14.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.sticky .st-text a{color:#5a3d00;text-decoration:underline;font-weight:600}
+.sticky .st-foot{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:11.5px;
+  color:rgba(38,33,15,.62);font-family:var(--mono);border-top:1px solid rgba(0,0,0,.1);padding-top:8px}
+.sticky .st-author{font-weight:600}
+.sticky .st-del{margin-left:auto;background:rgba(0,0,0,.08);border:0;color:#7a1f12;border-radius:6px;
+  width:22px;height:22px;cursor:pointer;font-size:12px;line-height:1;opacity:0;transition:.15s}
+.sticky:hover .st-del{opacity:1}
+.sticky .st-del:hover{background:rgba(122,31,18,.18)}
+.board-empty{grid-column:1/-1;text-align:center;padding:50px 0;color:var(--faint)}
+.board-empty .g{font-family:var(--serif);font-style:italic;font-size:22px;color:var(--mut)}
+@media(max-width:680px){.board-wrap{padding:16px 14px 60px}.board-head h1{font-size:24px}
+  .notes-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}}
 </style>
 </head>
 <body>
@@ -592,6 +643,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <button class="navitem on" data-page="studio">Studio</button>
     <button class="navitem" data-page="gallery">Gallery</button>
     <button class="navitem" data-page="reels">Reels</button>
+    <button class="navitem" data-page="notes">Notes</button>
     <button class="navitem hide" data-page="admin" id="navAdmin">Admin</button>
   </nav>
   <div class="compute" id="compute">
@@ -702,8 +754,8 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <div class="sel"><select id="variant"></select></div>
       </div>
       <div class="field">
-        <div class="lab">Character strength <input type="number" class="numin" id="csVal" min="0" max="2" step="0.01" value="1.00"></div>
-        <input type="range" id="cstrength" min="0" max="1.5" step="0.01" value="1">
+        <div class="lab">Character strength <input type="number" class="numin" id="csVal" min="0" max="2" step="0.01" value="0.80"></div>
+        <input type="range" id="cstrength" min="0" max="1.5" step="0.01" value="0.8">
       </div>
       <div class="field">
         <div class="lab">Variations <input type="number" class="numin" id="varNum" min="1" max="50" step="1" value="2"></div>
@@ -735,11 +787,13 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <input type="range" id="steps" min="4" max="24" step="1" value="8">
       </div>
       <!-- OpenRouter Vision Settings -->
+      <div style="margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);
+        font-family:var(--serif);font-style:italic;font-size:14px;color:var(--amber)">✦ Describe with AI</div>
       <div class="field" id="visionModelField">
         <div class="lab">Vision Model</div>
         <div class="sel">
           <select id="openrouterModel">
-            <option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option value="qwen/qwen3-vl-235b-a22b-instruct">Qwen3-VL 235B (SFW + NSFW)</option>
           </select>
         </div>
       </div>
@@ -754,20 +808,69 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           </select>
         </div>
       </div>
-      <div class="field" id="bodyShapeField">
-        <div class="lab">Steer Body Shape</div>
+      <div class="field" id="bodyTypeField">
+        <div class="lab">Body Type · optional</div>
+        <div class="sel"><select id="bodyType">
+          <option value="">None — don't steer</option>
+          <option value="Curvy hourglass">Curvy hourglass</option>
+          <option value="Slim">Slim</option>
+          <option value="Athletic / toned">Athletic / toned</option>
+          <option value="Petite">Petite</option>
+          <option value="Plus / voluptuous">Plus / voluptuous</option>
+          <option value="Busty">Busty</option>
+        </select></div>
+      </div>
+      <div class="field" id="shotTypeField">
+        <div class="lab">Shot Type · optional</div>
+        <div class="sel"><select id="shotType">
+          <option value="">Auto</option>
+          <option value="Selfie">Selfie</option>
+          <option value="Portrait">Portrait</option>
+          <option value="Full-body">Full-body</option>
+          <option value="Close-up">Close-up</option>
+        </select></div>
+      </div>
+      <div class="field" id="detailField">
+        <div class="lab">Detail Level</div>
+        <div class="sel"><select id="detailLevel">
+          <option value="Concise">Concise</option>
+          <option value="Detailed" selected>Detailed</option>
+          <option value="Very detailed">Very detailed</option>
+        </select></div>
+      </div>
+      <div class="field" id="explicitField">
+        <div class="lab">Explicit / NSFW</div>
         <div class="seedrow" style="margin-top:4px">
-          <span class="hint" style="font-size:12px;color:var(--mut)">Curvy hourglass & waist emphasis</span>
-          <div class="sw" id="bodyShapeSw" title="hourglass shape"></div>
+          <span class="hint" style="font-size:12px;color:var(--mut)">Describe nudity & acts explicitly</span>
+          <div class="sw" id="explicitSw" title="explicit"></div>
         </div>
       </div>
       <div class="field" id="clothingNoteField">
-        <div class="lab">Clothing Note</div>
+        <div class="lab">Clothing Note · optional</div>
         <input type="text" id="clothingNote" placeholder="e.g. leather jacket, red dress..." style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px;font-family:var(--sans);font-size:13.5px">
       </div>
+      <div class="field" id="customInstrField">
+        <div class="lab">Custom Instruction · optional</div>
+        <textarea id="customInstruction" style="min-height:54px;font-size:13px"
+          placeholder="extra steering the AI follows, e.g. 'focus on the pose and lighting; ignore the background'"></textarea>
+      </div>
+      <div class="field" id="triggerField">
+        <div class="lab">Trigger Word <span class="num" style="font-size:10px;color:var(--faint)">prepended to prompt</span></div>
+        <input type="text" id="triggerWord" value="ing2lorance" placeholder="e.g. ing2lorance"
+          style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--amber);border-radius:10px;padding:10px;font-family:var(--mono);font-size:13px">
+      </div>
       <div class="field">
-        <div class="lab">Helper LoRAs</div>
-        <div id="helpers"></div>
+        <div class="lab">⚡ Lightning <span class="num" style="font-size:10px;color:var(--faint)">required · tweakable</span></div>
+        <div class="tog" style="align-items:center;gap:8px;padding:6px 0">
+          <div class="sel" style="flex:1;min-width:0"><select id="lightningPick" style="padding:8px 28px 8px 10px;font-size:12.5px;border-radius:8px;width:100%"></select></div>
+          <input type="number" id="lightningStr" value="1.0" step="0.05" min="0" max="2"
+            style="width:54px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 4px;font-family:var(--mono);font-size:12px;text-align:center">
+        </div>
+      </div>
+      <div class="field">
+        <div class="lab">LoRAs</div>
+        <div id="extraLoras"></div>
+        <button class="go ghost" id="addLoraBtn" type="button" style="width:100%;margin-top:10px;font-size:13px;padding:9px">+ Add LoRA</button>
       </div>
       <div class="field">
         <div class="lab">Seed</div>
@@ -881,6 +984,33 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   </div>
 </div>
 
+<!-- notes board page -->
+<div id="pageNotes" class="hide">
+  <div class="board-wrap">
+    <div class="board-head"><h1>Sticky Board</h1><span class="sub" id="notesCount"></span></div>
+    <div class="note-compose">
+      <textarea id="noteText" placeholder="Pin a note for everyone — type anything, paste a link or an image, or attach a file…"></textarea>
+      <div class="nc-thumbs" id="noteThumbs"></div>
+      <div class="nc-row">
+        <div class="nc-colors" id="noteColors">
+          <div class="nc-sw on" data-c="yellow" style="background:#f7e26b" title="yellow"></div>
+          <div class="nc-sw" data-c="amber" style="background:#f0b65a" title="amber"></div>
+          <div class="nc-sw" data-c="rose" style="background:#f2a6a0" title="rose"></div>
+          <div class="nc-sw" data-c="green" style="background:#bfe08a" title="green"></div>
+          <div class="nc-sw" data-c="blue" style="background:#a8cdf0" title="blue"></div>
+          <div class="nc-sw" data-c="purple" style="background:#cdb6ef" title="purple"></div>
+        </div>
+        <button class="nc-attach" id="noteAttachBtn" type="button">📎 Attach</button>
+        <input type="file" id="noteFiles" accept="image/*,video/*" multiple class="hide">
+        <div class="nc-spacer"></div>
+        <button class="go" id="notePin" style="width:auto;padding:11px 26px;font-size:15px;margin:0">Pin it</button>
+      </div>
+      <div class="err" id="noteErr"></div>
+    </div>
+    <div class="notes-grid" id="notesGrid"></div>
+  </div>
+</div>
+
 <!-- admin page -->
 <div id="pageAdmin" class="page hide">
   <div class="page-head"><h1 class="page-title">Users</h1><span class="hint" id="adminHint"></span></div>
@@ -958,10 +1088,22 @@ async function loadHealth(){
   updateStatus();
 }
 
+// Parse a JSON response, but fall back to a readable message when the body is
+// not JSON (e.g. nginx/Cloudflare returns an HTML 502/504 page when the home
+// ComfyUI agent is offline) — avoids the cryptic "Unexpected token '<'".
+async function safeJson(resp){
+  try{ return await resp.json(); }
+  catch(e){
+    if([502,503,504,530].includes(resp.status))
+      return {error:'ComfyUI host is offline — make sure the home PC is on and the agent is running.'};
+    return {error:`Server error (${resp.status}). Please try again.`};
+  }
+}
+
 $('#startComfy').onclick=async()=>{
   $('#startComfy').textContent='starting…';$('#startComfy').disabled=true;
   try{
-    const d=await(await fetch('/api/start-comfy',{method:'POST'})).json();
+    const d=await safeJson(await fetch('/api/start-comfy',{method:'POST'}));
     if(d.error){alert(d.error);$('#startComfy').textContent='▶ Start ComfyUI';$('#startComfy').disabled=false;return;}
   }catch(e){alert('Error starting ComfyUI: '+e);$('#startComfy').textContent='▶ Start ComfyUI';$('#startComfy').disabled=false;return;}
   $('#statusText').textContent='ComfyUI starting… (~1–2 min)';
@@ -975,11 +1117,11 @@ $('#stopComfy').onclick=async()=>{
   $('#stopComfy').textContent='stopping…';$('#stopComfy').disabled=true;
   try{
     const r=await fetch('/api/stop-comfy',{method:'POST'});
-    const d=await r.json();
+    const d=await safeJson(r);
     if(d.ok){
       $('#statusText').textContent='ComfyUI stopped';
     }else{
-      alert(d.message || "Failed to stop ComfyUI");
+      alert(d.message || d.error || "Failed to stop ComfyUI");
     }
   }catch(e){
     alert("Error stopping ComfyUI: "+e);
@@ -1014,6 +1156,7 @@ function setMode(m){
   // Steps + Denoise only apply to I2I; T2I uses its fixed workflow schedule
   $('#denoiseField').classList.toggle('hide',m!=='i2i');
   $('#stepsField').classList.toggle('hide',m!=='i2i');
+  applyLightningDefault(m);   // Lightning default differs per mode (t2i = v2 distill @0.6)
   refreshGo();
 }
 $('#mVid').onclick=()=>setMode('i2i');$('#mTxt').onclick=()=>setMode('t2i');
@@ -1035,28 +1178,66 @@ async function loadConfig(){
       S.aspect={key:b.dataset.key,width:+b.dataset.w,height:+b.dataset.h};}});
   $('#cw').oninput=$('#ch').oninput=()=>{if(S.aspect.key==='custom')
     S.aspect={key:'custom',width:+$('#cw').value,height:+$('#ch').value};};
-  $('#helpers').innerHTML = c.helpers.map(h => {
-    const options = h.variants && h.variants.length
-      ? h.variants.map(v => `<option value="${v.path}" ${v.path === h.default_path ? 'selected' : ''}>${v.label}</option>`).join('')
-      : `<option value="">No checkpoints found</option>`;
-      
-    return `<div class="tog" data-key="${h.key}" style="align-items: flex-start; padding: 12px 0;">
-      <div style="display:flex; flex-direction:column; gap:6px; flex: 1; min-width: 0; padding-right: 12px;">
-        <span class="nm" style="font-weight: 500;">${h.label}</span>
-        <div class="sel" style="width: 100%;">
-          <select class="helper-select" style="padding: 6px 28px 6px 10px; font-size: 12.5px; border-radius: 8px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            ${options}
-          </select>
-        </div>
-      </div>
-      <div class="rt" style="margin-top: 24px;">
-        <input type="number" value="${h.strength}" step="0.05" min="0" max="1.5" style="width: 50px; padding: 4px; border-radius: 6px;">
-        <div class="sw ${h.default ? 'on' : ''}"></div>
-      </div>
-    </div>`;
-  }).join('');
-  $$('#helpers .sw').forEach(sw => sw.onclick = () => sw.classList.toggle('on'));
+  // Lightning lightx2v — editable dropdown + strength, defaults per mode
+  S.lightning = c.lightning || {options:[], defaults:{}};
+  $('#lightningPick').innerHTML = (S.lightning.options||[])
+    .map(o=>`<option value="${o.path}">${o.label}</option>`).join('');
+  applyLightningDefault(S.mode);
 }
+
+// set Lightning pick + strength to the safe default for the given mode
+function applyLightningDefault(mode){
+  const d = (S.lightning && S.lightning.defaults && S.lightning.defaults[mode]) || null;
+  if(!d) return;
+  $('#lightningPick').value = d.path;
+  $('#lightningStr').value = d.strength;
+}
+
+// ===== Helper LoRAs (short curated list; selection remembered between visits) =====
+let LORA_OPTIONS_HTML = '<option value="">— select a LoRA —</option>';
+const HELPERS_KEY = 'atelier_helper_loras';
+
+function saveHelperLoras(){
+  const slots = $$('#extraLoras .tog').map(r=>({
+    path:r.querySelector('.lora-pick').value, strength:+r.querySelector('.lora-str').value
+  })).filter(s=>s.path);
+  try{ localStorage.setItem(HELPERS_KEY, JSON.stringify(slots)); }catch(e){}
+}
+
+async function loadLoras(){
+  try{
+    const d = await(await fetch('/api/loras')).json();
+    LORA_OPTIONS_HTML = '<option value="">— select a LoRA —</option>' +
+      (d.groups||[]).filter(g => g.items && g.items.length).map(g =>
+        `<optgroup label="${g.label}">` +
+        g.items.map(it => `<option value="${it.path}">${it.label}</option>`).join('') +
+        `</optgroup>`).join('');
+  }catch(e){ console.error('Failed to load loras:', e); }
+  // restore remembered helper LoRAs (set once, no need to re-pick every time)
+  $('#extraLoras').innerHTML = '';
+  let saved=[]; try{ saved=JSON.parse(localStorage.getItem(HELPERS_KEY)||'[]'); }catch(e){}
+  saved.forEach(s=>addLoraSlot(s.path, s.strength));
+}
+
+function addLoraSlot(path='', strength=1.0){
+  const row = document.createElement('div');
+  row.className = 'tog';
+  row.style.cssText = 'align-items:center;gap:8px;padding:8px 0';
+  row.innerHTML =
+    `<div class="sel" style="flex:1;min-width:0">
+       <select class="lora-pick" style="padding:8px 28px 8px 10px;font-size:12.5px;border-radius:8px;width:100%">${LORA_OPTIONS_HTML}</select>
+     </div>
+     <input type="number" class="lora-str" value="${strength}" step="0.05" min="0" max="2"
+       style="width:54px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 4px;font-family:var(--mono);font-size:12px;text-align:center">
+     <button class="lora-rm" type="button" title="remove"
+       style="flex:none;background:rgba(217,139,122,.1);border:1px solid rgba(217,139,122,.3);color:var(--rose);width:30px;height:30px;border-radius:8px;cursor:pointer">✕</button>`;
+  $('#extraLoras').appendChild(row);
+  if(path) row.querySelector('.lora-pick').value = path;
+  row.querySelector('.lora-pick').onchange = saveHelperLoras;
+  row.querySelector('.lora-str').oninput = saveHelperLoras;
+  row.querySelector('.lora-rm').onclick = () => { row.remove(); saveHelperLoras(); };
+}
+$('#addLoraBtn').onclick = () => addLoraSlot();
 
 // variations chips
 $$('#variations button').forEach(b=>b.onclick=()=>{$$('#variations button').forEach(x=>x.classList.remove('on'));
@@ -1111,10 +1292,12 @@ function showPage(p){
   $('#pageStudio').classList.toggle('hide',p!=='studio');
   $('#pageReels').classList.toggle('hide',p!=='reels');
   $('#pageGallery').classList.toggle('hide',p!=='gallery');
+  $('#pageNotes').classList.toggle('hide',p!=='notes');
   $('#pageAdmin').classList.toggle('hide',p!=='admin');
   $$('#nav .navitem').forEach(b=>b.classList.toggle('on',b.dataset.page===p));
   if(p==='reels')openReels();
   if(p==='gallery')openGallery();
+  if(p==='notes')openNotes();
   if(p==='admin')openAdmin();
 }
 $$('#nav .navitem').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
@@ -1344,19 +1527,15 @@ document.addEventListener('keydown',e=>{if(!$('#lb').classList.contains('on'))re
 
 $('#go').onclick=async()=>{
   $('#genErr').textContent='';
-  const helpers = $$('#helpers .tog').filter(t => t.querySelector('.sw').classList.contains('on'))
-    .map(t => ({
-      key: t.dataset.key,
-      path: t.querySelector('.helper-select').value,
-      strength: +t.querySelector('input').value
-    }));
+  const loras = $$('#extraLoras .tog')
+    .map(r => ({path: r.querySelector('.lora-pick').value, strength: +r.querySelector('.lora-str').value}))
+    .filter(l => l.path);
   const body={target:S.target,mode:S.mode,character_lora_path:$('#variant').value,character_strength:+$('#csVal').value,
     variations:S.variations,width:S.aspect.width,height:S.aspect.height,steps:+$('#stVal').value,
-    seed:S.rand?0:(+$('#seed').value||0),helper_loras:helpers,
-    openrouter_model:$('#openrouterModel').value,
-    style_preset:$('#stylePreset').value,
-    body_shape:S_bodyShape,
-    clothing_note:$('#clothingNote').value.trim()};
+    seed:S.rand?0:(+$('#seed').value||0),loras:loras,
+    lightning:{path:$('#lightningPick').value,strength:+$('#lightningStr').value},
+    trigger:$('#triggerWord').value.trim(),
+    ...describeOpts()};
   if(S.mode==='i2i'){
     body.session=S.session;
     body.frame=S.frame;
@@ -1370,30 +1549,46 @@ $('#go').onclick=async()=>{
   $('#stopGen').classList.remove('hide');
   $('#empty').innerHTML='<div class="g">developing…</div><p class="hint">First run wakes the GPU (~60s).</p>';
   $('#empty').classList.remove('hide');$('#results').innerHTML='';
+  const done=()=>{$('#go').textContent=t;$('#go').disabled=false;$('#stopGen').classList.add('hide');refreshGo();};
+
+  // Cloudflare cuts requests at ~100s, so generation is async: kick it off, get a
+  // job id, then poll for the result (each request stays short).
+  let jobId=null;
+  try{
+    const start=await safeJson(await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
+    if(start.error){$('#genErr').textContent=start.error;$('#empty').innerHTML='<div class="g">failed</div><p class="hint">'+start.error+'</p>';done();return;}
+    jobId=start.job_id;
+  }catch(e){$('#genErr').textContent=String(e);$('#empty').innerHTML='<div class="g">error</div>';done();return;}
+
+  let misses=0;
   const poll=setInterval(async()=>{
-    if($('#empty').classList.contains('hide'))return;
     try{ const p=await(await fetch('/api/progress')).json();
-      if(p.running && p.max>0){
-        const pct=Math.round(p.value/p.max*100);
+      if(p.running && p.max>0){ const pct=Math.round(p.value/p.max*100);
         $('#empty').innerHTML=`<div class="g">developing… ${p.value}/${p.max}</div>
           <div class="genbar"><span style="width:${pct}%"></span></div>`;
       }
     }catch(e){}
-  },1200);
-  try{
-    const d=await(await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
-    if(d.error){$('#genErr').textContent=d.error;$('#empty').innerHTML='<div class="g">failed</div><p class="hint">'+d.error+'</p>';return;}
-    $('#empty').classList.add('hide');
-    $('#results').innerHTML=d.images.map((b,i)=>`<figure style="animation-delay:${i*.07}s"><img src="data:image/png;base64,${b}"></figure>`).join('');
-    $('#seedTag').textContent='seed '+d.seed;
-    $$('#results img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.src;$('#imgview').classList.add('on');});
-  }catch(e){$('#genErr').textContent=String(e);$('#empty').innerHTML='<div class="g">error</div>';}
-  finally{
-    clearInterval(poll);
-    $('#go').textContent=t;$('#go').disabled=false;
-    $('#stopGen').classList.add('hide');
-    refreshGo();
-  }
+    try{
+      const r=await fetch('/api/generate/result?job_id='+encodeURIComponent(jobId));
+      if(r.status===404){ if(++misses>5){clearInterval(poll);
+        $('#genErr').textContent='Lost track of the job (server restarted?). Check the Gallery.';
+        $('#empty').innerHTML='<div class="g">lost</div>';done();} return; }
+      const d=await safeJson(r);
+      if(d.status==='done'){
+        clearInterval(poll);
+        $('#empty').classList.add('hide');
+        $('#results').innerHTML=(d.images||[]).map((b,i)=>`<figure style="animation-delay:${i*.07}s"><img src="data:image/png;base64,${b}"></figure>`).join('');
+        $('#seedTag').textContent='seed '+d.seed;
+        $$('#results img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.src;$('#imgview').classList.add('on');});
+        done();
+      } else if(d.status==='error'){
+        clearInterval(poll);
+        $('#genErr').textContent=d.error||'generation failed';
+        $('#empty').innerHTML='<div class="g">failed</div><p class="hint">'+(d.error||'')+'</p>';
+        done();
+      }
+    }catch(e){}
+  },2000);
 };
 
 $('#stopGen').onclick=async()=>{
@@ -1778,12 +1973,25 @@ $('#igClear').onclick=async()=>{
   $('#igMsg').className='msg';$('#igMsg').textContent='Removed.';igStatus();
 };
 
-// ===== OpenRouter Vision =====
-let S_bodyShape = false;
-$('#bodyShapeSw').onclick = () => {
-  S_bodyShape = !S_bodyShape;
-  $('#bodyShapeSw').classList.toggle('on', S_bodyShape);
+// ===== Describe-with-AI options =====
+let S_explicit = false;
+$('#explicitSw').onclick = () => {
+  S_explicit = !S_explicit;
+  $('#explicitSw').classList.toggle('on', S_explicit);
 };
+// all describe options, shared by both Describe buttons and the generate fallback
+function describeOpts(){
+  return {
+    openrouter_model: $('#openrouterModel').value,
+    style_preset: $('#stylePreset').value,
+    body_type: $('#bodyType').value,
+    shot_type: $('#shotType').value,
+    detail: $('#detailLevel').value,
+    explicit: S_explicit,
+    clothing_note: $('#clothingNote').value.trim(),
+    custom_instruction: $('#customInstruction').value.trim(),
+  };
+}
 
 async function loadVisionModels() {
   try {
@@ -1838,21 +2046,19 @@ $('#t2iDescribeBtn').onclick = async (e) => {
   
   const formData = new FormData();
   formData.append("image", fileInput.files[0]);
-  formData.append("openrouter_model", $('#openrouterModel').value);
-  formData.append("style_preset", $('#stylePreset').value);
-  formData.append("body_shape", S_bodyShape);
-  formData.append("clothing_note", $('#clothingNote').value.trim());
-  
+  Object.entries(describeOpts()).forEach(([k, v]) => formData.append(k, v));
+
   try {
     const r = await fetch('/api/describe', {
       method: 'POST',
       body: formData
     });
-    const d = await r.json();
+    const d = await safeJson(r);
     if (d.error) {
       alert("AI Description failed: " + d.error);
     } else if (d.prompt) {
       $('#prompt').value = d.prompt;
+      refreshGo();
     }
   } catch (err) {
     alert("AI Description failed: " + err);
@@ -1878,16 +2084,9 @@ $('#i2iDescribeBtn').onclick = async (e) => {
     const r = await fetch('/api/describe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        session: S.session,
-        frame: S.frame,
-        openrouter_model: $('#openrouterModel').value,
-        style_preset: $('#stylePreset').value,
-        body_shape: S_bodyShape,
-        clothing_note: $('#clothingNote').value.trim()
-      })
+      body: JSON.stringify({session: S.session, frame: S.frame, ...describeOpts()})
     });
-    const d = await r.json();
+    const d = await safeJson(r);
     if (d.error) {
       alert("AI Description failed: " + d.error);
     } else if (d.prompt) {
@@ -1901,7 +2100,83 @@ $('#i2iDescribeBtn').onclick = async (e) => {
   }
 };
 
+// ===== Sticky Notes board =====
+let _noteColor='yellow', _noteFiles=[], _noteMe=null, _noteAdmin=false;
+
+function _esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function _linkify(text){
+  const re=/(https?:\/\/[^\s]+)/g; let out='',last=0,m;
+  while((m=re.exec(text))){ out+=_esc(text.slice(last,m.index));
+    const u=m[0]; out+=`<a href="${_esc(u)}" target="_blank" rel="noopener noreferrer">${_esc(u)}</a>`;
+    last=m.index+u.length; }
+  return out+_esc(text.slice(last));
+}
+function _relTime(ts){const s=Math.max(1,Math.floor(Date.now()/1000-ts));
+  if(s<60)return s+'s ago';const m=Math.floor(s/60);if(m<60)return m+'m ago';
+  const h=Math.floor(m/60);if(h<24)return h+'h ago';const d=Math.floor(h/24);
+  if(d<7)return d+'d ago';return new Date(ts*1000).toLocaleDateString();}
+
+$$('#noteColors .nc-sw').forEach(sw=>sw.onclick=()=>{
+  _noteColor=sw.dataset.c;$$('#noteColors .nc-sw').forEach(x=>x.classList.toggle('on',x===sw));});
+$('#noteAttachBtn').onclick=()=>$('#noteFiles').click();
+$('#noteFiles').onchange=e=>{ for(const f of e.target.files) _noteFiles.push(f); e.target.value=''; renderNoteThumbs(); };
+$('#noteText').addEventListener('paste',e=>{
+  for(const it of (e.clipboardData||{}).items||[]){ if(it.type.startsWith('image/')){
+    const f=it.getAsFile(); if(f){_noteFiles.push(f);renderNoteThumbs();} } }
+});
+['dragover','dragleave','drop'].forEach(ev=>$('.note-compose').addEventListener(ev,e=>{e.preventDefault();
+  if(ev==='drop'){ for(const f of e.dataTransfer.files) _noteFiles.push(f); renderNoteThumbs(); }}));
+
+function renderNoteThumbs(){
+  $('#noteThumbs').innerHTML=_noteFiles.map((f,i)=>{
+    const url=URL.createObjectURL(f), vid=f.type.startsWith('video/');
+    return `<div class="nc-thumb">${vid?`<video src="${url}" muted></video><span class="vtag">video</span>`:`<img src="${url}">`}
+      <button class="rm" data-i="${i}" title="remove">✕</button></div>`;}).join('');
+  $$('#noteThumbs .rm').forEach(b=>b.onclick=()=>{_noteFiles.splice(+b.dataset.i,1);renderNoteThumbs();});
+}
+
+$('#notePin').onclick=async()=>{
+  const text=$('#noteText').value.trim();$('#noteErr').textContent='';
+  if(!text && !_noteFiles.length){$('#noteErr').textContent='Write something or attach a file.';return;}
+  const fd=new FormData(); fd.append('text',text); fd.append('color',_noteColor);
+  _noteFiles.forEach(f=>fd.append('files',f));
+  const t=$('#notePin').textContent;$('#notePin').innerHTML='<span class="spin"></span>pinning…';$('#notePin').disabled=true;
+  try{
+    const d=await(await fetch('/api/notes',{method:'POST',body:fd})).json();
+    if(d.error){$('#noteErr').textContent=d.error;return;}
+    $('#noteText').value='';_noteFiles=[];renderNoteThumbs();loadNotes();
+  }catch(e){$('#noteErr').textContent=String(e);}
+  finally{$('#notePin').textContent=t;$('#notePin').disabled=false;}
+};
+
+async function openNotes(){ loadNotes(); }
+async function loadNotes(){
+  let d={notes:[]}; try{ d=await(await fetch('/api/notes')).json(); }catch(e){}
+  _noteMe=d.me; _noteAdmin=d.is_admin;
+  const notes=d.notes||[];
+  $('#notesCount').textContent=notes.length+(notes.length===1?' note':' notes');
+  if(!notes.length){ $('#notesGrid').innerHTML=`<div class="board-empty"><div class="g">an empty board</div>
+    <p class="hint">Pin the first note above.</p></div>`; return; }
+  $('#notesGrid').innerHTML=notes.map(n=>{
+    const rot=((parseInt((n.id||'0').slice(0,4),16)%500)/100-2.5).toFixed(2);
+    const media=(n.media||[]).map(m=> m.type==='video'
+      ? `<div class="st-media"><video src="${_esc(m.url)}" controls preload="metadata"></video></div>`
+      : `<div class="st-media"><img src="${_esc(m.url)}" loading="lazy"></div>`).join('');
+    const canDel = n.author===_noteMe || _noteAdmin;
+    return `<div class="sticky st-${_esc(n.color)}" style="--rot:${rot}deg">
+      ${media}${n.text?`<div class="st-text">${_linkify(n.text)}</div>`:''}
+      <div class="st-foot"><span class="st-author">${_esc(n.author)}</span><span>${_relTime(n.ts)}</span>
+      ${canDel?`<button class="st-del" data-id="${_esc(n.id)}" title="delete">✕</button>`:''}</div></div>`;
+  }).join('');
+  $$('#notesGrid .st-del').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Delete this note?'))return;
+    await fetch(`/api/notes/${encodeURIComponent(b.dataset.id)}/delete`,{method:'POST'});
+    loadNotes();
+  });
+}
+
 loadVisionModels();
+loadLoras();
 
 initReelSortChips();
 initGalSortChips();

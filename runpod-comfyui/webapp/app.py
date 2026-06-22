@@ -54,7 +54,7 @@ API_KEY = os.environ.get("RUNPOD_API_KEY", "")
 RUNPOD_URL = f"https://api.runpod.ai/v2/{ENDPOINT_ID}/runsync"
 LOCAL_COMFY = os.environ.get("LOCAL_COMFY_URL", "http://127.0.0.1:8189")  # matches Windows_Run_GPU.bat
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "qwen/qwen3-vl-235b-a22b-instruct")
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # So the app can start ComfyUI for you when it's not running.
@@ -284,11 +284,7 @@ CHAR_DEFS = [
     {"key": "sindy",       "label": "Sindy",         "folder": "wan/Own/Sindy"},
     {"key": "olivia",      "label": "Olivia",        "folder": "wan/Own/Olivia"},
     {"key": "newccdd",     "label": "NewCCDD",       "folder": "wan/Own/NewCCDD"},
-]
-
-HELPER_DEFS = [
-    {"key": "lightning", "label": "Lightning", "folder": "wan/WanLightning"},
-    {"key": "realism",   "label": "Realism",   "folder": "wan/WanRealism"},
+    {"key": "siren",       "label": "Siren",         "folder": "wan/Own/siren2.2_LowOnly"},
 ]
 
 _STEP = re.compile(r"step\d+|-\d{6}$", re.I)   # checkpoint-iteration markers
@@ -368,49 +364,76 @@ def build_characters():
     return []
 
 
-def build_helpers():
-    comfy_list = []
+# Curated helper LoRAs for the "Add LoRA" picker. The full wan/ folder is 125+
+# LoRAs (a mess to scroll) and most won't exist on the RunPod volume — so the
+# picker only offers this short, hand-picked set of LOW-noise realism/style
+# helpers (the pipeline is single low-noise). Edit this list to add/remove.
+# These stack between the locked Lightning LoRA and the character LoRA.
+HELPER_LORAS = [
+    {"path": "wan/WanInsta/Lenovo/Lenovo.safetensors", "label": "Lenovo"},
+    {"path": "wan/WanInsta/WAN2.2-LowNoise_SmartphoneSnapshotPhotoReality_v3_by-AI_Characters/WAN2.2-LowNoise_SmartphoneSnapshotPhotoReality_v3_by-AI_Characters.safetensors", "label": "Smartphone Snapshot (low)"},
+    {"path": "wan/WanInsta/Instagirlv2.5-LOW/Instagirlv2.5-LOW.safetensors", "label": "Instagirl v2.5 (low)"},
+    {"path": "wan/WanInsta/Instareal_low/Instareal_low.safetensors", "label": "Instareal (low)"},
+    {"path": "wan/WanUtility/DetailEnhancerV1/DetailEnhancerV1.safetensors", "label": "Detail Enhancer"},
+]
+
+
+def _folder_loras(subfolder, cache_name):
+    """Every LoRA under wan/<subfolder> — live from ComfyUI, filesystem fallback
+    at home, cached file as last resort (the VPS has no H: drive). Used to expose
+    a whole folder (e.g. wan/NSFW) as a dedicated group in the LoRA picker."""
+    prefix = f"wan/{subfolder}/".lower()
+    items = []
     try:
-        comfy_list = _comfy_loras()
+        items = [l.replace("\\", "/") for l in _comfy_loras()
+                 if l.replace("\\", "/").lower().startswith(prefix)]
     except Exception:
-        pass
-        
-    res = []
-    for d in HELPER_DEFS:
-        variants = []
-        if comfy_list:
-            norm = [l.replace("\\", "/") for l in comfy_list]
-            folder = d["folder"].rstrip("/") + "/"
-            for p in norm:
-                if p.lower().startswith(folder.lower()):
-                    label = os.path.splitext(p[len(folder):])[0] or p.split("/")[-1]
-                    variants.append({"label": label or p, "path": p})
-        
-        if not variants:
-            variants = _list_variants(d["folder"])
-            
-        variants.sort(key=lambda v: (bool(_STEP.search(v["label"])), v["label"]))
-        
-        default_path = ""
-        if variants:
-            if d["key"] == "lightning":
-                matching = [v for v in variants if "light" in v["label"].lower() or "distill" in v["label"].lower()]
-                default_path = matching[0]["path"] if matching else variants[0]["path"]
-            elif d["key"] == "realism":
-                matching = [v for v in variants if "lenovo" in v["label"].lower() or "real" in v["label"].lower()]
-                default_path = matching[0]["path"] if matching else variants[0]["path"]
-            else:
-                default_path = variants[0]["path"]
-                
-        res.append({
-            "key": d["key"],
-            "label": d["label"],
-            "variants": variants,
-            "default_path": default_path,
-            "strength": 1.0,
-            "default": True
-        })
-    return res
+        items = []
+    if not items:
+        base = os.path.join(LORAS_DIR, "wan", subfolder)
+        if os.path.isdir(base):
+            for root, _, files in os.walk(base):
+                for fn in files:
+                    if fn.lower().endswith(".safetensors"):
+                        full = os.path.join(root, fn)
+                        items.append(os.path.relpath(full, LORAS_DIR).replace("\\", "/"))
+    cache = os.path.join(HERE, cache_name)
+    if items:
+        items = sorted(set(items))
+        try:
+            _json.dump(items, open(cache, "w", encoding="utf-8"))
+        except Exception:
+            pass
+    elif os.path.exists(cache):
+        try:
+            items = _json.load(open(cache, encoding="utf-8"))
+        except Exception:
+            items = []
+    return [{"path": p, "label": os.path.splitext(p.split("/")[-1])[0]} for p in items]
+
+
+# Per-mode default Lightning (lightx2v) LoRA — now tweakable from the UI but these
+# are the safe defaults baked into the workflows. t2i MUST stay v2-distill @0.6
+# (anything else risks confetti noise); i2i uses the 4-step rank64 @1.0.
+LIGHTNING_DEFAULTS = {
+    "i2i": {"path": "wan/WanLightning/Wan2.1-Distill-Loras/wan2.1_t2v_14b_lora_rank64_lightx2v_4step/wan2.1_t2v_14b_lora_rank64_lightx2v_4step.safetensors", "strength": 1.0},
+    "t2i": {"path": "wan/WanLightning/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank128_bf16/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank128_bf16.safetensors", "strength": 0.6},
+}
+
+
+# Curated OpenRouter vision models for the "Describe with AI" dropdown. Kept short
+# on purpose (the full /models list is 300+). Edit this list to add/remove options;
+# the first entry is the default. DeepSeek has no vision model on OpenRouter, so
+# Qwen3-VL covers the uncensored/strong slot.
+VISION_MODELS = [
+    {"id": "qwen/qwen3-vl-235b-a22b-instruct",      "name": "Qwen3-VL 235B (SFW + NSFW · default)"},
+    {"id": "qwen/qwen3-vl-32b-instruct",            "name": "Qwen3-VL 32B (both · cheaper)"},
+    {"id": "x-ai/grok-4.3",                         "name": "Grok 4.3 (both · least filtered)"},
+    {"id": "mistralai/mistral-small-3.2-24b-instruct", "name": "Mistral Small 3.2 (both · cheap)"},
+    {"id": "z-ai/glm-4.6v",                         "name": "GLM-4.6V (both)"},
+    {"id": "google/gemini-2.5-flash",               "name": "Gemini 2.5 Flash (SFW only · fast)"},
+    {"id": "nvidia/nemotron-nano-12b-v2-vl:free",   "name": "Nemotron Nano 12B VL (free · SFW)"},
+]
 
 ASPECTS = [
     {"key": "portrait",  "label": "Portrait · 9:16", "width": 1080, "height": 1920},
@@ -421,12 +444,26 @@ ASPECTS = [
 
 @app.get("/")
 def index():
-    return send_file(os.path.join(os.path.dirname(__file__), "index.html"))
+    # never cache the SPA shell so deploys show up without a manual hard-refresh
+    resp = send_file(os.path.join(os.path.dirname(__file__), "index.html"))
+    resp.headers["Cache-Control"] = "no-store, max-age=0"
+    return resp
 
 
 @app.get("/api/config")
 def config():
-    return jsonify({"characters": build_characters(), "helpers": build_helpers(), "aspects": ASPECTS})
+    return jsonify({"characters": build_characters(), "aspects": ASPECTS,
+                    "lightning": {"options": _folder_loras("WanLightning", ".lightning_loras.json"),
+                                  "defaults": LIGHTNING_DEFAULTS}})
+
+
+@app.get("/api/loras")
+def api_loras():
+    """LoRA picker options: curated helpers + the whole wan/NSFW folder (its own group)."""
+    return jsonify({"groups": [
+        {"label": "Helpers", "items": HELPER_LORAS},
+        {"label": "NSFW", "items": _folder_loras("NSFW", ".nsfw_loras.json")},
+    ]})
 
 
 @app.get("/api/health")
@@ -671,14 +708,19 @@ def _build_input(body):
         "mode": body.get("mode", "i2i"),
         "character_lora_path": body.get("character_lora_path", ""),
         "character_strength": float(body.get("character_strength", 1.0)),
-        "helper_loras": [{"path": h.get("path", ""), "strength": float(h.get("strength", 1.0))}
-                         for h in body.get("helper_loras", []) if h.get("path")],
+        "extra_loras": [{"path": l.get("path", ""), "strength": float(l.get("strength", 1.0))}
+                        for l in body.get("loras", []) if l.get("path")],
+        "lightning": ({"path": body["lightning"]["path"],
+                       "strength": float(body["lightning"].get("strength", 1.0))}
+                      if isinstance(body.get("lightning"), dict) and body["lightning"].get("path")
+                      else None),
         "variations": int(body.get("variations", 1)),
         "width": int(body.get("width", 1080)),
         "height": int(body.get("height", 1920)),
         "steps": int(body.get("steps", 8)),
         "seed": int(body.get("seed", 0)),
         "prompt": body.get("prompt", "").strip(),
+        "trigger": body.get("trigger", "ing2lorance"),
     }
     if inp["mode"] == "i2i":
         session, frame_name = body["session"], body["frame"]
@@ -689,27 +731,65 @@ def _build_input(body):
     return inp
 
 
-def _describe_instruction(params):
-    preset = params.get("style_preset") or "Amateur"
-    body_shape = params.get("body_shape")
-    clothing = (params.get("clothing_note") or "").strip()
-    
-    body_str = ""
-    if body_shape:
-        body_str = " Curvy hourglass figure with a defined narrow waist, full bust, and wide hips."
-        
-    clothing_str = ""
+BODY_TYPE_TAGS = {
+    "Curvy hourglass": "a curvy hourglass figure with a defined narrow waist, full bust, and wide hips",
+    "Slim": "a slim, slender figure",
+    "Athletic / toned": "an athletic, toned figure",
+    "Petite": "a petite, small frame",
+    "Plus / voluptuous": "a plus-size, voluptuous figure",
+    "Busty": "a busty, voluptuous chest",
+}
+SHOT_TAGS = {
+    "Selfie": "Frame it as a casual phone selfie.",
+    "Portrait": "Frame it as a portrait shot from the chest up.",
+    "Full-body": "Frame it as a full-body shot.",
+    "Close-up": "Frame it as a tight close-up.",
+}
+DETAIL_TAGS = {
+    "Concise": "Keep it to one or two concise sentences.",
+    "Detailed": "Write one rich, detailed paragraph.",
+    "Very detailed": "Write a very thorough, highly detailed paragraph covering every visible element.",
+}
+
+
+def _describe_instruction(p):
+    """Build the vision-model instruction from the UI options. Identity is always
+    excluded (the character LoRA supplies the face/hair); everything else is
+    steerable. Returns an image-generation-style prompt instruction."""
+    style = p.get("style_preset") or "Amateur"
+    body = BODY_TYPE_TAGS.get((p.get("body_type") or "").strip())
+    clothing = (p.get("clothing_note") or "").strip()
+    detail = DETAIL_TAGS.get(p.get("detail") or "Detailed", DETAIL_TAGS["Detailed"])
+    custom = (p.get("custom_instruction") or "").strip()
+    shot = SHOT_TAGS.get((p.get("shot_type") or "").strip())
+    explicit = bool(p.get("explicit"))
+
+    parts = ["Describe this image as a single flowing image-generation prompt: the clothing, "
+             "pose and body position, background, setting, and lighting.",
+             f"Style: {style} photo."]
+    if shot:
+        parts.append(shot)
+    # Always keep the head/face in frame so the character LoRA's identity is visible —
+    # the reference may hide the face (e.g. an overhead lying-down selfie), but the
+    # generated image must show it.
+    parts.append("Frame the composition so the subject's head and face are fully within the "
+                 "shot and clearly visible, facing toward the camera. Do NOT describe a pose "
+                 "that crops out, turns away from, or hides the face; if the reference hides "
+                 "the face, describe a similar pose with the face visible instead.")
+    if body:
+        parts.append(f"The subject has {body}.")
     if clothing:
-        clothing_str = f" The clothing is: {clothing}."
-        
-    style_str = f" Style preset: {preset} photo."
-    
-    return (
-        "Describe the clothing, background setting, pose, and lighting in one paragraph."
-        f"{style_str}{body_str}{clothing_str}"
-        " Ignore any faces, hair, identity, skin tone, text, signs, logos, or tattoos."
-        " Write it as a single flowing description paragraph without headings or bullet points."
-    )
+        parts.append(f"Clothing focus: {clothing}.")
+    if explicit:
+        parts.append("This is an adult/NSFW image — describe nudity, anatomy, and any sexual "
+                     "acts explicitly and in detail; do not censor, soften, or omit them.")
+    parts.append("Do NOT describe the face's features, hair, skin tone, ethnicity, identity, "
+                 "or any text, signs, logos, watermarks, or tattoos (only ensure the face is in frame).")
+    parts.append(detail)
+    parts.append("Output only the description itself — no preamble, no headings, no bullet points.")
+    if custom:
+        parts.append(f"Additional instructions to follow: {custom}")
+    return " ".join(parts)
 
 
 def describe_image(image_b64, params, model=None):
@@ -755,96 +835,50 @@ def describe_image(image_b64, params, model=None):
     return choices[0]["message"]["content"].strip()
 
 
-_MODELS_CACHE = {"timestamp": 0, "list": []}
-
 @app.get("/api/openrouter/models")
 def get_openrouter_models():
-    now = time.time()
-    if now - _MODELS_CACHE["timestamp"] < 3600 and _MODELS_CACHE["list"]:
-        return jsonify({"models": _MODELS_CACHE["list"]})
-        
-    try:
-        r = requests.get("https://openrouter.ai/api/v1/models", timeout=10)
-        r.raise_for_status()
-        data = r.json().get("data", [])
-        models = []
-        for m in data:
-            modalities = m.get("architecture", {}).get("input_modalities", [])
-            m_id = m.get("id", "").lower()
-            if "image" in modalities or "vision" in m_id or "vl" in m_id or "gemini" in m_id or "pixtral" in m_id or "llama-3.2-" in m_id or "deepseek" in m_id:
-                models.append({
-                    "id": m["id"],
-                    "name": m.get("name") or m["id"]
-                })
-        
-        models.sort(key=lambda x: x["name"])
-        
-        gemini_default = "google/gemini-2.5-flash"
-        models = [m for m in models if m["id"] != gemini_default]
-        models.insert(0, {"id": gemini_default, "name": "Gemini 2.5 Flash"})
-        
-        _MODELS_CACHE["list"] = models
-        _MODELS_CACHE["timestamp"] = now
-        return jsonify({"models": models})
-    except Exception as e:
-        fallbacks = [
-            {"id": "google/gemini-2.5-flash", "name": "Gemini 2.5 Flash"},
-            {"id": "deepseek/deepseek-chat", "name": "DeepSeek V3 (Chat)"},
-            {"id": "deepseek/deepseek-r1", "name": "DeepSeek R1 (Reasoning)"},
-            {"id": "google/gemini-pro-vision", "name": "Gemini Pro Vision"},
-            {"id": "meta-llama/llama-3.2-11b-vision-instruct:free", "name": "Llama 3.2 11B Vision (free)"},
-            {"id": "meta-llama/llama-3.2-90b-vision-instruct", "name": "Llama 3.2 90B Vision"},
-            {"id": "openai/gpt-4o-mini", "name": "GPT-4o Mini"},
-        ]
-        return jsonify({"models": fallbacks})
+    """Curated short list of vision models (see VISION_MODELS)."""
+    return jsonify({"models": VISION_MODELS})
+
+
+def _describe_params(src, is_form):
+    """Pull the describe options out of a form or JSON body into one dict."""
+    def b(v):
+        return (v == "true" or v is True) if is_form else bool(v)
+    return {
+        "model": src.get("openrouter_model") or OPENROUTER_MODEL,
+        "style_preset": src.get("style_preset") or "Amateur",
+        "body_type": src.get("body_type") or "",
+        "clothing_note": src.get("clothing_note") or "",
+        "detail": src.get("detail") or "Detailed",
+        "custom_instruction": src.get("custom_instruction") or "",
+        "shot_type": src.get("shot_type") or "",
+        "explicit": b(src.get("explicit")),
+    }
 
 
 @app.post("/api/describe")
 def api_describe():
-    model = OPENROUTER_MODEL
-    style_preset = "Amateur"
-    body_shape = False
-    clothing_note = ""
     image_b64 = None
-    
     if request.files and "image" in request.files:
-        f = request.files["image"]
-        img_bytes = f.read()
-        image_b64 = base64.b64encode(img_bytes).decode()
-        
-        model = request.form.get("openrouter_model") or model
-        style_preset = request.form.get("style_preset") or style_preset
-        body_shape = request.form.get("body_shape") == "true"
-        clothing_note = request.form.get("clothing_note") or clothing_note
+        image_b64 = base64.b64encode(request.files["image"].read()).decode()
+        p = _describe_params(request.form, True)
     else:
         body = request.get_json(force=True, silent=True) or {}
-        model = body.get("openrouter_model") or model
-        style_preset = body.get("style_preset") or style_preset
-        body_shape = bool(body.get("body_shape"))
-        clothing_note = body.get("clothing_note") or clothing_note
-        
-        session = body.get("session")
-        frame_name = body.get("frame")
-        
+        p = _describe_params(body, False)
+        session, frame_name = body.get("session"), body.get("frame")
         if session and frame_name:
             fpath = os.path.join(FRAMES_DIR, session, frame_name)
-            if os.path.exists(fpath):
-                with open(fpath, "rb") as f:
-                    image_b64 = base64.b64encode(f.read()).decode()
-            else:
+            if not os.path.exists(fpath):
                 return jsonify({"error": "Frame not found."}), 404
-                
+            with open(fpath, "rb") as f:
+                image_b64 = base64.b64encode(f.read()).decode()
+
     if not image_b64:
         return jsonify({"error": "No image file or frame session/name provided."}), 400
-        
-    params = {
-        "style_preset": style_preset,
-        "body_shape": body_shape,
-        "clothing_note": clothing_note,
-    }
-    
+
     try:
-        prompt = describe_image(image_b64, params, model)
+        prompt = describe_image(image_b64, p, p["model"])
         return jsonify({"prompt": prompt})
     except Exception as e:
         return jsonify({"error": f"OpenRouter call failed: {e}"}), 500
@@ -863,6 +897,42 @@ def api_progress():
     return jsonify(PROGRESS)
 
 
+# --- async generation jobs --------------------------------------------------
+# Cloudflare drops any proxied HTTP request that runs longer than ~100s, and a
+# multi-variation generation takes minutes. So /api/generate kicks the work off
+# in a background thread and returns a job_id immediately; the browser polls
+# /api/generate/result (each request is short). Results are still saved to R2.
+GEN_JOBS = {}
+GEN_JOBS_LOCK = threading.Lock()
+
+
+def _run_gen_job(job_id, target, inp, body):
+    try:
+        # i2i with an empty prompt → auto-describe the frame first (OpenRouter)
+        if inp["mode"] == "i2i" and not inp.get("prompt"):
+            p = _describe_params(body, False)
+            inp["prompt"] = describe_image(inp["image_b64"], p, p["model"])
+
+        if target == "local":
+            out = comfy_common.generate(LOCAL_COMFY, WORKFLOW_DIR, inp, client_id=CLIENT_ID)
+        else:
+            if not (ENDPOINT_ID and API_KEY):
+                raise RuntimeError("Cloud not configured (set RunPod env vars).")
+            r = requests.post(RUNPOD_URL, json={"input": inp},
+                              headers={"Authorization": f"Bearer {API_KEY}"}, timeout=900)
+            out = r.json().get("output", {})
+
+        if not out or "error" in out:
+            raise RuntimeError((out or {}).get("error", "No output from worker."))
+        images = out.get("images", [])
+        _save_to_gallery(inp, images, out.get("seed"))   # persist (best-effort)
+        with GEN_JOBS_LOCK:
+            GEN_JOBS[job_id] = {"status": "done", "images": images, "seed": out.get("seed")}
+    except Exception as e:
+        with GEN_JOBS_LOCK:
+            GEN_JOBS[job_id] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
+
+
 @app.post("/api/generate")
 def generate():
     body = request.get_json(force=True)
@@ -876,37 +946,25 @@ def generate():
         return jsonify({"error": "Type a prompt for text mode."}), 400
 
     inp = _build_input(body)
+    job_id = uuid.uuid4().hex[:12]
+    with GEN_JOBS_LOCK:
+        # keep only the 10 most recent finished jobs so the dict can't grow forever
+        done = [k for k, v in GEN_JOBS.items() if v.get("status") in ("done", "error")]
+        for k in done[:-10]:
+            GEN_JOBS.pop(k, None)
+        GEN_JOBS[job_id] = {"status": "running"}
+    threading.Thread(target=_run_gen_job, args=(job_id, target, inp, body), daemon=True).start()
+    return jsonify({"job_id": job_id})
 
-    if inp["mode"] == "i2i" and not inp["prompt"]:
-        params = {
-            "style_preset": body.get("style_preset", ""),
-            "body_shape": bool(body.get("body_shape")),
-            "clothing_note": body.get("clothing_note", ""),
-        }
-        model = body.get("openrouter_model") or OPENROUTER_MODEL
-        try:
-            inp["prompt"] = describe_image(inp["image_b64"], params, model)
-        except Exception as e:
-            return jsonify({"error": f"Auto-describe failed: {e}"}), 500
 
-    try:
-        if target == "local":
-            out = comfy_common.generate(LOCAL_COMFY, WORKFLOW_DIR, inp, client_id=CLIENT_ID)
-        else:
-            if not (ENDPOINT_ID and API_KEY):
-                return jsonify({"error": "Cloud not configured (set RunPod env vars)."}), 500
-            r = requests.post(RUNPOD_URL, json={"input": inp},
-                              headers={"Authorization": f"Bearer {API_KEY}"}, timeout=900)
-            out = r.json().get("output", {})
-    except Exception as e:
-        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
-
-    if not out or "error" in out:
-        return jsonify({"error": (out or {}).get("error", "No output from worker.")}), 500
-
-    images = out.get("images", [])
-    _save_to_gallery(inp, images, out.get("seed"))   # persist results (best-effort)
-    return jsonify({"images": images, "seed": out.get("seed")})
+@app.get("/api/generate/result")
+def generate_result():
+    """Poll target for an async generation job (see /api/generate)."""
+    with GEN_JOBS_LOCK:
+        j = GEN_JOBS.get(request.args.get("job_id", ""))
+    if not j:
+        return jsonify({"status": "unknown"}), 404
+    return jsonify(j)
 
 
 def _gallery_group(inp):
@@ -1000,6 +1058,112 @@ def gallery_delete_group():
             r2_store.delete_folder(f"gallery/{group}")
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+    return jsonify({"ok": True})
+
+
+# ----------------------------- sticky notes board ----------------------------
+# Shared wall: any logged-in user posts text + optional image/video (stored in
+# R2). Metadata in notes.json (thread-locked); media served via /api/media.
+NOTES_FILE = os.path.join(HERE, "notes.json")
+NOTES_LOCK = threading.Lock()
+NOTE_COLORS = {"yellow", "amber", "rose", "green", "blue", "purple"}
+NOTE_TEXT_MAX = 2000
+NOTE_MAX_FILES = 4
+NOTE_MAX_BYTES = 50 * 1024 * 1024
+
+
+def load_notes():
+    if os.path.exists(NOTES_FILE):
+        try:
+            return _json.load(open(NOTES_FILE, encoding="utf-8"))
+        except Exception:
+            return []
+    return []
+
+
+def save_notes(notes):
+    with open(NOTES_FILE, "w", encoding="utf-8") as f:
+        _json.dump(notes, f, indent=2)
+
+
+def _note_media_url(key):
+    from urllib.parse import quote
+    return f"/api/media?key={quote(key, safe='')}"
+
+
+@app.get("/api/notes")
+def notes_list():
+    notes = load_notes()
+    notes.sort(key=lambda n: n.get("ts", 0), reverse=True)   # newest first
+    for n in notes:
+        for m in n.get("media", []):
+            m["url"] = _note_media_url(m["key"])
+    me = session.get("user")
+    return jsonify({"notes": notes, "me": me,
+                    "is_admin": load_users().get(me, {}).get("role") == "admin"})
+
+
+@app.post("/api/notes")
+def notes_create():
+    text = (request.form.get("text") or "").strip()[:NOTE_TEXT_MAX]
+    color = request.form.get("color", "yellow")
+    if color not in NOTE_COLORS:
+        color = "yellow"
+    files = [f for f in request.files.getlist("files") if f and f.filename][:NOTE_MAX_FILES]
+
+    if not text and not files:
+        return jsonify({"error": "Write something or attach a file."}), 400
+
+    nid = uuid.uuid4().hex[:12]
+    media = []
+    for f in files:
+        ct = (f.content_type or "").lower()
+        kind = "image" if ct.startswith("image/") else "video" if ct.startswith("video/") else None
+        if not kind:
+            return jsonify({"error": f"Unsupported file type: {f.filename} ({ct})."}), 400
+        data = f.read()
+        if len(data) > NOTE_MAX_BYTES:
+            return jsonify({"error": f"{f.filename} is too large (max 50 MB)."}), 400
+        if not r2_store.configured():
+            return jsonify({"error": "Media storage (R2) is not configured here."}), 500
+        safe = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(f.filename))[:80] or "file"
+        key = f"notes/{nid}/{uuid.uuid4().hex[:6]}_{safe}"
+        try:
+            r2_store.upload_bytes(key, data)
+        except Exception as e:
+            return jsonify({"error": f"Upload failed: {type(e).__name__}: {e}"}), 500
+        media.append({"key": key, "type": kind, "name": safe})
+
+    note = {"id": nid, "text": text, "color": color, "media": media,
+            "author": session.get("user", "?"), "ts": int(time.time())}
+    with NOTES_LOCK:
+        notes = load_notes()
+        notes.append(note)
+        save_notes(notes)
+
+    for m in note["media"]:
+        m["url"] = _note_media_url(m["key"])
+    return jsonify({"note": note})
+
+
+@app.post("/api/notes/<nid>/delete")
+def notes_delete(nid):
+    me = session.get("user")
+    is_admin = load_users().get(me, {}).get("role") == "admin"
+    with NOTES_LOCK:
+        notes = load_notes()
+        note = next((n for n in notes if n.get("id") == nid), None)
+        if not note:
+            return jsonify({"error": "Note not found."}), 404
+        if note.get("author") != me and not is_admin:
+            return jsonify({"error": "You can only delete your own notes."}), 403
+        notes = [n for n in notes if n.get("id") != nid]
+        save_notes(notes)
+    for m in note.get("media", []):
+        try:
+            r2_store.delete(m["key"])
+        except Exception:
+            pass
     return jsonify({"ok": True})
 
 

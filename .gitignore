@@ -14,12 +14,17 @@ runpod-comfyui/webapp/.env
 
 # Auth store + session secret (runtime, never commit)
 runpod-comfyui/webapp/users.json
+runpod-comfyui/webapp/notes.json
 runpod-comfyui/webapp/.secret
 runpod-comfyui/webapp/ig_cookies.txt
 
-# Home agent (contains the agent secret) + its log
+# Home agent (contains the agent secret) + its logs/scratch
 runpod-comfyui/home_agent/Start_Agent.bat
 runpod-comfyui/home_agent/agent.log
+runpod-comfyui/home_agent/_*.txt
+
+# graphify output (generated)
+graphify-out/
 
 # OS
 Thumbs.db
@@ -27,3 +32,7 @@ Thumbs.db
 
 # character catalog cache (fetched from ComfyUI)
 runpod-comfyui/webapp/.catalog.json
+# wan/ lora list caches (fetched from ComfyUI)
+runpod-comfyui/webapp/.loras.json
+runpod-comfyui/webapp/.nsfw_loras.json
+runpod-comfyui/webapp/.lightning_loras.json
