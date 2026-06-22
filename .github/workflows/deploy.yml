@@ -26,23 +26,35 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          PORT="${{ secrets.VPS_PORT }}"; PORT="${PORT:-22}"
-          ssh-keyscan -p "$PORT" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          # strip any stray whitespace/newlines that got pasted into the secrets
+          HOST="$(printf '%s' "$VPS_HOST" | tr -d '[:space:]')"
+          PORT="$(printf '%s' "$VPS_PORT" | tr -d '[:space:]')"; PORT="${PORT:-22}"
+          ssh-keyscan -p "$PORT" "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy code + restart service
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
         run: |
           set -euo pipefail
-          PORT="${{ secrets.VPS_PORT }}"; PORT="${PORT:-22}"
+          HOST="$(printf '%s' "$VPS_HOST" | tr -d '[:space:]')"
+          USER="$(printf '%s' "$VPS_USER" | tr -d '[:space:]')"
+          PORT="$(printf '%s' "$VPS_PORT" | tr -d '[:space:]')"; PORT="${PORT:-22}"
           cd runpod-comfyui
           tar czf - \
             comfy_common.py workflow_i2i.json workflow_t2i.json \
             webapp/app.py webapp/r2_store.py webapp/index.html webapp/login.html \
           | ssh -i ~/.ssh/deploy_key -p "$PORT" \
-              -o StrictHostKeyChecking=yes \
-              "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
-              "tar xzf - -C /root/atelier && systemctl restart atelier && echo '✅ deployed + atelier restarted'"
+              -o StrictHostKeyChecking=accept-new \
+              "$USER@$HOST" \
+              "tar xzf - -C /root/atelier && systemctl restart atelier && echo 'deployed + atelier restarted'"
