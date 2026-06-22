@@ -630,6 +630,27 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 .board-empty .g{font-family:var(--serif);font-style:italic;font-size:22px;color:var(--mut)}
 @media(max-width:680px){.board-wrap{padding:16px 14px 60px}.board-head h1{font-size:24px}
   .notes-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}}
+
+/* cloud (RunPod) mode */
+.spendchip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11.5px;
+  padding:5px 11px;border-radius:999px;border:1px solid var(--amber-dim);color:var(--amber);background:rgba(233,184,100,.08)}
+.cloud-card .step{background:none;border:1px solid var(--amber-dim);color:var(--amber)}
+.cstrip{height:6px;border-radius:999px;background:#23222a;overflow:hidden;position:relative}
+.cstrip>span{position:absolute;top:0;bottom:0;left:-60%;width:60%;border-radius:999px;
+  background:linear-gradient(90deg,var(--amber-dim),var(--amber));animation:cwarm 1.5s ease-in-out infinite}
+@keyframes cwarm{0%{left:-60%}100%{left:100%}}
+.ctiles{display:flex;gap:10px;flex-wrap:wrap}
+.ctile{flex:1;min-width:130px;background:var(--ink2);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+.ctk{font-size:10.5px;color:var(--mut);letter-spacing:.5px;text-transform:uppercase}
+.ctv{font-size:14px;margin-top:3px}
+.lchk{display:flex;align-items:center;gap:10px;padding:8px 11px;border:1px solid var(--line);border-radius:10px;
+  background:rgba(255,255,255,.012);margin-top:7px}
+.lchk.off{opacity:.65}
+.ldot{width:8px;height:8px;border-radius:50%;flex:none}
+.reqsync{font-family:var(--sans);font-size:11px;color:var(--mut);background:transparent;border:1px solid var(--line2);
+  border-radius:8px;padding:4px 9px;cursor:pointer;white-space:nowrap}
+.reqsync:hover{border-color:var(--amber-dim);color:var(--amber)}
+.reqsync.done{color:var(--good);border-color:rgba(127,200,160,.4);cursor:default}
 </style>
 </head>
 <body>
@@ -653,6 +674,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   <button id="startComfy" class="startbtn hide">▶ Start ComfyUI</button>
   <button id="stopComfy" class="stopbtn hide">■ Stop ComfyUI</button>
   <div class="status"><span class="led" id="led"></span><span id="statusText">connecting…</span></div>
+  <span class="spendchip hide" id="spendChip" title="estimated cloud spend this session"></span>
   <span class="userchip" id="userChip"></span>
   <button class="startbtn" id="logoutBtn" style="display:none">Logout</button>
 </header>
@@ -663,6 +685,29 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <button id="mVid" class="on" data-mode="i2i"><span class="k">i</span>Video → Character</button>
     <button id="mTxt" data-mode="t2i"><span class="k">t</span>Text → Character</button>
   </div>
+</div>
+
+<div id="cloudWrap" class="hide" style="max-width:1180px;margin:18px auto 0;padding:0 34px">
+  <section class="card cloud-card">
+    <div class="hd"><span class="step">☁</span><h2>RunPod endpoint</h2><span class="sub" id="cloudMeta">cloud</span></div>
+    <div class="bd">
+      <div id="cloudWarm" class="hide" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:7px">
+          <span style="color:var(--amber);font-size:12.5px">⟳ Cold start — warming a worker</span>
+          <span id="cloudWarmEta" style="font-family:var(--mono);font-size:12px;color:var(--mut)"></span>
+        </div>
+        <div class="cstrip"><span></span></div>
+        <div style="margin-top:7px;font-size:11.5px;color:var(--faint)">First request of the session spins up a GPU; it stays warm ~5 min after, so later gens start instantly.</div>
+      </div>
+      <div id="cloudNote" class="hide" style="font-size:12.5px;color:var(--mut);margin-bottom:14px"></div>
+      <div id="cloudTiles" class="ctiles">
+        <div class="ctile"><div class="ctk">Health</div><div class="ctv" id="ctHealth">…</div></div>
+        <div class="ctile"><div class="ctk">This generation</div><div class="ctv" id="ctGen">—</div></div>
+        <div class="ctile"><div class="ctk">Session spend</div><div class="ctv" id="ctSpend">$0.00 · 0 gens</div></div>
+      </div>
+      <div id="cloudLoras" style="margin-top:14px"></div>
+    </div>
+  </section>
 </div>
 
 <main>
@@ -883,6 +928,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <button class="go" id="go" style="flex:1;margin:0" disabled>Develop</button>
         <button class="go hide" id="stopGen" style="flex:none;width:50px;margin:0;background:rgba(217,139,122,.15);border-color:rgba(217,139,122,.3);color:var(--rose)" title="Stop Generation">✕</button>
       </div>
+      <div id="genCost" class="hide" style="margin-top:8px;font-family:var(--mono);font-size:11.5px;text-align:center;color:var(--mut)"></div>
       <div class="err" id="genErr"></div>
     </div>
   </aside>
@@ -1078,15 +1124,17 @@ async function loadHealth(){
   document.querySelectorAll('#compute button').forEach(b=>{
     const t=b.dataset.t, ok=h[t];
     b.classList.toggle('off',!ok);
-    b.onclick=ok?()=>{S.target=t;document.querySelectorAll('#compute button').forEach(x=>x.classList.toggle('on',x===b));updateStatus();}:null;
+    b.onclick=ok?()=>{S.target=t;document.querySelectorAll('#compute button').forEach(x=>x.classList.toggle('on',x===b));_lastTarget=t;updateStatus();onTargetChange();}:null;
   });
   // prefer local when ComfyUI is on, else cloud
-  S.target = h.local ? 'local' : (h.cloud ? 'cloud' : 'local');
+  if(_lastTarget===null) S.target = h.local ? 'local' : (h.cloud ? 'cloud' : 'local');
   document.querySelectorAll('#compute button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.target));
   $('#startComfy').classList.toggle('hide', h.local);   // hide once ComfyUI is up
   $('#stopComfy').classList.toggle('hide', !h.local);
   updateStatus();
+  if(S.target!==_lastTarget){ _lastTarget=S.target; onTargetChange(); }
 }
+let _lastTarget=null;
 
 // Parse a JSON response, but fall back to a readable message when the body is
 // not JSON (e.g. nginx/Cloudflare returns an HTML 502/504 page when the home
@@ -1133,9 +1181,136 @@ $('#stopComfy').onclick=async()=>{
 function updateStatus(){
   const ok=S.avail[S.target];
   $('#led').classList.toggle('on',ok);
-  $('#statusText').textContent = S.target==='local'
-    ? (S.avail.local?'ComfyUI · 5090':'ComfyUI offline')
-    : (S.avail.cloud?'RunPod · cloud':'cloud not set');
+  if(S.target==='cloud'){
+    const st=CLOUD.status;
+    $('#statusText').textContent = (st&&st.warming) ? 'RunPod · warming GPU'
+      : (S.avail.cloud?'RunPod · cloud':'cloud not set');
+  }else{
+    $('#statusText').textContent = S.avail.local?'ComfyUI · 5090':'ComfyUI offline';
+  }
+}
+
+// ===== Cloud (RunPod) mode: warming/health, cost, LoRA availability =====
+const CLOUD={info:null,manifest:new Set(),status:null,spend:0,gens:0,lastSec:25,requested:new Set(),poll:null};
+const isCloud=()=>S.target==='cloud';
+
+async function loadCloudInfo(){
+  try{
+    const d=await(await fetch('/api/cloud/info')).json();
+    CLOUD.info=d; CLOUD.manifest=new Set(d.manifest||[]);
+  }catch(e){ CLOUD.info=null; }
+}
+
+function onCloud(path){            // known to be on the volume (manifest is lowercased)
+  if(!path) return true;
+  return CLOUD.manifest.has(String(path).replace(/\\/g,'/').toLowerCase());
+}
+
+function currentLoraSelection(){
+  const out=[];
+  const cv=$('#variant'); if(cv&&cv.value) out.push({path:cv.value,label:cv.options[cv.selectedIndex].text,kind:'character'});
+  const lp=$('#lightningPick'); if(lp&&lp.value) out.push({path:lp.value,label:'Lightning',kind:'lightning'});
+  $$('#extraLoras .lora-pick').forEach(s=>{ if(s.value) out.push({path:s.value,label:s.options[s.selectedIndex].text,kind:'helper'}); });
+  return out;
+}
+
+function hasManifest(){ return !!(CLOUD.info&&CLOUD.info.manifest_count>0); }
+
+function cloudMissing(){            // selected LoRAs not on the volume (only when a manifest exists)
+  if(!isCloud()||!hasManifest()) return [];
+  return currentLoraSelection().filter(l=>!onCloud(l.path));
+}
+
+async function requestSync(path,label,btn){
+  try{
+    await fetch('/api/cloud/request-sync',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({path,label,kind:'lora'})});
+    CLOUD.requested.add(path);
+    if(btn){ btn.textContent='✓ requested'; btn.classList.add('done'); }
+  }catch(e){}
+}
+
+function renderCloudLoras(){
+  const box=$('#cloudLoras'); if(!box) return;
+  if(!hasManifest()){ box.innerHTML=''; return; }
+  const sel=currentLoraSelection();
+  box.innerHTML='<div style="font-size:11px;color:var(--mut);margin-bottom:2px">LoRAs for this generation · checked against the cloud volume</div>'+
+    sel.map(l=>{
+      const ok=onCloud(l.path), req=CLOUD.requested.has(l.path);
+      return `<div class="lchk ${ok?'':'off'}">
+        <span class="ldot" style="background:${ok?'var(--good)':'var(--rose)'};${ok?'box-shadow:0 0 8px var(--good)':''}"></span>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.label}</div>
+        <div style="font-size:10.5px;color:${ok?'var(--faint)':'var(--rose)'}">${l.kind} · ${ok?'on volume':'not on cloud volume'}</div></div>
+        ${ok?'<span style="font-family:var(--mono);font-size:10px;color:var(--good)">on volume</span>'
+            :`<button class="reqsync ${req?'done':''}" data-p="${encodeURIComponent(l.path)}" data-l="${encodeURIComponent(l.label)}">${req?'✓ requested':'⬆ request sync'}</button>`}
+      </div>`;
+    }).join('');
+  box.querySelectorAll('.reqsync:not(.done)').forEach(b=>b.onclick=()=>
+    requestSync(decodeURIComponent(b.dataset.p),decodeURIComponent(b.dataset.l),b));
+}
+
+function updateGenCost(){
+  const gc=$('#genCost'); if(!gc) return;
+  const miss=cloudMissing();
+  if(isCloud()&&miss.length){
+    gc.classList.remove('hide'); gc.style.color='var(--rose)';
+    gc.textContent='Blocked — '+miss.length+' LoRA'+(miss.length>1?'s':'')+' not on the cloud volume (request sync above).';
+    return;
+  }
+  if(!isCloud()||!CLOUD.info){ gc.classList.add('hide'); return; }
+  const each=(CLOUD.info.price_per_sec||0)*CLOUD.lastSec, n=S.variations||1;
+  gc.classList.remove('hide'); gc.style.color='var(--mut)';
+  gc.textContent=`≈ $${each.toFixed(2)} each · ${n} variation${n>1?'s':''} ≈ $${(each*n).toFixed(2)} · ~${CLOUD.lastSec}s on ${CLOUD.info.gpu}`;
+}
+
+function updateSpendChip(){
+  const c=$('#spendChip'); if(!c) return;
+  c.classList.toggle('hide',!(isCloud()&&CLOUD.gens>0));
+  c.innerHTML=`≈ $${CLOUD.spend.toFixed(2)} today`;
+}
+
+function renderCloudCard(){
+  const wrap=$('#cloudWrap'); if(!wrap) return;
+  wrap.classList.toggle('hide',!isCloud());
+  if(!isCloud()){ updateGenCost(); updateSpendChip(); return; }
+  const info=CLOUD.info, st=CLOUD.status, note=$('#cloudNote');
+  $('#cloudMeta').textContent=info?[info.gpu,info.region].filter(Boolean).join(' · '):'cloud';
+  if(!(info&&info.configured)){
+    note.classList.remove('hide');
+    note.textContent='Cloud isn’t configured yet — set RUNPOD_API_KEY / RUNPOD_ENDPOINT_ID on the server. This card goes live once the endpoint exists.';
+  }else if(!hasManifest()){
+    note.classList.remove('hide');
+    note.textContent='No cloud LoRA manifest yet — build the network volume and add .cloud_loras.json so the picker can tag what’s available.';
+  }else note.classList.add('hide');
+  let health='…', warming=false;
+  if(st){
+    if(st.error) health='error';
+    else if(st.configured===false) health='not configured';
+    else{ warming=!!st.warming;
+      health=st.unhealthy?'degraded':(st.ready?'healthy':(warming?'warming':'idle')); }
+  }
+  $('#cloudWarm').classList.toggle('hide',!warming);
+  if(warming&&st&&st.queued) $('#cloudWarmEta').textContent=st.queued+' queued';
+  const ch=$('#ctHealth'); let extra='';
+  if(st&&st.workers){ const w=st.workers, up=(w.ready||0)+(w.running||0)+(w.idle||0),
+    tot=Object.values(w).reduce((a,b)=>a+b,0); extra=` · ${up}/${tot} workers`; }
+  ch.textContent=health+extra;
+  ch.style.color=health==='healthy'?'var(--good)':(health==='error'||health==='degraded'?'var(--rose)':'var(--amber)');
+  $('#ctGen').textContent=info?`≈ $${(info.price_per_sec*CLOUD.lastSec).toFixed(2)} · ~${CLOUD.lastSec}s`:'—';
+  $('#ctSpend').textContent=`$${CLOUD.spend.toFixed(2)} · ${CLOUD.gens} gen${CLOUD.gens===1?'':'s'}`;
+  renderCloudLoras(); updateGenCost(); updateSpendChip(); refreshGo();
+}
+
+async function pollCloudStatus(){
+  if(!isCloud()) return;
+  try{ CLOUD.status=await(await fetch('/api/cloud/status')).json(); }
+  catch(e){ CLOUD.status={configured:true,error:'unreachable'}; }
+  updateStatus(); renderCloudCard();
+}
+function onTargetChange(){
+  if(CLOUD.poll){ clearInterval(CLOUD.poll); CLOUD.poll=null; }
+  renderCloudCard();
+  if(isCloud()){ pollCloudStatus(); CLOUD.poll=setInterval(pollCloudStatus,7000); }
 }
 
 function setRange(el){el.style.setProperty('--p',((el.value-el.min)/(el.max-el.min)*100)+'%');}
@@ -1158,6 +1333,7 @@ function setMode(m){
   $('#stepsField').classList.toggle('hide',m!=='i2i');
   applyLightningDefault(m);   // Lightning default differs per mode (t2i = v2 distill @0.6)
   refreshGo();
+  if(typeof renderCloudCard==='function') renderCloudCard();
 }
 $('#mVid').onclick=()=>setMode('i2i');$('#mTxt').onclick=()=>setMode('t2i');
 
@@ -1241,9 +1417,9 @@ $('#addLoraBtn').onclick = () => addLoraSlot();
 
 // variations chips
 $$('#variations button').forEach(b=>b.onclick=()=>{$$('#variations button').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on');S.variations=+b.dataset.v;$('#varNum').value=S.variations;});
+  b.classList.add('on');S.variations=+b.dataset.v;$('#varNum').value=S.variations;updateGenCost();});
 $('#varNum').oninput=()=>{const v=Math.max(1,+$('#varNum').value||1);S.variations=v;
-  $$('#variations button').forEach(x=>x.classList.toggle('on',+x.dataset.v===v));};
+  $$('#variations button').forEach(x=>x.classList.toggle('on',+x.dataset.v===v));updateGenCost();};
 
 // seed random
 $('#randSw').onclick=()=>{S.rand=!S.rand;$('#randSw').classList.toggle('on',S.rand);$('#seed').disabled=S.rand;};
@@ -1256,7 +1432,8 @@ $('#video').onchange=()=>{if($('#video').files[0])$('#drop').querySelector('p').
   if(ev==='drop'&&e.dataTransfer.files[0]){$('#video').files=e.dataTransfer.files;$('#video').onchange();}}));
 
 function refreshGo(){
-  const ok = S.mode==='i2i' ? !!S.frame : $('#prompt').value.trim().length>3;
+  let ok = S.mode==='i2i' ? !!S.frame : $('#prompt').value.trim().length>3;
+  if(ok && cloudMissing().length) ok=false;   // grey out: a selected LoRA isn't on the cloud volume
   $('#go').disabled=!ok;
 }
 $('#prompt').oninput=refreshGo;
@@ -1546,6 +1723,7 @@ $('#go').onclick=async()=>{
     body.prompt=$('#prompt').value.trim();
   }
   const t=$('#go').textContent;$('#go').innerHTML='<span class="spin"></span>developing…';$('#go').disabled=true;
+  const _t0=Date.now(), _wasCloud=isCloud(), _vars=S.variations||1;
   $('#stopGen').classList.remove('hide');
   $('#empty').innerHTML='<div class="g">developing…</div><p class="hint">First run wakes the GPU (~60s).</p>';
   $('#empty').classList.remove('hide');$('#results').innerHTML='';
@@ -1580,6 +1758,11 @@ $('#go').onclick=async()=>{
         $('#results').innerHTML=(d.images||[]).map((b,i)=>`<figure style="animation-delay:${i*.07}s"><img src="data:image/png;base64,${b}"></figure>`).join('');
         $('#seedTag').textContent='seed '+d.seed;
         $$('#results img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.src;$('#imgview').classList.add('on');});
+        if(_wasCloud&&CLOUD.info){   // estimate-only spend: $/sec × measured seconds × variations
+          CLOUD.lastSec=Math.max(1,Math.round((Date.now()-_t0)/1000));
+          CLOUD.spend+=CLOUD.info.price_per_sec*CLOUD.lastSec*_vars; CLOUD.gens++;
+          updateSpendChip(); renderCloudCard();
+        }
         done();
       } else if(d.status==='error'){
         clearInterval(poll);
@@ -2182,8 +2365,15 @@ initReelSortChips();
 initGalSortChips();
 loadMe();
 loadConfig();
-loadHealth();
+loadCloudInfo().then(loadHealth);   // info first so the cloud card has cost + manifest on first paint
 setInterval(loadHealth, 20000);
+
+// re-check cloud LoRA availability + cost whenever the character/lightning/helper selection changes
+document.addEventListener('change', e=>{
+  if(e.target && e.target.matches && e.target.matches('#variant,#character,#lightningPick,.lora-pick')){
+    if(isCloud()) renderCloudCard(); else refreshGo();
+  }
+});
 </script>
 </body>
 </html>

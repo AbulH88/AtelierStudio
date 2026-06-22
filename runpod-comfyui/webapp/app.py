@@ -52,7 +52,33 @@ import yt_dlp         # noqa: E402  (Instagram reel downloader)
 ENDPOINT_ID = os.environ.get("RUNPOD_ENDPOINT_ID", "")
 API_KEY = os.environ.get("RUNPOD_API_KEY", "")
 RUNPOD_URL = f"https://api.runpod.ai/v2/{ENDPOINT_ID}/runsync"
+RUNPOD_HEALTH_URL = f"https://api.runpod.ai/v2/{ENDPOINT_ID}/health"
 LOCAL_COMFY = os.environ.get("LOCAL_COMFY_URL", "http://127.0.0.1:8189")  # matches Windows_Run_GPU.bat
+
+# Cloud (RunPod) cost + capacity hints. Cost is ESTIMATE-ONLY: the UI multiplies
+# price_per_sec by the measured generation seconds — we never call RunPod billing.
+RUNPOD_GPU = os.environ.get("RUNPOD_GPU", "L40S")
+RUNPOD_REGION = os.environ.get("RUNPOD_REGION", "")
+# Approximate RunPod serverless $/sec by GPU (flex rate, 2025). Keys are the GPU
+# name upper-cased with spaces/dashes stripped. Override the active GPU's rate
+# directly with RUNPOD_PRICE_PER_SEC.
+GPU_PRICE_PER_SEC = {
+    "L40S": 0.00053, "L40": 0.00053, "A40": 0.00044,
+    "RTX4090": 0.00034, "RTX5090": 0.00046, "RTXA6000": 0.00049,
+    "A100": 0.00076, "A100SXM": 0.00114, "H100": 0.00155, "H200": 0.00220,
+}
+
+
+def _price_per_sec():
+    """$/sec for the active cloud GPU — env override wins, else the table."""
+    try:
+        v = float(os.environ.get("RUNPOD_PRICE_PER_SEC", "") or 0)
+        if v > 0:
+            return v
+    except ValueError:
+        pass
+    key = RUNPOD_GPU.upper().replace(" ", "").replace("-", "")
+    return GPU_PRICE_PER_SEC.get(key, 0.0005)
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "qwen/qwen3-vl-235b-a22b-instruct")
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -412,6 +438,50 @@ def _folder_loras(subfolder, cache_name):
     return [{"path": p, "label": os.path.splitext(p.split("/")[-1])[0]} for p in items]
 
 
+# --- Cloud LoRA manifest ------------------------------------------------------
+# On Cloud, only LoRAs present on the RunPod network volume will load. This
+# manifest lists those relative paths (the same form the picker uses, e.g.
+# "wan/WanInsta/.../X.safetensors"). Source: CLOUD_LORAS_FILE env (a JSON list,
+# or {"loras":[...]}), else a .cloud_loras.json cache next to app.py. An empty
+# manifest means "nothing confirmed on the volume yet" — the UI then shows the
+# cloud card in a not-ready state instead of greying every row.
+CLOUD_LORAS_FILE = os.environ.get("CLOUD_LORAS_FILE",
+                                  os.path.join(HERE, ".cloud_loras.json"))
+
+
+def _cloud_lora_set():
+    """Set of normalized (lowercased, fwd-slash) LoRA paths on the RunPod volume."""
+    try:
+        data = _json.load(open(CLOUD_LORAS_FILE, encoding="utf-8"))
+    except Exception:
+        return set()
+    if isinstance(data, dict):
+        data = data.get("loras", [])
+    return {str(p).replace("\\", "/").lower() for p in data if p}
+
+
+def _cloud_status():
+    """Live RunPod endpoint health (warming / ready / queue). Degrades to
+    {configured:False} with no creds, {configured:True, error:...} on failure."""
+    if not (ENDPOINT_ID and API_KEY):
+        return {"configured": False}
+    try:
+        r = requests.get(RUNPOD_HEALTH_URL,
+                         headers={"Authorization": f"Bearer {API_KEY}"}, timeout=8)
+        r.raise_for_status()
+        d = r.json() or {}
+        w = d.get("workers", {}) or {}
+        j = d.get("jobs", {}) or {}
+        ready = (w.get("ready", 0) + w.get("running", 0) + w.get("idle", 0)) > 0
+        warming = (not ready) and w.get("initializing", 0) > 0
+        return {"configured": True, "ready": ready, "warming": warming,
+                "workers": w, "queued": j.get("inQueue", 0),
+                "in_progress": j.get("inProgress", 0),
+                "unhealthy": w.get("unhealthy", 0) + w.get("throttled", 0)}
+    except Exception as e:
+        return {"configured": True, "error": f"{type(e).__name__}: {e}"}
+
+
 # Per-mode default Lightning (lightx2v) LoRA — now tweakable from the UI but these
 # are the safe defaults baked into the workflows. t2i MUST stay v2-distill @0.6
 # (anything else risks confetti noise); i2i uses the 4-step rank64 @1.0.
@@ -477,6 +547,62 @@ def health():
     except Exception:
         pass
     return jsonify({"local": local, "cloud": bool(ENDPOINT_ID and API_KEY)})
+
+
+@app.get("/api/cloud/info")
+def cloud_info():
+    """Static-ish cloud facts the UI needs once: cost rate, GPU, and the LoRA
+    manifest (so the picker can tag what's on the volume). No RunPod call."""
+    manifest = sorted(_cloud_lora_set())
+    return jsonify({
+        "configured": bool(ENDPOINT_ID and API_KEY),
+        "gpu": RUNPOD_GPU, "region": RUNPOD_REGION,
+        "price_per_sec": _price_per_sec(),
+        "manifest": manifest, "manifest_count": len(manifest),
+    })
+
+
+@app.get("/api/cloud/status")
+def cloud_status():
+    """Live endpoint health for the warming/health strip (polled in cloud mode)."""
+    return jsonify(_cloud_status())
+
+
+# Wishlist of LoRAs users want pushed to the cloud volume (the "request sync"
+# button). We only record the request — nothing auto-syncs. Admin reviews it.
+SYNC_FILE = os.path.join(HERE, "cloud_sync_requests.json")
+SYNC_LOCK = threading.Lock()
+
+
+@app.post("/api/cloud/request-sync")
+def cloud_request_sync():
+    b = request.get_json(force=True) or {}
+    path = (b.get("path") or "").replace("\\", "/").strip()
+    if not path:
+        return jsonify({"error": "no path"}), 400
+    entry = {"path": path, "label": (b.get("label") or "").strip(),
+             "kind": b.get("kind", "lora"),
+             "user": session.get("user", "?"), "ts": int(time.time())}
+    with SYNC_LOCK:
+        try:
+            reqs = _json.load(open(SYNC_FILE, encoding="utf-8"))
+        except Exception:
+            reqs = []
+        if not any(r.get("path") == path for r in reqs):
+            reqs.append(entry)
+            _json.dump(reqs, open(SYNC_FILE, "w", encoding="utf-8"), indent=2)
+    return jsonify({"ok": True})
+
+
+@app.get("/api/cloud/sync-requests")
+@admin_required
+def cloud_sync_requests():
+    try:
+        reqs = _json.load(open(SYNC_FILE, encoding="utf-8"))
+    except Exception:
+        reqs = []
+    reqs.sort(key=lambda r: r.get("ts", 0), reverse=True)
+    return jsonify({"requests": reqs})
 
 
 def _agent(path):

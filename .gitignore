@@ -36,3 +36,6 @@ runpod-comfyui/webapp/.catalog.json
 runpod-comfyui/webapp/.loras.json
 runpod-comfyui/webapp/.nsfw_loras.json
 runpod-comfyui/webapp/.lightning_loras.json
+# cloud (RunPod) state: volume manifest + LoRA sync wishlist
+runpod-comfyui/webapp/.cloud_loras.json
+runpod-comfyui/webapp/cloud_sync_requests.json
