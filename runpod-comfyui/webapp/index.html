@@ -705,6 +705,11 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <div class="ctile"><div class="ctk">This generation</div><div class="ctv" id="ctGen">—</div></div>
         <div class="ctile"><div class="ctk">Session spend</div><div class="ctv" id="ctSpend">$0.00 · 0 gens</div></div>
       </div>
+      <div id="cloudGpuRow" class="hide" style="display:flex;align-items:center;gap:10px;margin-top:13px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--mut);letter-spacing:.5px;text-transform:uppercase">GPU</span>
+        <select id="cloudGpu" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:8px 12px;font-size:13px;font-family:var(--sans);min-width:240px"></select>
+        <span id="cloudGpuNote" style="font-size:11px;color:var(--faint)"></span>
+      </div>
       <div id="cloudLoras" style="margin-top:14px"></div>
     </div>
   </section>
@@ -1192,7 +1197,37 @@ function updateStatus(){
 }
 
 // ===== Cloud (RunPod) mode: warming/health, cost, LoRA availability =====
-const CLOUD={info:null,manifest:new Set(),status:null,spend:0,gens:0,lastSec:25,requested:new Set(),poll:null};
+const CLOUD={info:null,manifest:new Set(),status:null,spend:0,gens:0,lastSec:25,requested:new Set(),poll:null,gpus:[],gpu:'auto',gpusLoaded:false};
+
+function cloudPricePerSec(){
+  if(CLOUD.gpu&&CLOUD.gpu!=='auto'){ const g=CLOUD.gpus.find(x=>x.id===CLOUD.gpu); if(g) return g.price_per_sec; }
+  if(CLOUD.gpus.length) return Math.min(...CLOUD.gpus.map(x=>x.price_per_sec));   // auto -> cheapest
+  return (CLOUD.info&&CLOUD.info.price_per_sec)||0.0005;
+}
+async function loadCloudGpus(){
+  try{
+    const d=await(await fetch('/api/cloud/gpus')).json();
+    CLOUD.gpus=d.options||[]; CLOUD.gpu=d.current||'auto'; CLOUD.gpusLoaded=true;
+    const sel=$('#cloudGpu'); if(!sel) return;
+    sel.innerHTML='<option value="auto">Auto · cheapest available</option>'+
+      CLOUD.gpus.map(g=>`<option value="${g.id}">${g.label} · ${g.vram}GB · ~$${(g.price_per_sec*CLOUD.lastSec).toFixed(3)}/img</option>`).join('');
+    sel.value=CLOUD.gpu;
+    sel.onchange=setCloudGpu;
+    updateGenCost();
+  }catch(e){}
+}
+async function setCloudGpu(){
+  const sel=$('#cloudGpu'),note=$('#cloudGpuNote'),gpu=sel.value;
+  sel.disabled=true; note.textContent='applying…'; note.style.color='var(--mut)';
+  try{
+    const d=await(await fetch('/api/cloud/gpu',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({gpu})})).json();
+    if(d.error){ note.textContent=d.error; note.style.color='var(--rose)'; sel.value=CLOUD.gpu; }
+    else{ CLOUD.gpu=gpu; note.style.color='var(--faint)';
+      note.textContent=gpu==='auto'?'uses the cheapest free card':'locked — gens wait for this card';
+      updateGenCost(); renderCloudCard(); }
+  }catch(e){ note.textContent='failed'; note.style.color='var(--rose)'; }
+  finally{ sel.disabled=false; }
+}
 const isCloud=()=>S.target==='cloud';
 
 async function loadCloudInfo(){
@@ -1259,7 +1294,7 @@ function updateGenCost(){
     return;
   }
   if(!isCloud()||!CLOUD.info){ gc.classList.add('hide'); return; }
-  const each=(CLOUD.info.price_per_sec||0)*CLOUD.lastSec, n=S.variations||1;
+  const each=cloudPricePerSec()*CLOUD.lastSec, n=S.variations||1;
   gc.classList.remove('hide'); gc.style.color='var(--mut)';
   gc.textContent=`≈ $${each.toFixed(2)} each · ${n} variation${n>1?'s':''} ≈ $${(each*n).toFixed(2)} · ~${CLOUD.lastSec}s on ${CLOUD.info.gpu}`;
 }
@@ -1297,7 +1332,9 @@ function renderCloudCard(){
     tot=Object.values(w).reduce((a,b)=>a+b,0); extra=` · ${up}/${tot} workers`; }
   ch.textContent=health+extra;
   ch.style.color=health==='healthy'?'var(--good)':(health==='error'||health==='degraded'?'var(--rose)':'var(--amber)');
-  $('#ctGen').textContent=info?`≈ $${(info.price_per_sec*CLOUD.lastSec).toFixed(2)} · ~${CLOUD.lastSec}s`:'—';
+  $('#ctGen').textContent=info?`≈ $${(cloudPricePerSec()*CLOUD.lastSec).toFixed(2)} · ~${CLOUD.lastSec}s`:'—';
+  $('#cloudGpuRow').classList.toggle('hide', !(info&&info.configured));
+  if(info&&info.configured&&!CLOUD.gpusLoaded) loadCloudGpus();
   $('#ctSpend').textContent=`$${CLOUD.spend.toFixed(2)} · ${CLOUD.gens} gen${CLOUD.gens===1?'':'s'}`;
   renderCloudLoras(); updateGenCost(); updateSpendChip(); refreshGo();
 }
@@ -1761,7 +1798,7 @@ $('#go').onclick=async()=>{
         $$('#results img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.src;$('#imgview').classList.add('on');});
         if(_wasCloud&&CLOUD.info){   // estimate-only spend: $/sec × measured seconds × variations
           CLOUD.lastSec=Math.max(1,Math.round((Date.now()-_t0)/1000));
-          CLOUD.spend+=CLOUD.info.price_per_sec*CLOUD.lastSec*_vars; CLOUD.gens++;
+          CLOUD.spend+=cloudPricePerSec()*CLOUD.lastSec*_vars; CLOUD.gens++;
           updateSpendChip(); renderCloudCard();
         }
         done();

@@ -79,6 +79,22 @@ def _price_per_sec():
         pass
     key = RUNPOD_GPU.upper().replace(" ", "").replace("-", "")
     return GPU_PRICE_PER_SEC.get(key, 0.0005)
+
+
+# GPUs that can run the 14B fp16 image model (needs >=40GB VRAM), with the RunPod
+# REST gpuTypeId + approx serverless flex $/sec. The UI lets the user pick one (or
+# "auto" = cheapest-available). Cheapest first.
+CLOUD_GPU_OPTIONS = [
+    {"id": "NVIDIA A40",                     "label": "A40",          "vram": 48,  "price_per_sec": 0.00044},
+    {"id": "NVIDIA RTX A6000",               "label": "RTX A6000",    "vram": 48,  "price_per_sec": 0.00049},
+    {"id": "NVIDIA L40S",                    "label": "L40S",         "vram": 48,  "price_per_sec": 0.00053},
+    {"id": "NVIDIA A100 80GB PCIe",          "label": "A100 80GB",    "vram": 80,  "price_per_sec": 0.00076},
+    {"id": "NVIDIA RTX 6000 Ada Generation", "label": "RTX 6000 Ada", "vram": 48,  "price_per_sec": 0.00077},
+    {"id": "NVIDIA H100 PCIe",               "label": "H100 PCIe",    "vram": 80,  "price_per_sec": 0.00155},
+    {"id": "NVIDIA H100 80GB HBM3",          "label": "H100 SXM",     "vram": 80,  "price_per_sec": 0.00169},
+    {"id": "NVIDIA H200",                    "label": "H200",         "vram": 141, "price_per_sec": 0.00220},
+]
+RUNPOD_EP_URL = f"https://rest.runpod.io/v1/endpoints/{ENDPOINT_ID}"
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "qwen/qwen3-vl-235b-a22b-instruct")
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -566,6 +582,45 @@ def cloud_info():
 def cloud_status():
     """Live endpoint health for the warming/health strip (polled in cloud mode)."""
     return jsonify(_cloud_status())
+
+
+@app.get("/api/cloud/gpus")
+def cloud_gpus():
+    """GPU options + the endpoint's current selection ('auto' = cheapest-available
+    full list; a single id = locked to that GPU)."""
+    current = "auto"
+    try:
+        if ENDPOINT_ID and API_KEY:
+            r = requests.get(RUNPOD_EP_URL, headers={"Authorization": f"Bearer {API_KEY}"}, timeout=8)
+            ids = (r.json() or {}).get("gpuTypeIds") or []
+            if len(ids) == 1:
+                current = ids[0]
+    except Exception:
+        pass
+    return jsonify({"options": CLOUD_GPU_OPTIONS, "current": current})
+
+
+@app.post("/api/cloud/gpu")
+@admin_required
+def cloud_set_gpu():
+    """Reconfigure the shared endpoint's GPU. 'auto' -> full cheap-first list; a
+    specific id -> lock to that one. Admin-only (it changes the endpoint for everyone)."""
+    if not (ENDPOINT_ID and API_KEY):
+        return jsonify({"error": "cloud not configured"}), 400
+    gid = (request.get_json(force=True) or {}).get("gpu", "auto")
+    if gid == "auto":
+        ids = [g["id"] for g in CLOUD_GPU_OPTIONS]
+    elif any(g["id"] == gid for g in CLOUD_GPU_OPTIONS):
+        ids = [gid]
+    else:
+        return jsonify({"error": "unknown gpu"}), 400
+    try:
+        r = requests.patch(RUNPOD_EP_URL, headers={"Authorization": f"Bearer {API_KEY}"},
+                           json={"gpuTypeIds": ids}, timeout=15)
+        r.raise_for_status()
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 502
+    return jsonify({"ok": True, "current": gid})
 
 
 # Wishlist of LoRAs users want pushed to the cloud volume (the "request sync"

@@ -65,16 +65,36 @@ def run(base, graph, timeout=900, client_id=None):
     while time.time() - start < timeout:
         hist = requests.get(f"{base}/history/{pid}", headers=CF_HEADERS, timeout=30).json()
         if pid in hist:
+            h = hist[pid]
             imgs = []
-            for out in hist[pid].get("outputs", {}).values():
+            for out in h.get("outputs", {}).values():
                 for im in out.get("images", []):
                     v = requests.get(f"{base}/view", params={
                         "filename": im["filename"], "subfolder": im.get("subfolder", ""),
                         "type": im.get("type", "output")}, headers=CF_HEADERS, timeout=60)
                     imgs.append(base64.b64encode(v.content).decode())
+            if imgs:
+                return imgs
+            # No images: surface ComfyUI's actual node error instead of a generic
+            # "no image" so model-path / node failures are debuggable.
+            err = _history_error(h.get("status", {}) or {})
+            if err:
+                raise RuntimeError("ComfyUI node error — " + err)
             return imgs
         time.sleep(1)
     raise TimeoutError("ComfyUI timed out")
+
+
+def _history_error(status):
+    """Extract the node error from a /history entry's status.messages, if any."""
+    if status.get("status_str") == "success":
+        return ""
+    for m in status.get("messages", []):
+        if isinstance(m, (list, tuple)) and len(m) == 2 and m[0] == "execution_error":
+            d = m[1] or {}
+            return (f"{d.get('node_type', '?')}#{d.get('node_id', '?')}: "
+                    f"{d.get('exception_type', '')}: {d.get('exception_message', '')}")[:500]
+    return "execution did not complete (no node output)" if status.get("status_str") == "error" else ""
 
 
 def _prompt_with_trigger(inp):
