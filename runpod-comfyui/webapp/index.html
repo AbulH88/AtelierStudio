@@ -708,8 +708,10 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
       <div id="cloudGpuRow" class="hide" style="display:flex;align-items:center;gap:10px;margin-top:13px;flex-wrap:wrap">
         <span style="font-size:11px;color:var(--mut);letter-spacing:.5px;text-transform:uppercase">GPU</span>
         <select id="cloudGpu" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:8px 12px;font-size:13px;font-family:var(--sans);min-width:240px"></select>
+        <button id="cloudStockBtn" class="reqsync" type="button">⟳ check stock</button>
         <span id="cloudGpuNote" style="font-size:11px;color:var(--faint)"></span>
       </div>
+      <div id="cloudStock" class="hide" style="margin-top:10px"></div>
       <div id="cloudLoras" style="margin-top:14px"></div>
     </div>
   </section>
@@ -1213,6 +1215,7 @@ async function loadCloudGpus(){
       CLOUD.gpus.map(g=>`<option value="${g.id}">${g.label} · ${g.vram}GB · ~$${(g.price_per_sec*CLOUD.lastSec).toFixed(3)}/img</option>`).join('');
     sel.value=CLOUD.gpu;
     sel.onchange=setCloudGpu;
+    const sb=$('#cloudStockBtn'); if(sb) sb.onclick=checkCloudStock;
     updateGenCost();
   }catch(e){}
 }
@@ -1228,6 +1231,29 @@ async function setCloudGpu(){
   }catch(e){ note.textContent='failed'; note.style.color='var(--rose)'; }
   finally{ sel.disabled=false; }
 }
+
+async function checkCloudStock(){
+  const btn=$('#cloudStockBtn'), box=$('#cloudStock'); if(!box) return;
+  btn.disabled=true; btn.textContent='checking…';
+  box.classList.remove('hide');
+  box.innerHTML='<span style="font-size:11.5px;color:var(--mut)">querying RunPod stock…</span>';
+  try{
+    const d=await(await fetch('/api/cloud/gpu-availability')).json();
+    if(d.error){ box.innerHTML='<span style="font-size:11.5px;color:var(--rose)">'+d.error+'</span>'; }
+    else if(!d.gpus || !d.gpus.length){
+      box.innerHTML='<span style="font-size:12px;color:var(--rose)">✗ No model-capable GPU in stock in '+(d.dc||'this DC')+' right now — try again later.</span>';
+    }else{
+      const col=s=>s==='High'?'var(--good)':(s==='Medium'?'var(--amber)':'var(--rose)');
+      box.innerHTML='<div style="font-size:11px;color:var(--mut);margin-bottom:5px">In stock now · '+(d.dc||'')+' (≥32GB cards that fit the model)</div>'+
+        d.gpus.map(g=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12.5px">
+          <span class="ldot" style="background:${col(g.stock)}"></span>
+          <span style="flex:1">${g.label} · ${g.vram}GB</span>
+          <span style="font-family:var(--mono);font-size:11px;color:${col(g.stock)}">${g.stock} stock</span></div>`).join('');
+    }
+  }catch(e){ box.innerHTML='<span style="font-size:11.5px;color:var(--rose)">check failed</span>'; }
+  finally{ btn.disabled=false; btn.textContent='⟳ check stock'; }
+}
+
 const isCloud=()=>S.target==='cloud';
 
 async function loadCloudInfo(){

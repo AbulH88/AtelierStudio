@@ -90,8 +90,10 @@ CLOUD_GPU_OPTIONS = [
     {"id": "NVIDIA L40S",                    "label": "L40S",         "vram": 48,  "price_per_sec": 0.00053},
     {"id": "NVIDIA A100 80GB PCIe",          "label": "A100 80GB",    "vram": 80,  "price_per_sec": 0.00076},
     {"id": "NVIDIA RTX 6000 Ada Generation", "label": "RTX 6000 Ada", "vram": 48,  "price_per_sec": 0.00077},
+    {"id": "NVIDIA RTX PRO 6000 Blackwell Server Edition", "label": "RTX PRO 6000 (Blackwell)", "vram": 96, "price_per_sec": 0.00112},
     {"id": "NVIDIA H100 PCIe",               "label": "H100 PCIe",    "vram": 80,  "price_per_sec": 0.00155},
     {"id": "NVIDIA H100 80GB HBM3",          "label": "H100 SXM",     "vram": 80,  "price_per_sec": 0.00169},
+    {"id": "NVIDIA B200",                    "label": "B200",         "vram": 180, "price_per_sec": 0.00240},
     {"id": "NVIDIA H200",                    "label": "H200",         "vram": 141, "price_per_sec": 0.00220},
 ]
 RUNPOD_EP_URL = f"https://rest.runpod.io/v1/endpoints/{ENDPOINT_ID}"
@@ -621,6 +623,34 @@ def cloud_set_gpu():
     except Exception as e:
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 502
     return jsonify({"ok": True, "current": gid})
+
+
+@app.get("/api/cloud/gpu-availability")
+def cloud_gpu_availability():
+    """Live GPU stock in the endpoint's datacenter (no pods created — a free
+    GraphQL read). Lets the UI show whether a runnable GPU is in stock before a gen."""
+    if not API_KEY:
+        return jsonify({"configured": False})
+    dc = (RUNPOD_REGION or "").strip()
+    q = ("query($dc:String){ gpuTypes { displayName memoryInGb "
+         "lowestPrice(input:{gpuCount:1, dataCenterId:$dc}){ stockStatus } } }")
+    try:
+        r = requests.post("https://api.runpod.io/graphql",
+                          headers={"Authorization": f"Bearer {API_KEY}"},
+                          json={"query": q, "variables": {"dc": dc}}, timeout=20)
+        types = ((r.json() or {}).get("data") or {}).get("gpuTypes") or []
+    except Exception as e:
+        return jsonify({"configured": True, "dc": dc, "error": f"{type(e).__name__}: {e}"})
+    rank = {"High": 0, "Medium": 1, "Low": 2}
+    gpus = []
+    for g in types:
+        mem = g.get("memoryInGb") or 0
+        stock = (g.get("lowestPrice") or {}).get("stockStatus")
+        if mem >= 32 and stock:   # >=32GB fits the 28GB model; stock present
+            gpus.append({"label": g["displayName"], "vram": mem, "stock": stock})
+    gpus.sort(key=lambda x: (rank.get(x["stock"], 3), -x["vram"]))
+    return jsonify({"configured": True, "dc": dc or "endpoint default",
+                    "any": bool(gpus), "gpus": gpus})
 
 
 # Wishlist of LoRAs users want pushed to the cloud volume (the "request sync"
