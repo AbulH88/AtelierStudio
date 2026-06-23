@@ -247,6 +247,11 @@ def _build_video(graph, inp, seed, video_name, ref_name):
     graph[nm["load_video"]]["inputs"]["video"] = video_name
     if inp.get("frame_cap"):
         graph[nm["load_video"]]["inputs"]["frame_load_cap"] = max(1, int(inp["frame_cap"]))
+    if inp.get("fps"):                       # resample input + final output to this fps
+        fps = max(1, int(inp["fps"]))
+        graph[nm["load_video"]]["inputs"]["force_rate"] = fps
+        if nm["output"] in graph:
+            graph[nm["output"]]["inputs"]["frame_rate"] = fps
     graph[nm["ref_image"]]["inputs"]["image"] = ref_name
     graph[nm["prompt"]]["inputs"]["text"] = _prompt_with_trigger(inp)
     if inp.get("character_lora_path"):   # WanVideoLoraSelect: lora + strength

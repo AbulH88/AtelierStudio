@@ -807,8 +807,10 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         </div>
         <div class="inline" style="margin-top:16px">
           <label>Frames</label>
-          <input type="number" id="mFrames" value="81" min="9" max="161" step="4" style="width:80px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
-          <label style="color:var(--faint)">(81 ≈ 2.7s @30fps · more = longer + heavier)</label>
+          <input type="number" id="mFrames" value="81" min="9" max="100000" step="4" style="width:90px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+          <label style="margin-left:8px">FPS</label>
+          <input type="number" id="mFps" value="30" min="1" max="60" step="1" style="width:64px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+          <label style="color:var(--faint)" id="mLenHint">≈ 2.7s · more frames = longer + heavier</label>
         </div>
         <button id="mDescribeBtn" class="go ghost" style="width:auto;margin-top:14px;padding:8px 16px;font-size:13px" type="button">🪄 Describe ref photo with AI</button>
         <textarea id="mPrompt" placeholder="optional: describe the look (clothing, setting). Or hit 'Describe ref photo' to auto-fill from the reference image. The character identity comes from the LoRA." style="margin-top:10px"></textarea>
@@ -843,14 +845,14 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <div class="lab">Character strength <input type="number" class="numin" id="csVal" min="0" max="2" step="0.01" value="0.80"></div>
         <input type="range" id="cstrength" min="0" max="1.5" step="0.01" value="0.8">
       </div>
-      <div class="field">
+      <div class="field imgonly">
         <div class="lab">Variations <input type="number" class="numin" id="varNum" min="1" max="50" step="1" value="2"></div>
         <div class="chips" id="variations">
           <button data-v="1">1</button><button data-v="2" class="on">2</button>
           <button data-v="3">3</button><button data-v="4">4</button>
         </div>
       </div>
-      <div class="field">
+      <div class="field imgonly">
         <div class="lab">Aspect ratio</div>
         <div class="aspects" id="aspects"></div>
       </div>
@@ -945,7 +947,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <input type="text" id="triggerWord" value="ing2lorance" placeholder="e.g. ing2lorance"
           style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--amber);border-radius:10px;padding:10px;font-family:var(--mono);font-size:13px">
       </div>
-      <div class="field">
+      <div class="field imgonly">
         <div class="lab">⚡ Lightning <span class="num" style="font-size:10px;color:var(--faint)">required · tweakable</span></div>
         <div class="tog" style="align-items:center;gap:8px;padding:6px 0">
           <div class="sel" style="flex:1;min-width:0"><select id="lightningPick" style="padding:8px 28px 8px 10px;font-size:12.5px;border-radius:8px;width:100%"></select></div>
@@ -953,7 +955,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
             style="width:54px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 4px;font-family:var(--mono);font-size:12px;text-align:center">
         </div>
       </div>
-      <div class="field">
+      <div class="field imgonly">
         <div class="lab">LoRAs</div>
         <div id="extraLoras"></div>
         <button class="go ghost" id="addLoraBtn" type="button" style="width:100%;margin-top:10px;font-size:13px;padding:9px">+ Add LoRA</button>
@@ -1480,6 +1482,19 @@ $('#mDescribeBtn').onclick=async()=>{
   }catch(e){ alert('Describe failed: '+e); }
   finally{ btn.disabled=false; btn.textContent=old; }
 };
+function _mUpdateLen(){ const fr=+$('#mFrames').value||81, fps=Math.max(1,+$('#mFps').value||30);
+  $('#mLenHint').textContent='≈ '+(fr/fps).toFixed(1)+'s · more frames = longer + heavier'; }
+$('#mFrames').oninput=_mUpdateLen; $('#mFps').oninput=_mUpdateLen;
+// send a generated image straight into Motion mode as the reference photo
+function _b64ToFile(b64,name){ const bin=atob(b64),a=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i); return new File([a],name,{type:'image/png'}); }
+function useAsMotionRef(b64){
+  S.motionRef=_b64ToFile(b64,'gallery_ref.png');
+  setMode('video');
+  const im=$('#mRefPreview'); im.src='data:image/png;base64,'+b64; im.classList.remove('hide');
+  const p=$('#mDropRef').querySelector('p'); if(p) p.innerHTML='<b>from gallery</b> ✓';
+  refreshGo(); window.scrollTo({top:0,behavior:'smooth'});
+}
 
 async function loadConfig(){
   const c=await(await fetch('/api/config')).json();
@@ -1899,6 +1914,7 @@ $('#go').onclick=async()=>{
       body.ref_b64=await _fileToB64(S.motionRef);
     }catch(e){ $('#genErr').textContent='Could not read the files.'; return; }
     body.frame_cap=+$('#mFrames').value||81;
+    body.fps=+$('#mFps').value||30;
     body.prompt=$('#mPrompt').value.trim();
   }
   else{
@@ -1941,8 +1957,9 @@ $('#go').onclick=async()=>{
           const src=d.video_url||('data:video/mp4;base64,'+((d.videos||[])[0]||''));
           $('#results').innerHTML=`<video controls autoplay loop playsinline style="width:100%;max-width:460px;border-radius:12px;background:#000" src="${src}"></video>`;
         } else {
-          $('#results').innerHTML=(d.images||[]).map((b,i)=>`<figure style="animation-delay:${i*.07}s"><img src="data:image/png;base64,${b}"></figure>`).join('');
+          $('#results').innerHTML=(d.images||[]).map((b,i)=>`<figure style="animation-delay:${i*.07}s;position:relative"><img src="data:image/png;base64,${b}"><button class="to-motion" data-i="${i}" title="Use as Motion reference photo" style="position:absolute;left:6px;bottom:6px;background:rgba(12,12,14,.74);border:1px solid var(--amber-dim);color:var(--amber);font-size:11px;padding:4px 9px;border-radius:8px;cursor:pointer">→ Motion ref</button></figure>`).join('');
           $$('#results img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.src;$('#imgview').classList.add('on');});
+          $$('#results .to-motion').forEach(btn=>btn.onclick=(e)=>{e.stopPropagation(); useAsMotionRef(d.images[+btn.dataset.i]);});
         }
         $('#seedTag').textContent='seed '+d.seed;
         if(_wasCloud&&CLOUD.info){   // estimate-only spend: $/sec × measured seconds × variations
