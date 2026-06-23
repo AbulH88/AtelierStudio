@@ -52,7 +52,7 @@ jobs:
           PORT="$(printf '%s' "$VPS_PORT" | tr -d '[:space:]')"; PORT="${PORT:-22}"
           cd runpod-comfyui
           tar czf - \
-            comfy_common.py workflow_i2i.json workflow_t2i.json \
+            comfy_common.py workflow_i2i.json workflow_t2i.json workflow_video.json \
             webapp/app.py webapp/r2_store.py webapp/index.html webapp/login.html \
           | ssh -i ~/.ssh/deploy_key -p "$PORT" \
               -o StrictHostKeyChecking=accept-new \

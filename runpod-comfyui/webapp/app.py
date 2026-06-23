@@ -969,6 +969,11 @@ def _build_input(body):
         with open(fpath, "rb") as f:
             inp["image_b64"] = base64.b64encode(f.read()).decode()
         inp["denoise"] = float(body.get("denoise", 0.65))
+    elif inp["mode"] == "video":   # Wan Animate: driving video + ref photo
+        inp["video_b64"] = body.get("video_b64", "")
+        inp["video_filename"] = body.get("video_filename", "driving.mp4")
+        inp["ref_b64"] = body.get("ref_b64", "")
+        inp["frame_cap"] = int(body.get("frame_cap", 81))
     return inp
 
 
@@ -1165,6 +1170,20 @@ def _run_gen_job(job_id, target, inp, body):
 
         if not out or "error" in out:
             raise RuntimeError((out or {}).get("error", "No output from worker."))
+        if inp["mode"] == "video":                       # Wan Animate -> mp4
+            vids = out.get("videos", [])
+            url = None
+            try:                                          # persist to R2 (best-effort)
+                if vids:
+                    key = f"video_outputs/motion_{int(time.time())}.mp4"
+                    r2_store.upload_bytes(key, base64.b64decode(vids[0]))
+                    url = f"/api/media?key={key}"
+            except Exception:
+                pass
+            with GEN_JOBS_LOCK:
+                GEN_JOBS[job_id] = {"status": "done", "videos": vids,
+                                    "video_url": url, "seed": out.get("seed")}
+            return
         images = out.get("images", [])
         _save_to_gallery(inp, images, out.get("seed"))   # persist (best-effort)
         with GEN_JOBS_LOCK:
@@ -1179,10 +1198,16 @@ def generate():
     body = request.get_json(force=True)
     target = body.get("target", "local")
 
-    if body.get("mode", "i2i") == "i2i":
+    mode = body.get("mode", "i2i")
+    if mode == "i2i":
         fpath = os.path.join(FRAMES_DIR, body.get("session", ""), body.get("frame", ""))
         if not os.path.exists(fpath):
             return jsonify({"error": "Frame not found."}), 404
+    elif mode == "video":
+        if not body.get("video_b64"):
+            return jsonify({"error": "Upload a driving video."}), 400
+        if not body.get("ref_b64"):
+            return jsonify({"error": "Upload a reference image."}), 400
     elif not body.get("prompt", "").strip():
         return jsonify({"error": "Type a prompt for text mode."}), 400
 

@@ -682,8 +682,9 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 <div id="pageStudio">
 <div class="modes">
   <div class="seg">
-    <button id="mVid" class="on" data-mode="i2i"><span class="k">i</span>Video → Character</button>
+    <button id="mVid" class="on" data-mode="i2i"><span class="k">i</span>Frame → Character</button>
     <button id="mTxt" data-mode="t2i"><span class="k">t</span>Text → Character</button>
+    <button id="mMotion" data-mode="video"><span class="k">m</span>Motion → Video</button>
   </div>
 </div>
 
@@ -779,6 +780,38 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 
         <textarea id="prompt" placeholder="e.g. standing on a rooftop at blue hour, fitted black blazer, gold necklace, city skyline behind, editorial photoshoot lighting…"></textarea>
         <p class="hint" style="margin:10px 0 0">Your character's identity comes from the LoRA — describe the outfit, pose & setting.</p>
+      </div>
+    </section>
+
+    <!-- motion (Wan Animate) workspace -->
+    <section class="card d1 hide" id="paneMotion">
+      <div class="hd"><span class="step">1</span><h2>Motion → Video</h2><span class="sub">wan animate · cloud/5090</span></div>
+      <div class="bd">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div>
+            <div class="lab" style="margin-bottom:6px">Driving video <span style="color:var(--faint)">(the motion)</span></div>
+            <div class="drop" id="mDropVid" style="padding:22px">
+              <div class="ic">🎬</div><p><b>Drop a clip</b> or click</p>
+            </div>
+            <input type="file" id="mVidFile" accept="video/*" class="hide">
+            <video id="mVidPreview" class="hide" controls muted playsinline style="width:100%;margin-top:10px;border-radius:10px;max-height:220px;background:#000"></video>
+          </div>
+          <div>
+            <div class="lab" style="margin-bottom:6px">Reference photo <span style="color:var(--faint)">(the character)</span></div>
+            <div class="drop" id="mDropRef" style="padding:22px">
+              <div class="ic">🖼</div><p><b>Drop a photo</b> or click</p>
+            </div>
+            <input type="file" id="mRefFile" accept="image/*" class="hide">
+            <img id="mRefPreview" class="hide" style="width:100%;margin-top:10px;border-radius:10px;max-height:220px;object-fit:contain;background:#000">
+          </div>
+        </div>
+        <div class="inline" style="margin-top:16px">
+          <label>Frames</label>
+          <input type="number" id="mFrames" value="81" min="9" max="161" step="4" style="width:80px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+          <label style="color:var(--faint)">(81 ≈ 2.7s @30fps · more = longer + heavier)</label>
+        </div>
+        <textarea id="mPrompt" placeholder="optional: describe the look (clothing, setting). The character identity comes from the LoRA." style="margin-top:14px"></textarea>
+        <p class="hint" style="margin:10px 0 0">Ref photo drives the character's appearance via CLIP-Vision; the LoRA owns the face. The driving video supplies the motion.</p>
       </div>
     </section>
 
@@ -1402,16 +1435,38 @@ PAIRS.forEach(([r,n,dec])=>{const R=$(r),N=$(n);
 function setMode(m){
   S.mode=m;
   $('#mVid').classList.toggle('on',m==='i2i');$('#mTxt').classList.toggle('on',m==='t2i');
+  $('#mMotion').classList.toggle('on',m==='video');
   $('#paneVideo').classList.toggle('hide',m!=='i2i');
   $('#paneText').classList.toggle('hide',m!=='t2i');
-  // Steps + Denoise only apply to I2I; T2I uses its fixed workflow schedule
+  $('#paneMotion').classList.toggle('hide',m!=='video');
+  // Steps + Denoise only apply to I2I; T2I uses its fixed schedule; video uses its own
   $('#denoiseField').classList.toggle('hide',m!=='i2i');
   $('#stepsField').classList.toggle('hide',m!=='i2i');
-  applyLightningDefault(m);   // Lightning default differs per mode (t2i = v2 distill @0.6)
+  // Lightning + the helper-LoRA / lightning controls are image-only
+  $$('.imgonly').forEach(el=>el.classList.toggle('hide', m==='video'));
+  applyLightningDefault(m);
   refreshGo();
   if(typeof renderCloudCard==='function') renderCloudCard();
 }
-$('#mVid').onclick=()=>setMode('i2i');$('#mTxt').onclick=()=>setMode('t2i');
+$('#mVid').onclick=()=>setMode('i2i');$('#mTxt').onclick=()=>setMode('t2i');$('#mMotion').onclick=()=>setMode('video');
+
+// ===== Motion (Wan Animate) inputs: driving video + ref photo =====
+S.motionVid=null; S.motionRef=null;
+function _mWireDrop(dropId,fileId,onPick){
+  const d=$(dropId),f=$(fileId); if(!d) return;
+  d.onclick=()=>f.click();
+  f.onchange=()=>{ if(f.files[0]) onPick(f.files[0]); };
+  ['dragover','dragleave','drop'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();
+    if(ev==='drop'&&e.dataTransfer.files[0]){ onPick(e.dataTransfer.files[0]); }}));
+}
+_mWireDrop('#mDropVid','#mVidFile',f=>{ S.motionVid=f;
+  const v=$('#mVidPreview'); v.src=URL.createObjectURL(f); v.classList.remove('hide');
+  $('#mDropVid').querySelector('p').innerHTML='<b>'+f.name+'</b> ready'; refreshGo(); });
+_mWireDrop('#mDropRef','#mRefFile',f=>{ S.motionRef=f;
+  const im=$('#mRefPreview'); im.src=URL.createObjectURL(f); im.classList.remove('hide');
+  $('#mDropRef').querySelector('p').innerHTML='<b>'+f.name+'</b> ready'; refreshGo(); });
+function _fileToB64(file){ return new Promise((res,rej)=>{ const r=new FileReader();
+  r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(file); }); }
 
 async function loadConfig(){
   const c=await(await fetch('/api/config')).json();
@@ -1508,7 +1563,9 @@ $('#video').onchange=()=>{if($('#video').files[0])$('#drop').querySelector('p').
   if(ev==='drop'&&e.dataTransfer.files[0]){$('#video').files=e.dataTransfer.files;$('#video').onchange();}}));
 
 function refreshGo(){
-  let ok = S.mode==='i2i' ? !!S.frame : $('#prompt').value.trim().length>3;
+  let ok;
+  if(S.mode==='video') ok = !!(S.motionVid && S.motionRef);   // need driving video + ref photo
+  else ok = S.mode==='i2i' ? !!S.frame : $('#prompt').value.trim().length>3;
   if(ok && cloudMissing().length) ok=false;   // grey out: a selected LoRA isn't on the cloud volume
   $('#go').disabled=!ok;
 }
@@ -1823,6 +1880,14 @@ $('#go').onclick=async()=>{
     body.denoise=+$('#dnVal').value;
     body.prompt=$('#i2iPrompt').value.trim();
   }
+  else if(S.mode==='video'){
+    try{
+      body.video_b64=await _fileToB64(S.motionVid); body.video_filename=S.motionVid.name;
+      body.ref_b64=await _fileToB64(S.motionRef);
+    }catch(e){ $('#genErr').textContent='Could not read the files.'; return; }
+    body.frame_cap=+$('#mFrames').value||81;
+    body.prompt=$('#mPrompt').value.trim();
+  }
   else{
     body.prompt=$('#prompt').value.trim();
   }
@@ -1859,9 +1924,14 @@ $('#go').onclick=async()=>{
       if(d.status==='done'){
         clearInterval(poll);
         $('#empty').classList.add('hide');
-        $('#results').innerHTML=(d.images||[]).map((b,i)=>`<figure style="animation-delay:${i*.07}s"><img src="data:image/png;base64,${b}"></figure>`).join('');
+        if(d.videos||d.video_url){   // Wan Animate motion result -> mp4
+          const src=d.video_url||('data:video/mp4;base64,'+((d.videos||[])[0]||''));
+          $('#results').innerHTML=`<video controls autoplay loop playsinline style="width:100%;max-width:460px;border-radius:12px;background:#000" src="${src}"></video>`;
+        } else {
+          $('#results').innerHTML=(d.images||[]).map((b,i)=>`<figure style="animation-delay:${i*.07}s"><img src="data:image/png;base64,${b}"></figure>`).join('');
+          $$('#results img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.src;$('#imgview').classList.add('on');});
+        }
         $('#seedTag').textContent='seed '+d.seed;
-        $$('#results img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.src;$('#imgview').classList.add('on');});
         if(_wasCloud&&CLOUD.info){   // estimate-only spend: $/sec × measured seconds × variations
           CLOUD.lastSec=Math.max(1,Math.round((Date.now()-_t0)/1000));
           CLOUD.spend+=cloudPricePerSec()*CLOUD.lastSec*_vars; CLOUD.gens++;
