@@ -1211,8 +1211,12 @@ async function loadCloudGpus(){
     const d=await(await fetch('/api/cloud/gpus')).json();
     CLOUD.gpus=d.options||[]; CLOUD.gpu=d.current||'auto'; CLOUD.gpusLoaded=true;
     const sel=$('#cloudGpu'); if(!sel) return;
-    sel.innerHTML='<option value="auto">Auto · cheapest available</option>'+
-      CLOUD.gpus.map(g=>`<option value="${g.id}">${g.label} · ${g.vram}GB · ~$${(g.price_per_sec*CLOUD.lastSec).toFixed(3)}/img</option>`).join('');
+    if(!CLOUD.gpus.length){
+      sel.innerHTML='<option value="auto">— no GPU in stock right now —</option>';
+    }else{
+      sel.innerHTML='<option value="auto">Auto · cheapest in stock</option>'+
+        CLOUD.gpus.map(g=>`<option value="${g.id}">${g.label} · ${g.vram}GB · ~$${(g.price_per_sec*CLOUD.lastSec).toFixed(3)}/img · ${g.stock} stock</option>`).join('');
+    }
     sel.value=CLOUD.gpu;
     sel.onchange=setCloudGpu;
     const sb=$('#cloudStockBtn'); if(sb) sb.onclick=checkCloudStock;

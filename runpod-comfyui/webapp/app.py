@@ -85,6 +85,7 @@ def _price_per_sec():
 # REST gpuTypeId + approx serverless flex $/sec. The UI lets the user pick one (or
 # "auto" = cheapest-available). Cheapest first.
 CLOUD_GPU_OPTIONS = [
+    {"id": "NVIDIA GeForce RTX 5090",        "label": "RTX 5090",     "vram": 32,  "price_per_sec": 0.00069},
     {"id": "NVIDIA A40",                     "label": "A40",          "vram": 48,  "price_per_sec": 0.00044},
     {"id": "NVIDIA RTX A6000",               "label": "RTX A6000",    "vram": 48,  "price_per_sec": 0.00049},
     {"id": "NVIDIA L40S",                    "label": "L40S",         "vram": 48,  "price_per_sec": 0.00053},
@@ -586,10 +587,39 @@ def cloud_status():
     return jsonify(_cloud_status())
 
 
+def _live_gpus(dc=None):
+    """LIVE GPUs from RunPod for the datacenter: >=32GB (fits the 28GB model) and
+    in stock, each with the real gpuTypeId + $/sec (from on-demand $/hr). Free
+    GraphQL read, no pods. Returns [] on error / no key."""
+    if not API_KEY:
+        return []
+    dc = (RUNPOD_REGION if dc is None else dc) or ""
+    q = ("query($dc:String){ gpuTypes { id displayName memoryInGb "
+         "lowestPrice(input:{gpuCount:1, dataCenterId:$dc}){ stockStatus uninterruptablePrice } } }")
+    try:
+        r = requests.post("https://api.runpod.io/graphql",
+                          headers={"Authorization": f"Bearer {API_KEY}"},
+                          json={"query": q, "variables": {"dc": dc}}, timeout=15)
+        types = ((r.json() or {}).get("data") or {}).get("gpuTypes") or []
+    except Exception:
+        return []
+    rank = {"High": 0, "Medium": 1, "Low": 2}
+    out = []
+    for g in types:
+        mem = g.get("memoryInGb") or 0
+        lp = g.get("lowestPrice") or {}
+        stock = lp.get("stockStatus")
+        if mem >= 32 and stock:
+            hr = lp.get("uninterruptablePrice") or 0
+            out.append({"id": g["id"], "label": g.get("displayName") or g["id"],
+                        "vram": mem, "stock": stock, "price_per_sec": round((hr or 0) / 3600.0, 8)})
+    out.sort(key=lambda x: (rank.get(x["stock"], 3), x["price_per_sec"] or 9))
+    return out
+
+
 @app.get("/api/cloud/gpus")
 def cloud_gpus():
-    """GPU options + the endpoint's current selection ('auto' = cheapest-available
-    full list; a single id = locked to that GPU)."""
+    """LIVE GPU options from RunPod (in-stock, model-capable) + the endpoint's current pick."""
     current = "auto"
     try:
         if ENDPOINT_ID and API_KEY:
@@ -599,23 +629,21 @@ def cloud_gpus():
                 current = ids[0]
     except Exception:
         pass
-    return jsonify({"options": CLOUD_GPU_OPTIONS, "current": current})
+    return jsonify({"options": _live_gpus(), "current": current})
 
 
 @app.post("/api/cloud/gpu")
 @admin_required
 def cloud_set_gpu():
-    """Reconfigure the shared endpoint's GPU. 'auto' -> full cheap-first list; a
-    specific id -> lock to that one. Admin-only (it changes the endpoint for everyone)."""
+    """Reconfigure the shared endpoint's GPU. 'auto' -> every in-stock model-capable
+    card; a specific id -> lock to it. Admin-only (changes the endpoint for everyone)."""
     if not (ENDPOINT_ID and API_KEY):
         return jsonify({"error": "cloud not configured"}), 400
     gid = (request.get_json(force=True) or {}).get("gpu", "auto")
     if gid == "auto":
-        ids = [g["id"] for g in CLOUD_GPU_OPTIONS]
-    elif any(g["id"] == gid for g in CLOUD_GPU_OPTIONS):
-        ids = [gid]
+        ids = [g["id"] for g in _live_gpus()] or [g["id"] for g in CLOUD_GPU_OPTIONS]
     else:
-        return jsonify({"error": "unknown gpu"}), 400
+        ids = [gid]   # RunPod validates the id on PATCH
     try:
         r = requests.patch(RUNPOD_EP_URL, headers={"Authorization": f"Bearer {API_KEY}"},
                            json={"gpuTypeIds": ids}, timeout=15)
@@ -632,23 +660,7 @@ def cloud_gpu_availability():
     if not API_KEY:
         return jsonify({"configured": False})
     dc = (RUNPOD_REGION or "").strip()
-    q = ("query($dc:String){ gpuTypes { displayName memoryInGb "
-         "lowestPrice(input:{gpuCount:1, dataCenterId:$dc}){ stockStatus } } }")
-    try:
-        r = requests.post("https://api.runpod.io/graphql",
-                          headers={"Authorization": f"Bearer {API_KEY}"},
-                          json={"query": q, "variables": {"dc": dc}}, timeout=20)
-        types = ((r.json() or {}).get("data") or {}).get("gpuTypes") or []
-    except Exception as e:
-        return jsonify({"configured": True, "dc": dc, "error": f"{type(e).__name__}: {e}"})
-    rank = {"High": 0, "Medium": 1, "Low": 2}
-    gpus = []
-    for g in types:
-        mem = g.get("memoryInGb") or 0
-        stock = (g.get("lowestPrice") or {}).get("stockStatus")
-        if mem >= 32 and stock:   # >=32GB fits the 28GB model; stock present
-            gpus.append({"label": g["displayName"], "vram": mem, "stock": stock})
-    gpus.sort(key=lambda x: (rank.get(x["stock"], 3), -x["vram"]))
+    gpus = _live_gpus(dc)
     return jsonify({"configured": True, "dc": dc or "endpoint default",
                     "any": bool(gpus), "gpus": gpus})
 
