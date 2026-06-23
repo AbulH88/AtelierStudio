@@ -810,8 +810,9 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           <input type="number" id="mFrames" value="81" min="9" max="161" step="4" style="width:80px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
           <label style="color:var(--faint)">(81 ≈ 2.7s @30fps · more = longer + heavier)</label>
         </div>
-        <textarea id="mPrompt" placeholder="optional: describe the look (clothing, setting). The character identity comes from the LoRA." style="margin-top:14px"></textarea>
-        <p class="hint" style="margin:10px 0 0">Ref photo drives the character's appearance via CLIP-Vision; the LoRA owns the face. The driving video supplies the motion.</p>
+        <button id="mDescribeBtn" class="go ghost" style="width:auto;margin-top:14px;padding:8px 16px;font-size:13px" type="button">🪄 Describe ref photo with AI</button>
+        <textarea id="mPrompt" placeholder="optional: describe the look (clothing, setting). Or hit 'Describe ref photo' to auto-fill from the reference image. The character identity comes from the LoRA." style="margin-top:10px"></textarea>
+        <p class="hint" style="margin:10px 0 0">Ref photo drives the character's appearance via CLIP-Vision; the LoRA owns the face. The driving video supplies the motion. Describe options are in the rail →</p>
       </div>
     </section>
 
@@ -1467,6 +1468,18 @@ _mWireDrop('#mDropRef','#mRefFile',f=>{ S.motionRef=f;
   $('#mDropRef').querySelector('p').innerHTML='<b>'+f.name+'</b> ready'; refreshGo(); });
 function _fileToB64(file){ return new Promise((res,rej)=>{ const r=new FileReader();
   r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(file); }); }
+$('#mDescribeBtn').onclick=async()=>{
+  if(!S.motionRef){ alert('Upload a reference photo first.'); return; }
+  const btn=$('#mDescribeBtn'),old=btn.textContent; btn.disabled=true; btn.textContent='🪄 describing…';
+  const fd=new FormData(); fd.append('image',S.motionRef);
+  Object.entries(describeOpts()).forEach(([k,v])=>fd.append(k,v));
+  try{
+    const d=await safeJson(await fetch('/api/describe',{method:'POST',body:fd}));
+    if(d.error) alert('Describe failed: '+d.error);
+    else if(d.prompt){ $('#mPrompt').value=d.prompt; }
+  }catch(e){ alert('Describe failed: '+e); }
+  finally{ btn.disabled=false; btn.textContent=old; }
+};
 
 async function loadConfig(){
   const c=await(await fetch('/api/config')).json();
