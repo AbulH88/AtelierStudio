@@ -863,6 +863,24 @@ def reels_download():
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+@app.post("/api/reels/upload")
+def reels_upload():
+    """Upload a local video file straight into the reel library (R2)."""
+    f = request.files.get("video")
+    folder = (request.form.get("folder") or "").strip()
+    if not f or not f.filename:
+        return jsonify({"error": "No file selected."}), 400
+    if not (f.content_type or "").lower().startswith("video/"):
+        return jsonify({"error": "That's not a video file."}), 400
+    name = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(f.filename)) or "video.mp4"
+    key = (f"{folder}/" if folder else "") + name
+    try:
+        r2_store.upload_bytes(key, f.read())
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
+    return jsonify({"ok": True, "key": key, "name": name})
+
+
 @app.get("/api/reels/media")
 @app.get("/api/media")
 def reels_media():

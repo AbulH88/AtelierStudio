@@ -963,6 +963,8 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
       <div class="reels-top-bar">
         <input type="text" id="reelUrl" placeholder="Paste an Instagram reel URL…">
         <button class="go" id="reelDlBtn" style="width:auto;padding:11px 24px;font-size:14px">Download</button>
+        <button class="go ghost" id="reelUploadBtn" style="width:auto;padding:11px 18px;font-size:14px">⬆ Upload</button>
+        <input type="file" id="reelUploadFile" accept="video/*" class="hide">
         <button class="go ghost hide" id="igBtn" style="width:auto;padding:11px 16px;font-size:13px"><span class="igdot" id="igDot"></span>Instagram</button>
       </div>
       <div class="err" id="reelErr"></div>
@@ -1089,6 +1091,12 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 
 <!-- result image viewer -->
 <div class="imgview" id="imgview"><img id="imgviewImg" alt=""></div>
+
+<!-- reel video player (with sound) -->
+<div class="imgview" id="vidview" style="flex-direction:column;gap:14px">
+  <video id="vidviewVideo" controls playsinline style="max-width:92vw;max-height:82vh;border-radius:12px;box-shadow:0 30px 80px -20px #000;background:#000"></video>
+  <div id="vidviewName" style="font-family:var(--mono);font-size:12px;color:var(--mut)"></div>
+</div>
 
 <!-- frame picker (full-screen grid popup) -->
 <div class="picker" id="picker">
@@ -1684,11 +1692,13 @@ function renderReelGrid(){
     return;
   }
   $('#reelGrid').innerHTML = list.map(r => `<div class="reel-card">
-    <video src="${r.url}" muted preload="metadata" onmouseover="this.play()" onmouseout="this.pause();this.currentTime=0"></video>
+    <video src="${r.url}" muted preload="metadata" data-url="${r.url}" data-name="${r.name}" style="cursor:pointer"
+      onmouseover="this.play()" onmouseout="this.pause();this.currentTime=0"></video>
     <div class="meta"><div class="nm" title="${r.name}">${r.name}</div><div class="sz">${r.size_mb} MB</div></div>
     <div class="acts"><button class="use" data-key="${r.key}">Use</button>
       <button class="save" data-key="${r.key}">↓ Save</button>
       <button class="del" data-key="${r.key}">✕</button></div></div>`).join('');
+  $$('#reelGrid video').forEach(v=>v.onclick=()=>openReelPlayer(v.dataset.url, v.dataset.name));
   $$('#reelGrid .use').forEach(b=>b.onclick=()=>useReel(b.dataset.key));
   $$('#reelGrid .save').forEach(b=>b.onclick=async()=>{
     const d=await(await fetch('/api/reels/save-url?key='+encodeURIComponent(b.dataset.key))).json();
@@ -1728,6 +1738,32 @@ $('#reelDlBtn').onclick=async()=>{
   }catch(e){$('#reelErr').textContent=String(e);}
   finally{$('#reelDlBtn').textContent=t;$('#reelDlBtn').disabled=false;}
 };
+
+// upload a local video straight into the reel library
+$('#reelUploadBtn').onclick=()=>$('#reelUploadFile').click();
+$('#reelUploadFile').onchange=async()=>{
+  const f=$('#reelUploadFile').files[0]; if(!f) return;
+  $('#reelErr').textContent='';
+  const t=$('#reelUploadBtn').textContent;$('#reelUploadBtn').innerHTML='<span class="spin"></span>uploading…';$('#reelUploadBtn').disabled=true;
+  try{
+    const fd=new FormData(); fd.append('video',f); fd.append('folder',_activeFolder);
+    const d=await safeJson(await fetch('/api/reels/upload',{method:'POST',body:fd}));
+    if(d.error){$('#reelErr').textContent=d.error;return;}
+    loadReels();
+  }catch(e){$('#reelErr').textContent=String(e);}
+  finally{$('#reelUploadBtn').textContent=t;$('#reelUploadBtn').disabled=false;$('#reelUploadFile').value='';}
+};
+
+// reel video player popup (plays with sound)
+function openReelPlayer(url, name){
+  const v=$('#vidviewVideo'); v.src=url; v.muted=false; v.currentTime=0;
+  $('#vidviewName').textContent=name||'';
+  $('#vidview').classList.add('on'); v.play().catch(()=>{});
+}
+function closeReelPlayer(){ const v=$('#vidviewVideo'); v.pause(); v.removeAttribute('src'); v.load(); $('#vidview').classList.remove('on'); }
+$('#vidview').onclick=e=>{ if(e.target.id==='vidview') closeReelPlayer(); };
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && $('#vidview').classList.contains('on')) closeReelPlayer(); });
+
 async function useReel(key){
   $('#reelErr').textContent='extracting frames…';
   const d=await(await fetch('/api/reels/use',{method:'POST',headers:{'Content-Type':'application/json'},
