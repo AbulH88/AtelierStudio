@@ -34,7 +34,7 @@
   },
   "14": {
     "class_type": "PathchSageAttentionKJ",
-    "inputs": { "model": ["10", 0], "sage_attention": "auto" },
+    "inputs": { "model": ["10", 0], "sage_attention": "disabled" },
     "_meta": { "title": "Sage attention (VERIFY field name)" }
   },
   "11": {
