@@ -78,10 +78,16 @@ for repo, fn, target in BASE:
 hardlink("text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
          "clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors")
 
-# 2) private repo: LoRAs (motion + character) under loras/, detection models under detection/
+# 2) private repo: LoRAs + detection models.
+#    - motion LoRAs are stored as  loras/wan/WanLightning/...  (from _upload_video.py)
+#    - character LoRAs are stored as  wan/Own/...  (from the older _upload_loras.py, no prefix)
+#    Both must land at models/loras/<rel>. Skip the old image lightning LoRAs (wan/WanLightning/*)
+#    — the motion workflow brings its own lightning stack.
 for f in list_repo_files(LORA_REPO, token=TOK):
-    if f.startswith("loras/") and f.endswith(".safetensors"):
+    if f.endswith(".safetensors") and f.startswith("loras/"):
         grab(LORA_REPO, f, f, token=TOK)                      # -> models/loras/<rel>
+    elif f.endswith(".safetensors") and f.startswith("wan/Own/"):
+        grab(LORA_REPO, f, "loras/" + f, token=TOK)           # char LoRA -> models/loras/wan/Own/<rel>
     elif f.startswith("detection/"):
         grab(LORA_REPO, f, "detection/" + os.path.basename(f), token=TOK)  # -> models/detection/<file>
 
