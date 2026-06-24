@@ -59,7 +59,7 @@
       "pad_color": "0, 0, 0",
       "crop_position": "center",
       "divisible_by": 16,
-      "device": "gpu",
+      "device": "cpu",
       "image": [
         "515",
         0
@@ -183,7 +183,7 @@
       "pad_color": "0, 0, 0",
       "crop_position": "center",
       "divisible_by": 16,
-      "device": "gpu",
+      "device": "cpu",
       "image": [
         "28",
         0
