@@ -90,6 +90,8 @@ for f in list_repo_files(LORA_REPO, token=TOK):
         grab(LORA_REPO, f, "loras/" + f, token=TOK)           # char LoRA -> models/loras/wan/Own/<rel>
     elif f.startswith("detection/"):
         grab(LORA_REPO, f, "detection/" + os.path.basename(f), token=TOK)  # -> models/detection/<file>
+    elif f.startswith("rife/"):
+        grab(LORA_REPO, f, "rife/" + os.path.basename(f), token=TOK)  # ComfyUI-VFI finds it at models/rife/flownet.pkl
 
 shutil.rmtree(STAGE, ignore_errors=True)
 
