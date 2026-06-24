@@ -1164,9 +1164,29 @@ def _run_gen_job(job_id, target, inp, body):
         else:
             if not (ENDPOINT_ID and API_KEY):
                 raise RuntimeError("Cloud not configured (set RunPod env vars).")
-            r = requests.post(RUNPOD_URL, json={"input": inp},
-                              headers={"Authorization": f"Bearer {API_KEY}"}, timeout=900)
-            out = r.json().get("output", {})
+            # Async submit + poll. /runsync only holds the connection ~90s, but a
+            # Wan Animate video gen runs for minutes — runsync would return no output
+            # while the worker is still sampling (looks "killed"). /run + /status waits
+            # for the real result up to the endpoint's execution timeout.
+            hdr = {"Authorization": f"Bearer {API_KEY}"}
+            base = f"https://api.runpod.ai/v2/{ENDPOINT_ID}"
+            rid = requests.post(f"{base}/run", json={"input": inp},
+                                headers=hdr, timeout=60).json().get("id")
+            if not rid:
+                raise RuntimeError("RunPod did not return a job id.")
+            out = {}
+            deadline = time.time() + 1200            # 20 min (matches endpoint executionTimeout)
+            while time.time() < deadline:
+                st = requests.get(f"{base}/status/{rid}", headers=hdr, timeout=30).json()
+                s = st.get("status")
+                if s == "COMPLETED":
+                    out = st.get("output", {}) or {}
+                    break
+                if s in ("FAILED", "CANCELLED", "TIMED_OUT"):
+                    raise RuntimeError(f"RunPod job {s}: {str(st.get('output') or st.get('error') or '')[:300]}")
+                time.sleep(3)
+            else:
+                raise RuntimeError("RunPod job did not finish within 20 min.")
 
         if not out or "error" in out:
             raise RuntimeError((out or {}).get("error", "No output from worker."))

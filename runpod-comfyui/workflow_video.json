@@ -4,7 +4,7 @@
       "model": "WAN/Kijai Collection/Wan2_2-Animate-14B_fp8_scaled_e4m3fn_KJ_v2.safetensors",
       "base_precision": "fp16_fast",
       "quantization": "disabled",
-      "load_device": "offload_device",
+      "load_device": "main_device",
       "attention_mode": "sdpa",
       "rms_norm_function": "default"
     },
@@ -59,7 +59,7 @@
       "pad_color": "0, 0, 0",
       "crop_position": "center",
       "divisible_by": 16,
-      "device": "cpu",
+      "device": "gpu",
       "image": [
         "515",
         0
@@ -183,7 +183,7 @@
       "pad_color": "0, 0, 0",
       "crop_position": "center",
       "divisible_by": 16,
-      "device": "cpu",
+      "device": "gpu",
       "image": [
         "28",
         0
@@ -249,7 +249,7 @@
       "strength_2": 1,
       "crop": "center",
       "combine_embeds": "average",
-      "force_offload": true,
+      "force_offload": false,
       "tiles": 0,
       "ratio": 0.55,
       "clip_vision": [
@@ -272,7 +272,7 @@
       "cfg": 1,
       "shift": 5,
       "seed": 42,
-      "force_offload": true,
+      "force_offload": false,
       "scheduler": "dpm++_sde",
       "riflex_freq_index": 0,
       "denoise_strength": 0.85,
@@ -519,7 +519,7 @@
   },
   "546": {
     "inputs": {
-      "blocks_to_swap": 20,
+      "blocks_to_swap": 0,
       "offload_img_emb": false,
       "offload_txt_emb": false,
       "use_non_blocking": false,
