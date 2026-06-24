@@ -810,6 +810,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           <input type="number" id="mFrames" value="81" min="9" max="100000" step="4" style="width:90px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
           <label style="margin-left:8px">FPS</label>
           <input type="number" id="mFps" value="30" min="1" max="60" step="1" style="width:64px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+          <button id="mMaxFrames" class="reqsync" type="button" style="padding:7px 11px" title="Fill frames to the whole driving clip at this FPS">⤢ max</button>
           <label style="color:var(--faint)" id="mLenHint">≈ 2.7s · more frames = longer + heavier</label>
         </div>
         <button id="mDescribeBtn" class="go ghost" style="width:auto;margin-top:14px;padding:8px 16px;font-size:13px" type="button">🪄 Describe ref photo with AI</button>
@@ -1464,6 +1465,7 @@ function _mWireDrop(dropId,fileId,onPick){
 }
 _mWireDrop('#mDropVid','#mVidFile',f=>{ S.motionVid=f;
   const v=$('#mVidPreview'); v.src=URL.createObjectURL(f); v.classList.remove('hide');
+  v.onloadedmetadata=()=>{ S.motionVidDur=v.duration||0; _mUpdateLen(); };
   $('#mDropVid').querySelector('p').innerHTML='<b>'+f.name+'</b> ready'; refreshGo(); });
 _mWireDrop('#mDropRef','#mRefFile',f=>{ S.motionRef=f;
   const im=$('#mRefPreview'); im.src=URL.createObjectURL(f); im.classList.remove('hide');
@@ -1483,8 +1485,18 @@ $('#mDescribeBtn').onclick=async()=>{
   finally{ btn.disabled=false; btn.textContent=old; }
 };
 function _mUpdateLen(){ const fr=+$('#mFrames').value||81, fps=Math.max(1,+$('#mFps').value||30);
-  $('#mLenHint').textContent='≈ '+(fr/fps).toFixed(1)+'s · more frames = longer + heavier'; }
+  let t='≈ '+(fr/fps).toFixed(1)+'s';
+  if(S.motionVidDur){ const maxF=Math.floor(S.motionVidDur*fps);
+    t+=' · clip '+S.motionVidDur.toFixed(1)+'s = '+maxF+'f max';
+    $('#mFrames').style.borderColor = fr>maxF ? 'var(--rose)' : 'var(--line)'; }
+  $('#mLenHint').textContent=t; }
 $('#mFrames').oninput=_mUpdateLen; $('#mFps').oninput=_mUpdateLen;
+$('#mMaxFrames').onclick=()=>{
+  if(!S.motionVidDur){ alert('Drop a driving video first.'); return; }
+  const fps=Math.max(1,+$('#mFps').value||30);
+  $('#mFrames').value=Math.max(9, Math.floor(S.motionVidDur*fps));
+  _mUpdateLen(); refreshGo();
+};
 // send a generated image straight into Motion mode as the reference photo
 function _b64ToFile(b64,name){ const bin=atob(b64),a=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i); return new File([a],name,{type:'image/png'}); }
