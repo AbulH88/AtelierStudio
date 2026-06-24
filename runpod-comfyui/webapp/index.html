@@ -1422,6 +1422,13 @@ async function pollCloudStatus(){
 }
 function onTargetChange(){
   if(CLOUD.poll){ clearInterval(CLOUD.poll); CLOUD.poll=null; }
+  // Cloud volume holds only the Motion (Wan Animate) models -> Cloud runs Motion only.
+  // Hide the image modes (Frame->Character, Text->Character) and force Motion on Cloud;
+  // they reappear on Local (the home 5090 has every model).
+  const cloudOnly = isCloud();
+  $('#mVid').classList.toggle('hide', cloudOnly);
+  $('#mTxt').classList.toggle('hide', cloudOnly);
+  if(cloudOnly && S.mode!=='video') setMode('video');
   renderCloudCard();
   if(isCloud()){ pollCloudStatus(); CLOUD.poll=setInterval(pollCloudStatus,7000); }
 }

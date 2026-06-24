@@ -25,9 +25,6 @@ BASE = [
      "split_files/text_encoders/umt5_xxl_fp16.safetensors",
      "text_encoders/Wan/umt5_xxl_fp16.safetensors"),
     ("Comfy-Org/Wan_2.1_ComfyUI_repackaged",
-     "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-     "text_encoders/Wan/nsfw_wan_umt5-xxl_fp8_scaled.safetensors"),
-    ("Comfy-Org/Wan_2.1_ComfyUI_repackaged",
      "split_files/vae/wan_2.1_vae.safetensors",
      "vae/wan_2.1_vae.safetensors"),
 ]
@@ -75,7 +72,6 @@ for repo, fn, target in BASE:
 hardlink("diffusion_models/WAN/Wan2.2/Text/low_noise_model/wan2.2_t2v_low_noise_14B_fp16.safetensors",
          "unet/WAN/Wan2.2/Text/low_noise_model/wan2.2_t2v_low_noise_14B_fp16.safetensors")
 hardlink("text_encoders/Wan/umt5_xxl_fp16.safetensors", "clip/Wan/umt5_xxl_fp16.safetensors")
-hardlink("text_encoders/Wan/nsfw_wan_umt5-xxl_fp8_scaled.safetensors", "clip/Wan/nsfw_wan_umt5-xxl_fp8_scaled.safetensors")
 
 # private LoRAs -> models/loras/<same rel path>
 for f in list_repo_files(LORA_REPO, token=TOK):

@@ -1,7 +1,7 @@
 {
   "3": {
     "class_type": "CLIPLoader",
-    "inputs": { "clip_name": "Wan/nsfw_wan_umt5-xxl_fp8_scaled.safetensors", "type": "wan", "device": "default" },
+    "inputs": { "clip_name": "Wan/umt5_xxl_fp16.safetensors", "type": "wan", "device": "default" },
     "_meta": { "title": "CLIP / text encoder" }
   },
   "7": {
