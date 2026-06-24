@@ -128,24 +128,33 @@ def run_video(base, graph, out_node="319", timeout=1800, client_id=None):
         if pid in hist:
             h = hist[pid]
             outs = h.get("outputs", {}) or {}
-            # prefer the designated final node, else any output-type mp4
-            nodes = [outs[out_node]] if out_node in outs else list(outs.values())
-            vids = []
-            for out in nodes:
-                for g in out.get("gifs", []):
+            # Return the final SAVED character video only. The pose preview
+            # (node 117, save_output=false) lands as type "temp" — never return it.
+            # Try the designated final node first, then any other saved-output node.
+            order = ([out_node] if out_node in outs else []) + [k for k in outs if k != out_node]
+            for nid in order:
+                vids = []
+                for g in outs.get(nid, {}).get("gifs", []):
                     fn = str(g.get("filename", "")).lower()
                     if not fn.endswith((".mp4", ".webm", ".mov")):
+                        continue
+                    if g.get("type") == "temp":      # skip pose/preview temp clips
                         continue
                     v = requests.get(f"{base}/view", params={
                         "filename": g["filename"], "subfolder": g.get("subfolder", ""),
                         "type": g.get("type", "output")}, headers=CF_HEADERS, timeout=300)
                     vids.append(base64.b64encode(v.content).decode())
-            if vids:
-                return vids
+                if vids:
+                    return vids
             err = _history_error(h.get("status", {}) or {})
             if err:
                 raise RuntimeError("ComfyUI node error — " + err)
-            return vids
+            # No saved video — report what each node produced so we can see why the
+            # final node (319) is missing (filename + type per node).
+            diag = {nid: [(g.get("filename"), g.get("type")) for g in o.get("gifs", [])]
+                    for nid, o in outs.items() if o.get("gifs")}
+            raise RuntimeError("No saved output video (final node #%s missing). Nodes that produced clips: %s"
+                               % (out_node, json.dumps(diag)))
         time.sleep(2)
     raise TimeoutError("ComfyUI timed out (video)")
 
