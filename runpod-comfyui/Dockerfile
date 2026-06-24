@@ -34,7 +34,7 @@ RUN git clone https://github.com/ClownsharkBatwing/RES4LYF.git && \
 # --- Motion (Wan Animate) node packs ---
 # WanVideoWrapper (WanVideo* nodes, Animate embeds/sampler), WanAnimatePreprocess
 # (PoseAndFaceDetection, OnnxDetectionModelLoader), VideoHelperSuite (VHS load/combine),
-# JPS-Nodes (Text Prompt), rgthree (utils), Frame-Interpolation (RIFE), controlnet_aux (DWPose).
+# JPS-Nodes (Text Prompt), rgthree (utils), ComfyUI-VFI (RIFEInterpolation), controlnet_aux (DWPose).
 RUN git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git && \
     pip install -r ComfyUI-WanVideoWrapper/requirements.txt || true
 RUN git clone https://github.com/kijai/ComfyUI-WanAnimatePreprocess.git && \
@@ -44,8 +44,8 @@ RUN git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git && \
 RUN git clone https://github.com/JPS-GER/ComfyUI_JPS-Nodes.git || true
 RUN git clone https://github.com/rgthree/rgthree-comfy.git && \
     pip install -r rgthree-comfy/requirements.txt || true
-RUN git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git && \
-    pip install -r ComfyUI-Frame-Interpolation/requirements-no-cupy.txt || true
+RUN git clone https://github.com/GACLove/ComfyUI-VFI.git && \
+    pip install -r ComfyUI-VFI/requirements.txt || true
 RUN git clone https://github.com/Fannovel16/comfyui_controlnet_aux.git && \
     pip install -r comfyui_controlnet_aux/requirements.txt || true
 # ONNX runtime (GPU) for the pose/face detectors + DWPose (CUDAExecutionProvider).
