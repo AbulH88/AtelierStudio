@@ -1,20 +1,23 @@
 # Wan 2.2 ComfyUI serverless worker.
-# Base: CUDA 12.4 + Python. Models are NOT baked in — they mount from the
-# RunPod network volume at runtime (see start.sh).
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+# Base: CUDA 12.8 + Python (12.8 needed so PyTorch can drive Blackwell GPUs —
+# RTX 5090 / RTX PRO 6000, sm_120 — which CUDA 12.4 wheels cannot). Models are
+# NOT baked in — they mount from the RunPod network volume at runtime (see start.sh).
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1
 
+# build-essential gives triton/sageattention a host C compiler (fixes the
+# "Failed to find C compiler" runtime error seen in worker logs).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git wget curl ffmpeg python3 python3-pip python3-venv \
+    git wget curl ffmpeg python3 python3-pip python3-venv build-essential \
     && ln -sf /usr/bin/python3 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
-# PyTorch (CUDA 12.4 wheels).
+# PyTorch (CUDA 12.8 wheels — Blackwell sm_120 support).
 RUN pip install --upgrade pip && \
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
 # ComfyUI core.
 WORKDIR /
