@@ -27,11 +27,18 @@ session — read the "CLOUD STATE" and "MOTION MODE" sections below first. Origi
    in chat / are on the VPS. Mint new ones, update VPS `.env` + the MCP + HF.
 4. Optional: per-character trigger words; protect agent.thecristinaadam.com with Access.
 
-## ✅ CLOUD STATE (image path is LIVE on the VPS this session)
-- **Endpoint** `d27ehaezfyja3o` (serverless, workersMin=0 → $0 idle), template `4fo2wrxxci`,
-  **EU-RO-1**, volume attached. GPU list set live; cheap-first.
-- **Volume** `atelier-models` id `3qu8532k8s` (60 GB, EU-RO-1) — image models + 6 char LoRAs +
-  2 lightning LoRAs (~56 GB, verified). ~$4-7/mo storage = the only ongoing cost.
+## ✅ CLOUD STATE — MOTION is now LIVE (image cloud path retired)
+- **Motion endpoint** `tgh96neez89ei8` (name `atelier-motion`, serverless, workersMin=0 → $0
+  idle), template `4fo2wrxxci` → image `:0a2613536e...` (video node packs), **EU-RO-1**, 48 GB
+  GPU list (A40/A6000/L40/L40S/6000Ada). VPS `.env RUNPOD_ENDPOINT_ID` points here.
+- **Motion volume** `atelier-motion` id `p8od5of3fb` (**60 GB**, EU-RO-1) — fully populated:
+  18 files, 45.2 GB (Animate-14B fp8, umt5-fp8, clip_vision_h, vae, 5 motion LoRAs, 3 detection
+  incl. vitpose .bin, 6 char LoRAs). Manifest `_motion_manifest.json` in the HF repo (all_ok).
+- **OLD image volume `atelier-models`/endpoint `d27ehaezfyja3o` were DELETED** — cloud now does
+  Motion only (images run locally on the 5090). `populate_motion.py` rebuilds the volume from HF.
+- DWPose (yolox_l, dw-ll) + RIFE (flownet) are NOT on the volume — controlnet_aux +
+  Frame-Interpolation auto-download them at runtime on first gen (~350 MB, also in HF repo under
+  dwpose/ + rife/ as backup). UI: Cloud target shows Motion mode only (onTargetChange).
 - **Worker image** `orthoraj21/atelier-comfy-worker` on Docker Hub. :latest = sage-disabled
   (commit `8573c3d`). Built by `.github/workflows/build-worker.yml` (GitHub Actions, free).
 - **Private HF repo** `orthoraj21/atelier-loras` holds the own/lightning LoRAs.

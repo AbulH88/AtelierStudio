@@ -1320,8 +1320,13 @@ function onCloud(path){            // known to be on the volume (manifest is low
 function currentLoraSelection(){
   const out=[];
   const cv=$('#variant'); if(cv&&cv.value) out.push({path:cv.value,label:cv.options[cv.selectedIndex].text,kind:'character'});
-  const lp=$('#lightningPick'); if(lp&&lp.value) out.push({path:lp.value,label:'Lightning',kind:'lightning'});
-  $$('#extraLoras .lora-pick').forEach(s=>{ if(s.value) out.push({path:s.value,label:s.options[s.selectedIndex].text,kind:'helper'}); });
+  // Motion (Wan Animate) uses ONLY the character LoRA — it has its own baked-in
+  // lightning + motion LoRA stack. Image lightning/helper LoRAs don't apply in video
+  // mode, so don't count them against the cloud volume (no false "blocked" or sync tags).
+  if(S.mode!=='video'){
+    const lp=$('#lightningPick'); if(lp&&lp.value) out.push({path:lp.value,label:'Lightning',kind:'lightning'});
+    $$('#extraLoras .lora-pick').forEach(s=>{ if(s.value) out.push({path:s.value,label:s.options[s.selectedIndex].text,kind:'helper'}); });
+  }
   return out;
 }
 
