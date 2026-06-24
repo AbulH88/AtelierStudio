@@ -249,9 +249,23 @@ def _build_t2i(graph, inp, seed):
 
 
 # --- high level ---------------------------------------------------------------
+_MODEL_EXT = (".safetensors", ".onnx", ".pkl", ".pth", ".ckpt", ".pt", ".bin", ".sft")
+
+
+def _normalize_model_paths(graph):
+    """Windows-exported workflows use backslash path separators ('wan\\WanLightning\\..'),
+    but the Linux worker lists models with forward slashes, so ComfyUI rejects them
+    ('Value not in list'). Convert backslashes to '/' in any model-path-like input."""
+    for node in graph.values():
+        for k, v in (node.get("inputs") or {}).items():
+            if isinstance(v, str) and "\\" in v and v.lower().endswith(_MODEL_EXT):
+                node["inputs"][k] = v.replace("\\", "/")
+
+
 def _build_video(graph, inp, seed, video_name, ref_name):
     """Inject the dynamic inputs into the Wan Animate graph. Everything else
     (5-LoRA stack, sampler, pose-rig, block-swap) stays as the workflow defines it."""
+    _normalize_model_paths(graph)            # heal Windows-exported backslash paths
     nm = VIDEO
     graph[nm["load_video"]]["inputs"]["video"] = video_name
     if inp.get("frame_cap"):
