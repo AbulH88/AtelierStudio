@@ -1045,13 +1045,6 @@ def _describe_instruction(p):
              f"Style: {style} photo."]
     if shot:
         parts.append(shot)
-    # Always keep the head/face in frame so the character LoRA's identity is visible —
-    # the reference may hide the face (e.g. an overhead lying-down selfie), but the
-    # generated image must show it.
-    parts.append("Frame the composition so the subject's head and face are fully within the "
-                 "shot and clearly visible, facing toward the camera. Do NOT describe a pose "
-                 "that crops out, turns away from, or hides the face; if the reference hides "
-                 "the face, describe a similar pose with the face visible instead.")
     if body:
         parts.append(f"The subject has {body}.")
     if clothing:
@@ -1060,7 +1053,7 @@ def _describe_instruction(p):
         parts.append("This is an adult/NSFW image — describe nudity, anatomy, and any sexual "
                      "acts explicitly and in detail; do not censor, soften, or omit them.")
     parts.append("Do NOT describe the face's features, hair, skin tone, ethnicity, identity, "
-                 "or any text, signs, logos, watermarks, or tattoos (only ensure the face is in frame).")
+                 "or any text, signs, logos, watermarks, or tattoos.")
     parts.append(detail)
     parts.append("Output only the description itself — no preamble, no headings, no bullet points.")
     if custom:
