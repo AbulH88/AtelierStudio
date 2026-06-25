@@ -346,6 +346,11 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 .gal-card .gdel{position:absolute;top:7px;right:7px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line2);
   background:rgba(12,12,14,.75);color:var(--rose);cursor:pointer;display:none;font-size:12px;line-height:1}
 .gal-card:hover .gdel{display:block}
+.gal-card .gmotion{position:absolute;left:7px;right:7px;bottom:7px;border-radius:8px;padding:6px 0;font-size:11.5px;
+  font-weight:600;cursor:pointer;display:none;border:1px solid rgba(160,140,220,.32);
+  background:rgba(160,140,220,.18);color:#cebdf2;backdrop-filter:blur(4px)}
+.gal-card:hover .gmotion{display:block}
+.gal-card .gmotion:hover{background:rgba(160,140,220,.28)}
 @media(max-width:680px){.gallery-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
 
 .gal-card .gcheck {
@@ -1551,6 +1556,16 @@ function useAsMotionRef(b64){
   refreshGo(); window.scrollTo({top:0,behavior:'smooth'});
 }
 
+// Gallery image -> Motion reference photo (fetch the R2 image, reuse useAsMotionRef).
+async function galToMotionRef(url){
+  try{
+    const blob=await(await fetch(url)).blob();
+    const b64=await new Promise((res,rej)=>{ const r=new FileReader();
+      r.onloadend=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(blob); });
+    useAsMotionRef(b64); showPage('studio');
+  }catch(e){ alert('Could not load image into Motion: '+e); }
+}
+
 async function loadConfig(){
   const c=await(await fetch('/api/config')).json();
   S.chars=c.characters; S.cloudChars=c.cloud_characters||[];
@@ -2193,8 +2208,10 @@ function renderGallery() {
       <div class="gcheck"><input type="checkbox" ${checked} data-key="${im.key}"></div>
       <img src="${im.url}" loading="lazy" data-url="${im.url}">
       <button class="gdel" data-key="${im.key}" title="Delete">✕</button>
+      <button class="gmotion" data-url="${im.url}" title="Use as Motion reference photo">→ Motion ref</button>
     </div>`;
   }).join('');
+  $$('#galGrid .gmotion').forEach(b => b.onclick = e => { e.stopPropagation(); galToMotionRef(b.dataset.url); });
   
   $$('#galGrid img').forEach(im => {
     im.onclick = (e) => {
