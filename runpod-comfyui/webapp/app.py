@@ -1182,6 +1182,32 @@ GEN_JOBS = {}
 GEN_JOBS_LOCK = threading.Lock()
 
 
+def _mux_audio(video_bytes, audio_src_b64):
+    """Carry the driving video's audio onto the (silent) Wan Animate mp4. Returns the
+    muxed bytes, or the original video if there is no audio / ffmpeg fails. -shortest
+    matches the (usually shorter) animated clip length to the driving audio."""
+    if not audio_src_b64:
+        return video_bytes
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        vp = os.path.join(td, "v.mp4"); ap = os.path.join(td, "a.mp4"); op = os.path.join(td, "o.mp4")
+        with open(vp, "wb") as f:
+            f.write(video_bytes)
+        with open(ap, "wb") as f:
+            f.write(base64.b64decode(audio_src_b64))
+        try:
+            r = subprocess.run(["ffmpeg", "-y", "-i", vp, "-i", ap,
+                                "-map", "0:v:0", "-map", "1:a:0?",
+                                "-c:v", "copy", "-c:a", "aac", "-shortest", op],
+                               capture_output=True, timeout=180)
+            if r.returncode == 0 and os.path.exists(op) and os.path.getsize(op) > 1000:
+                with open(op, "rb") as f:
+                    return f.read()
+        except Exception:
+            pass
+    return video_bytes
+
+
 def _run_gen_job(job_id, target, inp, body):
     try:
         # i2i with an empty prompt → auto-describe the frame first (OpenRouter)
@@ -1225,8 +1251,10 @@ def _run_gen_job(job_id, target, inp, body):
             url = None
             try:                                          # persist to R2 (best-effort)
                 if vids:
+                    raw = _mux_audio(base64.b64decode(vids[0]), inp.get("video_b64"))
+                    vids = [base64.b64encode(raw).decode()]   # UI preview gets the audio version
                     key = f"video_outputs/motion_{int(time.time())}.mp4"
-                    r2_store.upload_bytes(key, base64.b64decode(vids[0]))
+                    r2_store.upload_bytes(key, raw)
                     url = f"/api/media?key={key}"
             except Exception:
                 pass
