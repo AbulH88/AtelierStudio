@@ -479,6 +479,35 @@ def _cloud_lora_set():
     return {str(p).replace("\\", "/").lower() for p in data if p}
 
 
+def _cloud_lora_list():
+    """Raw (cased) LoRA paths on the volume, from .cloud_loras.json."""
+    try:
+        data = _json.load(open(CLOUD_LORAS_FILE, encoding="utf-8"))
+    except Exception:
+        return []
+    if isinstance(data, dict):
+        data = data.get("loras", [])
+    return [str(p).replace("\\", "/") for p in data if p]
+
+
+def build_cloud_characters():
+    """Character picker built straight from the cloud volume manifest, so Cloud mode
+    shows EVERY character on the volume regardless of the home ComfyUI being up — and
+    with the exact paths the volume has (CHAR_DEFS folders differ from the volume layout).
+    Groups each own-character LoRA by its folder under wan/Own/<Name>/."""
+    groups = {}
+    for p in _cloud_lora_list():
+        parts = p.split("/")
+        if len(parts) >= 3 and parts[0].lower() == "wan" and parts[1].lower() == "own":
+            key = parts[2]
+            g = groups.setdefault(key, {"key": key.lower(), "label": key, "variants": []})
+            g["variants"].append({"label": os.path.splitext(parts[-1])[0], "path": p})
+    res = sorted(groups.values(), key=lambda c: c["label"].lower())
+    for c in res:
+        c["variants"].sort(key=lambda v: v["label"].lower())
+    return res
+
+
 def _cloud_status():
     """Live RunPod endpoint health (warming / ready / queue). Degrades to
     {configured:False} with no creds, {configured:True, error:...} on failure."""
@@ -506,7 +535,7 @@ def _cloud_status():
 # (anything else risks confetti noise); i2i uses the 4-step rank64 @1.0.
 LIGHTNING_DEFAULTS = {
     "i2i": {"path": "wan/WanLightning/Wan2.1-Distill-Loras/wan2.1_t2v_14b_lora_rank64_lightx2v_4step/wan2.1_t2v_14b_lora_rank64_lightx2v_4step.safetensors", "strength": 1.0},
-    "t2i": {"path": "wan/WanLightning/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank128_bf16/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank128_bf16.safetensors", "strength": 0.6},
+    "t2i": {"path": "wan/WanLightning/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank128_bf16/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank256_bf16.safetensors", "strength": 0.6},
 }
 
 
@@ -541,7 +570,8 @@ def index():
 
 @app.get("/api/config")
 def config():
-    return jsonify({"characters": build_characters(), "aspects": ASPECTS,
+    return jsonify({"characters": build_characters(),
+                    "cloud_characters": build_cloud_characters(), "aspects": ASPECTS,
                     "lightning": {"options": _folder_loras("WanLightning", ".lightning_loras.json"),
                                   "defaults": LIGHTNING_DEFAULTS}})
 
