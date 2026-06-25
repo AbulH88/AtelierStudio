@@ -1,31 +1,56 @@
 # Atelier Character Studio — Handoff
 
-Last updated by Claude (Opus 4.8), 2026-06-24. The big cloud + motion work happened this
-session — read the "CLOUD STATE" and "MOTION MODE" sections below first. Original intent in
-`runpod-serverless-build-plan.md`. Memory files: `runpod-cloud-build-state`, `video-wan-animate`.
+Last updated by Claude (Opus 4.8), 2026-06-25. **Cloud motion (Wan Animate) is now LIVE and
+working end-to-end** — this session built + fully debugged the cloud path and shipped UI polish.
+Read "CLOUD STATE" + "MOTION MODE" below. Memory: `runpod-cloud-build-state`, `video-wan-animate`.
 
 ## ⏭️ NEXT (in order)
-1. **VIDEO (Wan Animate) on cloud** — the user's ACTUAL primary goal (images they run locally;
-   they need *video* on cloud for 2 teammates). **Already works LOCALLY** (5090 via the app's
-   Local target). To put it on cloud (billable phase, user is cost-sensitive — confirm first):
-   a. **Dockerfile**: add video node packs — `kijai/ComfyUI-WanVideoWrapper`,
-      `kijai/ComfyUI-WanAnimatePreprocess`, `Kosinkadink/ComfyUI-VideoHelperSuite`,
-      `JPS-Nodes`, `rgthree-comfy`, `Fannovel16/ComfyUI-Frame-Interpolation` (RIFE). KJNodes
-      already in image.
-   b. **Rebuild image** via `build-worker.yml` (free) — it auto-bakes the video `comfy_common`
-      + `workflow_video.json` (both committed).
-   c. **Add video models to the volume** (~+25 GB → ~85 GB, OR drop the 28 GB image t2v UNet
-      since video doesn't use it → ~57 GB). Files: `Wan2_2-Animate-14B_fp8_scaled_e4m3fn_KJ_v2`,
-      `clip_vision_h`, the 5 video LoRAs (relight/Seko/FastWan/Pusa/Fun under wan/WanLightning),
-      ONNX pose (vitpose_h_wholebody, yolov10m, yolox_l, dw-ll_ucoco), RIFE `flownet.pkl`.
-      umt5-fp8 + vae already on the volume (hardlink to the path the video wf expects). On H:/I:.
-   d. Point the endpoint template at the new image SHA; needs a **48 GB+ GPU**.
-   e. Test one cloud motion gen.
-2. **Sync Lenovo (+ other helper LoRAs) to the cloud volume** for image gen — quick (~$0.30 pod).
-   `.cloud_loras.json` (local + VPS `/root/atelier/webapp/`) lists what's on the volume.
-3. **⚠️ ROTATE LEAKED KEYS**: RunPod API key + OpenRouter key + HF write token were all pasted
-   in chat / are on the VPS. Mint new ones, update VPS `.env` + the MCP + HF.
-4. Optional: per-character trigger words; protect agent.thecristinaadam.com with Access.
+1. **Build Motion Storyboard v1** — the user's current ask. Full plan in `motion-storyboard-plan.md`:
+   cut ONE driving video into time segments → per-segment ref image (outfit) → generate each (via
+   `skip_first_frames`/`frame_load_cap`, no real splitting) → auto-stitch with a transition
+   (crossfade default / hard cut / fade-to-black, ffmpeg `xfade` on the VPS) → one mp4 to Gallery.
+   All app-side (app.py + index.html + comfy_common), no image rebuild. Risk: verify the cloud worker
+   honors `skip_first_frames` on node 75 without a rebuild; if baked, fold into the next image build.
+2. **⚠️ ROTATE LEAKED KEYS** — the HF write token (pasted in chat, also in local `webapp/.env`) +
+   the RunPod API key + OpenRouter key are all exposed. Mint new ones, update VPS `.env`.
+3. Optional perf: raise endpoint `idleTimeout` 5s → ~150s so back-to-back gens reuse a warm worker
+   (first gen pays the ~4–5 min cold start: 18 GB image pull + 17 GB model load; compute itself ~90s).
+   `workersMin` stays 0. H200 is NOT in EU-RO-1 (only Blackwell), so it's not an option without a DC move.
+4. Optional: Stop/cancel button (`POST https://api.runpod.ai/v2/<ep>/cancel/<job_id>`); per-char triggers.
+
+## ✅ MOTION CLOUD — the fix chain this session (so it's not re-debugged)
+Worker now makes finished, audio'd character mp4s on a Blackwell GPU in ~90s compute. Fixes (committed):
+- **Blackwell GPU crash (exit 1 loop)** → image was CUDA 12.4 / torch cu124, can't drive RTX PRO 6000 /
+  5090 (sm_120). Rebuilt Dockerfile to **CUDA 12.8 + torch cu128** + `build-essential`. EU-RO-1 has
+  ONLY Blackwell cards, so cu128 was mandatory.
+- **Missing RIFE node** → workflow's `RIFEInterpolation` is from **GACLove/ComfyUI-VFI** (not Fannovel16,
+  which gives `RIFE_VFI`). Swapped the pack. `flownet.pkl` placed at `models/rife/` on the volume.
+- **Backslash paths** → workflow_video.json was Windows-exported (`wan\..`); Linux worker lists with `/`
+  → "Value not in list". Converted to `/` + `_normalize_model_paths()` self-heal guard in comfy_common.
+- **Got pose preview not the video** → run_video grabbed node 117 (DWPose temp) when 319 missing; now
+  returns only the saved output node + diagnostics.
+- **"No output from worker" at ~90s** → app used `/runsync` (90s cap) → switched to async `/run` + poll.
+- **Slow (~6 min)** → BlockSwap=0 + load_device=main + force_offload=false (96 GB fits in VRAM). All
+  nodes on GPU EXCEPT the two `ImageResizeKJv2` (KJNodes lanczos = CPU-only) + ffmpeg video I/O.
+
+## ✅ APP / UI shipped this session (all app-side, deployed to VPS)
+- **Cloud = Motion-only** UI (image modes hidden on Cloud target).
+- **Cloud character picker** built from `.cloud_loras.json` (CHAR_DEFS folders differed from the volume
+  layout → only Lorance showed; now all 6 own chars: Cristina, FscvrDD×2, Hazil, LoranceNew, MasterGothGirl).
+- **Motion audio** — `_mux_audio` ffmpeg muxes the driving video's audio onto the (silent) output.
+- **Reel → Motion** button (driving video) + **Gallery → Motion ref** button (reference photo).
+- **t2i matched to the user's good ComfyUI wf**: BF16 model, rank256 lightning (also LIGHTNING_DEFAULTS),
+  sage auto, fp8 clip. t2i/i2i run LOCAL only now (cloud is motion-only).
+
+## 🔧 How to operate (deploy / infra)
+- **VPS app deploy (instant, no rebuild)** for app.py/index.html/workflow_*.json used locally: tar over
+  SSH with the deploy key (see "Manual deploy"), `systemctl restart atelier`.
+- **Worker image rebuild (~15-20 min, free)**: push Dockerfile/handler/comfy_common/workflow_*.json to
+  `main` → GitHub Actions `build-worker.yml` → Docker Hub `orthoraj21/atelier-comfy-worker:<full-sha>`.
+  Then PATCH template `4fo2wrxxci` imageName to the new SHA (REST from VPS).
+- **RunPod control: REST from the VPS** (`https://rest.runpod.io/v1`, key in VPS `.env`) — the MCP 401s
+  and the home PC has TLS issues to some endpoints. Job submit/status/cancel use `https://api.runpod.ai/v2`.
+- **`populate_motion.py`** rebuilds the volume from HF; `_upload_video.py` pushes local motion models to HF.
 
 ## ✅ CLOUD STATE — MOTION is now LIVE (image cloud path retired)
 - **Motion endpoint** `tgh96neez89ei8` (name `atelier-motion`, serverless, workersMin=0 → $0
