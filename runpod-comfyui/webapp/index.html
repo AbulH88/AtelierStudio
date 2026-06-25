@@ -288,6 +288,8 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   transition:.18s;font-family:var(--sans)}
 .reel-card .use{background:linear-gradient(180deg,#f0c878,var(--amber));color:var(--ink);font-weight:600}
 .reel-card .use:hover{filter:brightness(1.08)}
+.reel-card .usemotion{background:rgba(160,140,220,.14);color:#bcaae6;border:1px solid rgba(160,140,220,.32)!important;font-weight:600}
+.reel-card .usemotion:hover{background:rgba(160,140,220,.22)}
 .reel-card .save{background:rgba(127,200,160,.08);color:var(--good);border:1px solid rgba(127,200,160,.2)!important}
 .reel-card .save:hover{background:rgba(127,200,160,.14)}
 .reel-card .del{background:rgba(217,139,122,.08);color:var(--rose);border:1px solid rgba(217,139,122,.2)!important}
@@ -1163,8 +1165,20 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const S={mode:"i2i",session:null,frame:null,aspect:null,variations:2,rand:true,target:"local",avail:{local:false,cloud:false},chars:[],frames:[],lbIndex:0};
 
+function _charList(){
+  // Cloud mode -> characters from the volume manifest (every char on the volume,
+  // with the volume's real paths). Local -> the live ComfyUI list. Fall back to
+  // whichever is non-empty so the picker is never empty.
+  if(isCloud() && S.cloudChars && S.cloudChars.length) return S.cloudChars;
+  return (S.chars && S.chars.length) ? S.chars : (S.cloudChars||[]);
+}
+function applyCharList(){
+  const list=_charList();
+  $('#character').innerHTML=list.map((x,i)=>`<option value="${i}">${x.label}</option>`).join('');
+  fillVariants();
+}
 function fillVariants(){
-  const ch=S.chars[+$('#character').value]; if(!ch) return;
+  const ch=_charList()[+$('#character').value]; if(!ch) return;
   $('#variant').innerHTML=ch.variants.map(v=>`<option value="${v.path}">${v.label}</option>`).join('');
   $('#vCount').textContent=ch.variants.length>1?ch.variants.length+' ckpts':'';
 }
@@ -1434,6 +1448,7 @@ function onTargetChange(){
   $('#mVid').classList.toggle('hide', cloudOnly);
   $('#mTxt').classList.toggle('hide', cloudOnly);
   if(cloudOnly && S.mode!=='video') setMode('video');
+  if(typeof applyCharList==='function') applyCharList();   // cloud vs local character list
   renderCloudCard();
   if(isCloud()){ pollCloudStatus(); CLOUD.poll=setInterval(pollCloudStatus,7000); }
 }
@@ -1479,6 +1494,22 @@ _mWireDrop('#mDropVid','#mVidFile',f=>{ S.motionVid=f;
   const v=$('#mVidPreview'); v.src=URL.createObjectURL(f); v.classList.remove('hide');
   v.onloadedmetadata=()=>{ S.motionVidDur=v.duration||0; _mUpdateLen(); };
   $('#mDropVid').querySelector('p').innerHTML='<b>'+f.name+'</b> ready'; refreshGo(); });
+
+// Load a reel from the library straight into Motion as the driving video.
+async function useReelMotion(url, name){
+  showPage('studio'); setMode('video');
+  const drop=$('#mDropVid'), pv=$('#mVidPreview'), setMsg=h=>{ const p=drop&&drop.querySelector('p'); if(p) p.innerHTML=h; };
+  setMsg('<span class="spin"></span> loading reel…');
+  try{
+    const blob=await(await fetch(url)).blob();
+    const f=new File([blob], name||'reel.mp4', {type:'video/mp4'});
+    S.motionVid=f;
+    if(pv){ pv.src=URL.createObjectURL(f); pv.classList.remove('hide');
+      pv.onloadedmetadata=()=>{ S.motionVidDur=pv.duration||0; if(typeof _mUpdateLen==='function') _mUpdateLen(); }; }
+    setMsg('<b>'+(name||'reel')+'</b> ready'); refreshGo();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){ setMsg('<b>Drop a clip</b> or click'); alert('Could not load reel into Motion: '+e); }
+}
 _mWireDrop('#mDropRef','#mRefFile',f=>{ S.motionRef=f;
   const im=$('#mRefPreview'); im.src=URL.createObjectURL(f); im.classList.remove('hide');
   $('#mDropRef').querySelector('p').innerHTML='<b>'+f.name+'</b> ready'; refreshGo(); });
@@ -1522,9 +1553,8 @@ function useAsMotionRef(b64){
 
 async function loadConfig(){
   const c=await(await fetch('/api/config')).json();
-  S.chars=c.characters;
-  $('#character').innerHTML=c.characters.map((x,i)=>`<option value="${i}">${x.label}</option>`).join('');
-  $('#character').onchange=fillVariants; fillVariants();
+  S.chars=c.characters; S.cloudChars=c.cloud_characters||[];
+  $('#character').onchange=fillVariants; applyCharList();
   $('#aspects').innerHTML=c.aspects.map((a,i)=>`<button data-key="${a.key}" data-w="${a.width}" data-h="${a.height}" class="${i===0?'on':''}">
      <span>${a.label.split(' · ')[0]}</span><span class="r">${a.width}×${a.height}</span></button>`).join('')
      +`<button data-key="custom"><span>Custom</span><span class="r">set px</span></button>`;
@@ -1804,11 +1834,13 @@ function renderReelGrid(){
     <video src="${r.url}" muted preload="metadata" data-url="${r.url}" data-name="${r.name}" style="cursor:pointer"
       onmouseover="this.play()" onmouseout="this.pause();this.currentTime=0"></video>
     <div class="meta"><div class="nm" title="${r.name}">${r.name}</div><div class="sz">${r.size_mb} MB</div></div>
-    <div class="acts"><button class="use" data-key="${r.key}">Use</button>
-      <button class="save" data-key="${r.key}">↓ Save</button>
-      <button class="del" data-key="${r.key}">✕</button></div></div>`).join('');
+    <div class="acts"><button class="use" data-key="${r.key}">→ Frame</button>
+      <button class="usemotion" data-url="${r.url}" data-name="${r.name}">→ Motion</button></div>
+    <div class="acts" style="padding-top:0"><button class="save" data-key="${r.key}">↓ Save</button>
+      <button class="del" data-key="${r.key}">✕ Delete</button></div></div>`).join('');
   $$('#reelGrid video').forEach(v=>v.onclick=()=>openReelPlayer(v.dataset.url, v.dataset.name));
   $$('#reelGrid .use').forEach(b=>b.onclick=()=>useReel(b.dataset.key));
+  $$('#reelGrid .usemotion').forEach(b=>b.onclick=()=>useReelMotion(b.dataset.url, b.dataset.name));
   $$('#reelGrid .save').forEach(b=>b.onclick=async()=>{
     const d=await(await fetch('/api/reels/save-url?key='+encodeURIComponent(b.dataset.key))).json();
     if(d.url)window.location.href=d.url;});
