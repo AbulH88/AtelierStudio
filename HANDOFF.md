@@ -1,22 +1,55 @@
 # Atelier Character Studio — Handoff
 
-Last updated by Claude (Opus 4.8), 2026-06-25. **Cloud motion (Wan Animate) is now LIVE and
-working end-to-end** — this session built + fully debugged the cloud path and shipped UI polish.
-Read "CLOUD STATE" + "MOTION MODE" below. Memory: `runpod-cloud-build-state`, `video-wan-animate`.
+Last updated by Claude (Opus 4.8), 2026-06-27. **INSTARAW "Advanced" mode is BUILT + WORKING
+end-to-end** (local-only). A full render proven this session: ~470s, eye-detailer + upscale +
+authenticity + real iPhone-12 EXIF, 2 images to Gallery. Memory: `instaraw-advanced-mode`,
+`runpod-cloud-build-state`. Plan: `instaraw-advanced-plan.md`. (Cloud Motion still LIVE — see below.)
+
+## ✅ INSTARAW ADVANCED MODE (this session — local only, on the home 5090)
+New app mode wrapping the user's `INSTARAW WAN 2.2 V2.0` workflow (t2i + image-guided "i2i" via the
+`576` toggle; "i2i" = image-guided PROMPTING, NOT latent img2img — verified, generation is always
+txt2img on the empty latent). Heavy pipeline: WAN 2.2 base → SDXL detailers (face/eyes/hands/feet/
+nipples/pussy/lips) → upscale → authenticity (LUT/GLCM/grain/perturb/compression) → fake-EXIF save.
+Needs the INSTARAW custom-node pack (home ComfyUI has it; cloud doesn't → why local-only).
+- **`workflow_adv.json`** (repo root of runpod-comfyui) — the export, leaked key stripped, model
+  paths remapped to the reorganized loras folder (`_remap_paths.py` does this — re-run on re-export).
+- **`comfy_common.py`** — `ADV` map, `_build_adv` (aspect 523, char-ref 581, prompt_batch 584,
+  OpenRouter key→580 from env, char LoRA synced to both rgthree stacks 287/256, lightning→287 slot2,
+  helpers per group, popups, `interactive` flag, `ADV_STAGES`+`_bypass_node` Main-Menu toggles),
+  `run(out_node=402)` returns only the final image, `generate()` `mode=="adv"` branch.
+- **`webapp/app.py`** — `adv` `_build_input` branch + validation; proxies: `/api/interaction`,
+  `/api/interact` (popups via agent), `/api/instaraw/{generate_creative_prompts,
+  generate_character_description,get_random_prompts,batch_upload,view}`, and `/api/instaraw/
+  prompts_db` + `/prompts_filters` (server-paginated 7.9k library, cached from S3, parses Python-repr).
+- **`webapp/index.html`** — Advanced mode (Local-only, hidden on Cloud), violet studio + branded
+  header. Prompt Studio tabs: **Generate** (AI prompts via Grok `x-ai/grok-4.3`, char-from-image,
+  expression chips, library inspiration) + **Library** (search/filter/paginate/fav/+Add). Always-on
+  **Generation Batch** (rich cards: positive/negative/repeat/seed/after-gen/source). Two **LoRA
+  groups** (high 256 / low 287; Lenovo seeded in low). **Main Menu** stage toggles. Interactive
+  **popup modals** (picker + mask canvas). Rail hides redundant Aspect + Describe in adv.
+- **`home_agent/agent.py`** — popup relay: catches WS `instaraw-interactive-images`, exposes
+  `/interaction` + `/interact`. Restart via `home_agent/Start_Agent.bat` after edits (it ran already).
+- **Reuse-their-engine:** the Prompt Studio + Library call the home ComfyUI's own `/instaraw/*` HTTP
+  routes (work through the tunnel); 22MB prompt DB = `instara.s3...prompts.db.json`.
+
+### Advanced mode — known + open
+- **MediaPipe/controlnet_aux fix (this session):** eye detailer crashed (`mp.tasks.vision` has no
+  `drawing_utils`). Patched `comfyui_controlnet_aux/.../mediapipe_face/mediapipe_face_common.py`
+  (new-API branch now reads drawing_utils/DrawingSpec from `mp.solutions`; `.bak` saved). Needs a
+  ComfyUI restart to load. NOT in git (it's the ComfyUI install).
+- A full render ≈ **8 min**, so the app sits on "developing…" a while — that's normal, not a hang.
+- Interactive popups only fire for **app-triggered** Develop with **Interactive ✓**; the popup also
+  shows in ComfyUI's canvas (WS broadcast). Both UI-update + popup confirmed working this session.
+- Not yet built (the smaller wf bits): Temperature/Top-P, complexity, SDXL toggle, i2i image-loader,
+  Create/Import/Export prompts, after-gen auto-reseed. Eye-detailer is one of the 12 Main-Menu toggles.
 
 ## ⏭️ NEXT (in order)
-1. **Build Motion Storyboard v1** — the user's current ask. Full plan in `motion-storyboard-plan.md`:
-   cut ONE driving video into time segments → per-segment ref image (outfit) → generate each (via
-   `skip_first_frames`/`frame_load_cap`, no real splitting) → auto-stitch with a transition
-   (crossfade default / hard cut / fade-to-black, ffmpeg `xfade` on the VPS) → one mp4 to Gallery.
-   All app-side (app.py + index.html + comfy_common), no image rebuild. Risk: verify the cloud worker
-   honors `skip_first_frames` on node 75 without a rebuild; if baked, fold into the next image build.
-2. **⚠️ ROTATE LEAKED KEYS** — the HF write token (pasted in chat, also in local `webapp/.env`) +
-   the RunPod API key + OpenRouter key are all exposed. Mint new ones, update VPS `.env`.
-3. Optional perf: raise endpoint `idleTimeout` 5s → ~150s so back-to-back gens reuse a warm worker
-   (first gen pays the ~4–5 min cold start: 18 GB image pull + 17 GB model load; compute itself ~90s).
-   `workersMin` stays 0. H200 is NOT in EU-RO-1 (only Blackwell), so it's not an option without a DC move.
-4. Optional: Stop/cancel button (`POST https://api.runpod.ai/v2/<ep>/cancel/<job_id>`); per-char triggers.
+1. Finish polishing Advanced mode per user (see "not yet built" above) + the in-app i2i image loader.
+2. **⚠️ ROTATE LEAKED KEYS** — HF write token + RunPod API key + OpenRouter key are exposed
+   (OpenRouter also baked in `workflow_*` node 580, now stripped from `workflow_adv.json`). Mint new,
+   update VPS `.env`. The Prompt Studio uses the VPS `OPENROUTER_API_KEY` (works; just rotate it).
+3. **Motion Storyboard v1** (parked) — plan in `motion-storyboard-plan.md`.
+4. Optional perf/buttons as before (idleTimeout, stop/cancel, per-char triggers).
 
 ## ✅ MOTION CLOUD — the fix chain this session (so it's not re-debugged)
 Worker now makes finished, audio'd character mp4s on a Blackwell GPU in ~90s compute. Fixes (committed):

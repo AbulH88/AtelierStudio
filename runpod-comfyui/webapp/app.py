@@ -1279,8 +1279,9 @@ _PROMPTS_DB = None
 PROMPTS_DB_URL = "https://instara.s3.us-east-1.amazonaws.com/prompts.db.json"
 
 
-@app.get("/api/instaraw/prompts_db")
-def api_ir_promptsdb():
+def _load_prompts_db():
+    """Fetch + parse the 22MB S3 DB once, cache in memory (~2s, the entries' tags/
+    prompt/classification are Python-repr strings). Returns the parsed list."""
     global _PROMPTS_DB
     if _PROMPTS_DB is None:
         import ast
@@ -1292,22 +1293,63 @@ def api_ir_promptsdb():
                 except Exception:
                     return default
             return v if v is not None else default
-        try:
-            raw = requests.get(PROMPTS_DB_URL, timeout=180).json()
-        except Exception as e:
-            return jsonify({"error": f"could not load library: {e}"}), 502
+        raw = requests.get(PROMPTS_DB_URL, timeout=180).json()
         out = []
         for p in raw:
             pr = _lit(p.get("prompt"), {}) or {}
-            tg = _lit(p.get("tags"), []) or []
             cl = _lit(p.get("classification"), {}) or {}
             out.append({"id": p.get("id"), "positive": pr.get("positive", ""),
-                        "negative": pr.get("negative", ""), "tags": tg,
+                        "negative": pr.get("negative", ""), "tags": _lit(p.get("tags"), []) or [],
                         "content_type": cl.get("content_type", ""),
                         "safety_level": cl.get("safety_level", ""),
                         "shot_type": cl.get("shot_type", "")})
         _PROMPTS_DB = out
-    return jsonify({"prompts": _PROMPTS_DB})
+    return _PROMPTS_DB
+
+
+@app.get("/api/instaraw/prompts_filters")
+def api_ir_filters():
+    """Filter dropdown values + total (loads the DB on first call)."""
+    try:
+        db = _load_prompts_db()
+    except Exception as e:
+        return jsonify({"error": f"could not load library: {e}"}), 502
+
+    def uniq(k):
+        return sorted({p[k] for p in db if p[k]})
+    return jsonify({"content": uniq("content_type"), "safety": uniq("safety_level"),
+                    "shot": uniq("shot_type"), "total": len(db)})
+
+
+@app.get("/api/instaraw/prompts_db")
+def api_ir_promptsdb():
+    """Search/filter/paginate the cached library — returns one small page."""
+    try:
+        db = _load_prompts_db()
+    except Exception as e:
+        return jsonify({"error": f"could not load library: {e}"}), 502
+    q = request.args.get("q", "").strip().lower()
+    c, s, sh = request.args.get("content", ""), request.args.get("safety", ""), request.args.get("shot", "")
+    favonly = request.args.get("favonly") == "1"
+    favs = set(x for x in request.args.get("favs", "").split(",") if x)
+    page = max(0, int(request.args.get("page", 0) or 0))
+    per = min(48, max(1, int(request.args.get("per", 12) or 12)))
+    res = []
+    for p in db:
+        if c and p["content_type"] != c:
+            continue
+        if s and p["safety_level"] != s:
+            continue
+        if sh and p["shot_type"] != sh:
+            continue
+        if favonly and p["id"] not in favs:
+            continue
+        if q and q not in (p["positive"] + " " + " ".join(p["tags"]) + " " + (p["id"] or "")).lower():
+            continue
+        res.append(p)
+    total = len(res)
+    return jsonify({"prompts": res[page * per:page * per + per], "total": total,
+                    "page": page, "per": per})
 
 
 # --- async generation jobs --------------------------------------------------

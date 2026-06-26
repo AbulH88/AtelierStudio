@@ -873,7 +873,6 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           <button id="advGenPrompts" type="button" class="go" style="width:auto;margin:0;padding:9px 16px;font-size:13px;background:linear-gradient(135deg,#6366f1,#8b5cf6 50%,#a78bfa);border:none;color:#15102b">✦ Generate prompts</button>
           <span id="advGenStatus" style="font-size:11px;color:var(--mut)"></span>
         </div>
-        <div id="advPromptCards" style="margin-top:10px;display:flex;flex-direction:column;gap:8px"></div>
         <div class="inline" style="margin-top:14px">
           <label>Aspect</label>
           <select id="advAspect" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
@@ -902,12 +901,20 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
             <button id="libClear" class="go ghost" type="button" style="width:auto;padding:6px 10px;font-size:11.5px">clear</button>
           </div>
           <div id="libCount" style="font-size:11px;color:var(--mut);margin-bottom:8px"></div>
-          <div id="libGrid" style="display:flex;flex-direction:column;gap:8px"></div>
+          <div id="libGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px"></div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
             <button id="libPrev" class="go ghost" type="button" style="width:auto;padding:6px 12px;font-size:12px">← prev</button>
             <span id="libPage" style="font-size:11px;color:var(--mut)"></span>
             <button id="libNext" class="go ghost" type="button" style="width:auto;padding:6px 12px;font-size:12px">next →</button>
           </div>
+        </div>
+        <div id="advBatchWrap" class="hide" style="margin-top:16px;border-top:1px solid var(--line);padding-top:13px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+            <span style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#a78bfa">⛁ Generation batch</span>
+            <span id="advBatchCount" style="font-size:11px;color:var(--mut)"></span>
+            <span id="advBatchClear2" style="margin-left:auto;font-size:11px;color:#f87171;cursor:pointer">clear all</span>
+          </div>
+          <div id="advPromptCards"></div>
         </div>
       </div>
     </section>
@@ -947,7 +954,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           <button data-v="3">3</button><button data-v="4">4</button>
         </div>
       </div>
-      <div class="field imgonly">
+      <div class="field imgonly advhide">
         <div class="lab">Aspect ratio</div>
         <div class="aspects" id="aspects"></div>
       </div>
@@ -970,7 +977,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <input type="range" id="steps" min="4" max="24" step="1" value="8">
       </div>
       <!-- OpenRouter Vision Settings -->
-      <div style="margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);
+      <div class="advhide" style="margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);
         font-family:var(--serif);font-style:italic;font-size:14px;color:var(--amber)">✦ Describe with AI</div>
       <div class="field" id="visionModelField">
         <div class="lab">Vision Model</div>
@@ -1628,6 +1635,9 @@ function setMode(m){
   $$('.imgonly').forEach(el=>el.classList.toggle('hide', m==='video'));
   $$('.stdlora').forEach(el=>el.classList.toggle('hide', m==='adv'));   // generic lightning/LoRAs hidden in adv
   $$('.advlora').forEach(el=>el.classList.toggle('hide', m!=='adv'));   // two LoRA groups shown only in adv
+  // adv has its own aspect + describe in the studio -> hide the rail's (keep Trigger Word)
+  $$('.advhide').forEach(el=>el.classList.toggle('hide', m==='adv'));
+  ['visionModelField','stylePresetField','bodyTypeField','shotTypeField','detailField','explicitField','clothingNoteField','customInstrField'].forEach(id=>{ const el=$('#'+id); if(el)el.classList.toggle('hide', m==='adv'); });
   applyLightningDefault(m);
   refreshGo();
   if(typeof renderCloudCard==='function') renderCloudCard();
@@ -1643,39 +1653,47 @@ $('#advRefFile').onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
 };
 $('#advScene').oninput=()=>{ S.advPrompts=null; const b=$('#advPromptCards'); if(b)b.innerHTML=''; const st=$('#advGenStatus'); if(st){st.textContent='';st.style.color='var(--mut)';} refreshGo(); };
 const _abBtn='background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--mut);width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:12px;line-height:1';
+const _abMini='background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--mut);border-radius:6px;cursor:pointer;font-size:10.5px;padding:4px 9px';
+const _abTa='width:100%;box-sizing:border-box;background:rgba(0,0,0,.25);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:7px;font-size:11.5px;line-height:1.5;resize:vertical';
+const _abNum='background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:4px;font-family:var(--mono);font-size:11px;text-align:center';
+$('#advBatchClear2') && ($('#advBatchClear2').onclick=()=>{ S.advPrompts=[]; renderAdvPrompts(); refreshGo(); });
 function renderAdvPrompts(){
-  const box=$('#advPromptCards'); if(!box)return;
   const ps=S.advPrompts||[];
-  if(!ps.length){ box.innerHTML=''; return; }
-  box.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin:2px 0 8px">
-      <span style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#a78bfa">Generation batch · ${ps.length}</span>
-      <span id="advBatchClear" style="margin-left:auto;font-size:11px;color:#f87171;cursor:pointer">clear all</span>
-    </div>`+
-    ps.map((p,i)=>`<div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.3);border-radius:8px;padding:9px 11px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-        <span style="font-size:10px;color:#a78bfa">#${i+1}</span>
-        <span style="margin-left:auto;display:flex;gap:5px">
-          <button class="ab-up" data-i="${i}" type="button" style="${_abBtn}">↑</button>
-          <button class="ab-dn" data-i="${i}" type="button" style="${_abBtn}">↓</button>
-          <button class="ab-rm" data-i="${i}" type="button" style="${_abBtn};color:#f87171">✕</button>
-        </span>
-      </div>
-      <textarea class="ab-pos" data-i="${i}" rows="3" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,.25);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:7px;font-size:11.5px;line-height:1.5;resize:vertical">${_esc(p.positive||'')}</textarea>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:11px;color:var(--mut);flex-wrap:wrap">
-        <label>repeat</label><input type="number" class="ab-rep" data-i="${i}" value="${p.repeat||1}" min="1" max="20" style="width:44px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:3px;font-family:var(--mono);font-size:11px;text-align:center">
-        <label>seed</label><input type="number" class="ab-seed" data-i="${i}" value="${p.seed||0}" style="width:96px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:3px;font-family:var(--mono);font-size:11px;text-align:center">
-        <button class="ab-rand" data-i="${i}" type="button" title="random seed" style="${_abBtn}">🎲</button>
-        <span style="margin-left:auto">${(p.tags||[]).length} tags</span>
-      </div>
-    </div>`).join('');
-  box.querySelector('#advBatchClear').onclick=()=>{ S.advPrompts=[]; renderAdvPrompts(); refreshGo(); };
+  const wrap=$('#advBatchWrap'); if(wrap) wrap.classList.toggle('hide', ps.length===0);
+  const cnt=$('#advBatchCount'); if(cnt) cnt.textContent=ps.length?('· '+ps.length+' prompt'+(ps.length>1?'s':'')):'';
+  const box=$('#advPromptCards'); if(!box)return;
+  box.innerHTML=ps.map((p,i)=>`<div style="background:rgba(167,139,250,.07);border:1px solid rgba(167,139,250,.3);border-radius:9px;padding:11px;margin-bottom:9px">
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">
+      <span style="font-size:11px;color:#15102b;font-weight:500;background:#a78bfa;border-radius:4px;padding:2px 7px">#${i+1}</span>
+      <span style="font-size:10px;color:#cdbcff;background:rgba(139,92,246,.18);border:1px solid rgba(167,139,250,.3);border-radius:4px;padding:2px 7px">${_esc(p.source||'manual')}</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
+        <label style="font-size:11px;color:var(--mut)">repeat</label>
+        <input type="number" class="ab-rep" data-i="${i}" value="${p.repeat||1}" min="1" max="20" style="${_abNum};width:46px">
+        <button class="ab-rm" data-i="${i}" type="button" title="remove" style="${_abBtn};color:#f87171">✕</button>
+      </span>
+    </div>
+    <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:4px">Positive prompt</div>
+    <textarea class="ab-pos" data-i="${i}" rows="4" style="${_abTa}">${_esc(p.positive||'')}</textarea>
+    <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:8px 0 4px">Negative prompt</div>
+    <textarea class="ab-neg" data-i="${i}" rows="2" style="${_abTa}">${_esc(p.negative||'')}</textarea>
+    ${(p.tags||[]).length?`<div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:4px">${(p.tags||[]).slice(0,12).map(t=>`<span style="font-size:10px;color:#cdbcff;background:rgba(139,92,246,.12);border:1px solid rgba(167,139,250,.3);border-radius:4px;padding:1px 6px">${_esc(t)}</span>`).join('')}</div>`:''}
+    <div style="display:flex;align-items:center;gap:6px;margin-top:9px;flex-wrap:wrap;font-size:11px;color:var(--mut)">
+      <label>seed</label>
+      <input type="number" class="ab-seed" data-i="${i}" value="${p.seed||0}" style="${_abNum};width:98px">
+      <button class="ab-rand" data-i="${i}" type="button" style="${_abMini}">🎲 random</button>
+      <button class="ab-reset" data-i="${i}" type="button" style="${_abMini}">reset</button>
+      <label style="margin-left:auto">after gen</label>
+      <select class="ab-after" data-i="${i}" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:3px 6px;font-size:11px"><option value="randomize"${(p.aftergen||'randomize')==='randomize'?' selected':''}>randomize</option><option value="fixed"${p.aftergen==='fixed'?' selected':''}>fixed</option></select>
+    </div>
+  </div>`).join('');
   box.querySelectorAll('.ab-pos').forEach(t=>t.oninput=()=>{ S.advPrompts[+t.dataset.i].positive=t.value; });
+  box.querySelectorAll('.ab-neg').forEach(t=>t.oninput=()=>{ S.advPrompts[+t.dataset.i].negative=t.value; });
   box.querySelectorAll('.ab-rep').forEach(t=>t.oninput=()=>{ S.advPrompts[+t.dataset.i].repeat=Math.max(1,+t.value||1); });
   box.querySelectorAll('.ab-seed').forEach(t=>t.oninput=()=>{ S.advPrompts[+t.dataset.i].seed=+t.value||0; });
+  box.querySelectorAll('.ab-after').forEach(s=>s.onchange=()=>{ S.advPrompts[+s.dataset.i].aftergen=s.value; });
   box.querySelectorAll('.ab-rand').forEach(b=>b.onclick=()=>{ S.advPrompts[+b.dataset.i].seed=Math.floor(Math.random()*1e9); renderAdvPrompts(); });
+  box.querySelectorAll('.ab-reset').forEach(b=>b.onclick=()=>{ S.advPrompts[+b.dataset.i].seed=0; renderAdvPrompts(); });
   box.querySelectorAll('.ab-rm').forEach(b=>b.onclick=()=>{ S.advPrompts.splice(+b.dataset.i,1); renderAdvPrompts(); refreshGo(); });
-  box.querySelectorAll('.ab-up').forEach(b=>b.onclick=()=>{ const i=+b.dataset.i, a=S.advPrompts; if(i>0){ [a[i-1],a[i]]=[a[i],a[i-1]]; renderAdvPrompts(); } });
-  box.querySelectorAll('.ab-dn').forEach(b=>b.onclick=()=>{ const i=+b.dataset.i, a=S.advPrompts; if(i<a.length-1){ [a[i+1],a[i]]=[a[i],a[i+1]]; renderAdvPrompts(); } });
 }
 // expression chips
 const ADV_EXPRESSIONS=['Neutral','Smiling','Laughing','Sexy/Seductive','Flirty','Blowing a kiss','Winking','Pouty','Surprised','Confident','Shy','Ahegao','Biting lip','Tongue out','Sultry'];
@@ -1713,7 +1731,8 @@ $('#advGenPrompts').onclick=async()=>{
       body:JSON.stringify({generation_count:S.variations||2,model:$('#advModel').value,is_sdxl:false,generation_mode:'txt2img',
         user_text_input:userText,character_description:S.advCharDesc||'',affect_elements:[],
         inspiration_count:inspo,random_inspiration_prompts:randomInspo})}));
-    if(d.success && (d.prompts||[]).length){ S.advPrompts=d.prompts; renderAdvPrompts();
+    if(d.success && (d.prompts||[]).length){
+      S.advPrompts=(d.prompts||[]).map(p=>({positive:p.positive||'',negative:p.negative||'',tags:p.tags||[],source:'AI'})); renderAdvPrompts();
       st.textContent='✓ '+d.prompts.length+' prompt(s) ready'; st.style.color='#6ee7b7'; }
     else { st.textContent=d.error||'generation failed'; st.style.color='var(--rose)'; }
   }catch(e){ st.textContent=String(e); st.style.color='var(--rose)'; }
@@ -1960,62 +1979,58 @@ async function _finishMask(){ const cv=$('#advMaskCanvas');
 $('#advMaskGo').onclick=_finishMask;
 $('#advMaskSkip').onclick=()=>{ const cv=$('#advMaskCanvas'); if(_mCtx)_mCtx.clearRect(0,0,cv.width,cv.height); _finishMask(); };
 
-// ===== Prompts Library (browse the 7.9k INSTARAW DB; + Add into the batch) =====
-S.promptDb=null; S.libPage=0; S.libFiltered=[];
+// ===== Prompts Library (server-paginated browse of the 7.9k INSTARAW DB) =====
+S.libPage=0; S.libTotal=0; S.libPagePrompts=[]; S.libLoaded=false; let _libT=null;
 try{ S.libFavs=new Set(JSON.parse(localStorage.getItem('adv_lib_favs')||'[]')); }catch(e){ S.libFavs=new Set(); }
 $('#advTabGen').onclick=()=>{ $('#advTabGen').classList.add('on'); $('#advTabLib').classList.remove('on'); $('#advGenView').classList.remove('hide'); $('#advLibView').classList.add('hide'); };
-$('#advTabLib').onclick=()=>{ $('#advTabLib').classList.add('on'); $('#advTabGen').classList.remove('on'); $('#advLibView').classList.remove('hide'); $('#advGenView').classList.add('hide'); loadPromptDb(); };
-async function loadPromptDb(){ if(S.promptDb)return;
-  $('#libCount').textContent='loading 7.9k prompts…';
-  try{ const d=await safeJson(await fetch('/api/instaraw/prompts_db')); if(d.error)throw new Error(d.error);
-    S.promptDb=d.prompts||[]; populateLibFilters(); libApply();
+$('#advTabLib').onclick=()=>{ $('#advTabLib').classList.add('on'); $('#advTabGen').classList.remove('on'); $('#advLibView').classList.remove('hide'); $('#advGenView').classList.add('hide'); loadLib(); };
+async function loadLib(){ if(S.libLoaded){ libFetch(S.libPage); return; }
+  $('#libCount').textContent='loading library…';
+  try{ const f=await safeJson(await fetch('/api/instaraw/prompts_filters')); if(f.error)throw new Error(f.error);
+    const fmt=v=>{ const u=(v||'').toLowerCase(); if(u==='nsfw')return'NSFW'; if(u==='sfw')return'SFW'; return (v||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); };
+    const opt=(a,lbl)=>`<option value="">${lbl}</option>`+(a||[]).map(v=>`<option value="${_esc(v)}">${_esc(fmt(v))}</option>`).join('');
+    $('#libContent').innerHTML=opt(f.content,'All Content Types'); $('#libSafety').innerHTML=opt(f.safety,'All Safety Levels'); $('#libShot').innerHTML=opt(f.shot,'All Shot Types');
+    S.libLoaded=true; libFetch(0);
   }catch(e){ $('#libCount').textContent='failed to load library: '+e.message; }
 }
-function populateLibFilters(){
-  const uniq=k=>[...new Set(S.promptDb.map(p=>p[k]).filter(Boolean))].sort();
-  const opt=arr=>'<option value="">all</option>'+arr.map(v=>`<option value="${_esc(v)}">${_esc(v)}</option>`).join('');
-  $('#libContent').innerHTML=opt(uniq('content_type')); $('#libSafety').innerHTML=opt(uniq('safety_level')); $('#libShot').innerHTML=opt(uniq('shot_type'));
+async function libFetch(page){ S.libPage=Math.max(0,page);
+  const params=new URLSearchParams({q:$('#libSearch').value.trim(),content:$('#libContent').value,safety:$('#libSafety').value,shot:$('#libShot').value,page:S.libPage,per:12});
+  if($('#libFav').checked){ params.set('favonly','1'); params.set('favs',[...S.libFavs].join(',')); }
+  $('#libCount').textContent='searching…';
+  try{ const d=await safeJson(await fetch('/api/instaraw/prompts_db?'+params.toString())); if(d.error)throw new Error(d.error);
+    S.libPagePrompts=d.prompts||[]; S.libTotal=d.total||0; renderLib();
+  }catch(e){ $('#libCount').textContent='error: '+e.message; }
 }
-function libApply(){
-  const q=$('#libSearch').value.trim().toLowerCase(), c=$('#libContent').value, s=$('#libSafety').value, sh=$('#libShot').value, fav=$('#libFav').checked;
-  S.libFiltered=(S.promptDb||[]).filter(p=>{
-    if(c&&p.content_type!==c)return false; if(s&&p.safety_level!==s)return false; if(sh&&p.shot_type!==sh)return false;
-    if(fav&&!S.libFavs.has(p.id))return false;
-    if(q){ if(!((p.positive||'')+' '+(p.tags||[]).join(' ')+' '+(p.id||'')).toLowerCase().includes(q))return false; }
-    return true; });
-  S.libPage=0; renderLib();
-}
-function renderLib(){
-  const per=12, total=S.libFiltered.length, pages=Math.max(1,Math.ceil(total/per));
-  if(S.libPage>=pages)S.libPage=0;
-  const start=S.libPage*per, slice=S.libFiltered.slice(start,start+per);
-  $('#libCount').textContent=total.toLocaleString()+' prompts';
+function renderLib(){ const per=12, pages=Math.max(1,Math.ceil(S.libTotal/per));
+  $('#libCount').textContent=S.libTotal.toLocaleString()+' prompts found';
   $('#libPage').textContent='page '+(S.libPage+1)+' / '+pages;
-  $('#libGrid').innerHTML=slice.map((p,i)=>{ const gi=start+i, fav=S.libFavs.has(p.id);
+  $('#libGrid').innerHTML=(S.libPagePrompts.map((p,i)=>{ const fav=S.libFavs.has(p.id);
     return `<div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:8px;padding:9px 11px">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
         <span style="font-size:9.5px;color:var(--faint);font-family:var(--mono)">${_esc((p.id||'').slice(0,10))}</span>
         <span style="font-size:9px;color:#cdbcff;background:rgba(139,92,246,.15);border-radius:4px;padding:1px 5px">${_esc(p.safety_level||'')}</span>
         <button class="lib-fav" data-id="${_esc(p.id)}" type="button" style="margin-left:auto;background:none;border:none;font-size:14px;cursor:pointer;color:${fav?'#fbbf24':'var(--faint)'}">★</button>
-        <button class="lib-add" data-i="${gi}" type="button" style="background:linear-gradient(135deg,#8b5cf6,#a78bfa);border:none;color:#15102b;font-size:11px;padding:4px 11px;border-radius:6px;cursor:pointer">+ Add</button>
+        <button class="lib-add" data-i="${i}" type="button" style="background:linear-gradient(135deg,#8b5cf6,#a78bfa);border:none;color:#15102b;font-size:11px;padding:4px 11px;border-radius:6px;cursor:pointer">+ Add</button>
       </div>
-      <div style="font-size:11.5px;color:var(--txt);line-height:1.5">${_esc((p.positive||'').slice(0,240))}${(p.positive||'').length>240?'…':''}</div>
-      <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">${(p.tags||[]).slice(0,6).map(t=>`<span style="font-size:10px;color:#cdbcff;background:rgba(139,92,246,.12);border:1px solid rgba(167,139,250,.3);border-radius:4px;padding:1px 6px">${_esc(t)}</span>`).join('')}</div>
-    </div>`; }).join('');
+      <div style="font-size:11.5px;color:var(--txt);line-height:1.5">${_esc((p.positive||'').slice(0,260))}${(p.positive||'').length>260?'…':''}</div>
+      <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">${(p.tags||[]).slice(0,8).map(t=>`<span style="font-size:10px;color:#cdbcff;background:rgba(139,92,246,.12);border:1px solid rgba(167,139,250,.3);border-radius:4px;padding:1px 6px">${_esc(t)}</span>`).join('')}</div>
+    </div>`; }).join('')) || '<div style="font-size:12px;color:var(--mut);padding:16px;text-align:center">no prompts match</div>';
   $('#libGrid').querySelectorAll('.lib-add').forEach(b=>b.onclick=()=>libAdd(+b.dataset.i));
   $('#libGrid').querySelectorAll('.lib-fav').forEach(b=>b.onclick=()=>{ const id=b.dataset.id;
     if(S.libFavs.has(id))S.libFavs.delete(id); else S.libFavs.add(id);
-    try{localStorage.setItem('adv_lib_favs',JSON.stringify([...S.libFavs]));}catch(e){} renderLib(); });
+    try{localStorage.setItem('adv_lib_favs',JSON.stringify([...S.libFavs]));}catch(e){}
+    if($('#libFav').checked) libFetch(S.libPage); else renderLib(); });
 }
-function libAdd(i){ const p=S.libFiltered[i]; if(!p)return;
-  S.advPrompts=S.advPrompts||[]; S.advPrompts.push({positive:p.positive,negative:p.negative||'',tags:p.tags||[]});
+function libAdd(i){ const p=S.libPagePrompts[i]; if(!p)return;
+  S.advPrompts=S.advPrompts||[]; S.advPrompts.push({positive:p.positive,negative:p.negative||'',tags:p.tags||[],source:'Library'});
   renderAdvPrompts(); const st=$('#advGenStatus'); if(st){ st.textContent='✓ added — '+S.advPrompts.length+' in batch'; st.style.color='#6ee7b7'; }
   refreshGo();
 }
-$('#libSearch').oninput=libApply; ['#libContent','#libSafety','#libShot'].forEach(s=>$(s).onchange=libApply); $('#libFav').onchange=libApply;
-$('#libClear').onclick=()=>{ $('#libSearch').value=''; $('#libContent').value=''; $('#libSafety').value=''; $('#libShot').value=''; $('#libFav').checked=false; libApply(); };
-$('#libPrev').onclick=()=>{ if(S.libPage>0){S.libPage--; renderLib(); window.scrollTo({top:0,behavior:'smooth'});} };
-$('#libNext').onclick=()=>{ if(S.libPage<Math.ceil(S.libFiltered.length/12)-1){S.libPage++; renderLib(); window.scrollTo({top:0,behavior:'smooth'});} };
+$('#libSearch').oninput=()=>{ clearTimeout(_libT); _libT=setTimeout(()=>libFetch(0),350); };
+['#libContent','#libSafety','#libShot'].forEach(s=>$(s).onchange=()=>libFetch(0)); $('#libFav').onchange=()=>libFetch(0);
+$('#libClear').onclick=()=>{ $('#libSearch').value=''; $('#libContent').value=''; $('#libSafety').value=''; $('#libShot').value=''; $('#libFav').checked=false; libFetch(0); };
+$('#libPrev').onclick=()=>{ if(S.libPage>0)libFetch(S.libPage-1); };
+$('#libNext').onclick=()=>{ if(S.libPage<Math.ceil(S.libTotal/12)-1)libFetch(S.libPage+1); };
 
 // ===== Main Menu: pipeline stage toggles =====
 const ADV_STAGE_DEFS=[['face','Face detailer'],['eyes','Eye detailer'],['hands','Hand detailer'],['pussy','Pussy detailer'],['nipples','Breast detailer'],['feet','Feet detailer'],['lips','Mouth / lips'],['color','Color science'],['glcm','GLCM normalize'],['grain','Neural grain'],['perturb','Pixel perturb'],['compress','Multi-compression']];
