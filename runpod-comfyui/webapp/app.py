@@ -1011,6 +1011,7 @@ def _build_input(body):
         inp["loader_batch_data"] = body.get("loader_batch_data")   # i2i source batch (JSON)
         inp["prompt_batch_data"] = body.get("prompt_batch_data")   # resolved prompts (JSON)
         inp["stages"] = body.get("stages") or {}                   # Main Menu: pipeline stage toggles
+        inp["interactive"] = bool(body.get("interactive", False))   # popup picker/mask-paint mid-gen
         inp["openrouter_key"] = OPENROUTER_API_KEY                 # injected; never from the browser
         inp["loras_low"] = [{"path": l.get("path", ""), "strength": float(l.get("strength", 0.6))}
                             for l in body.get("loras_low", []) if l.get("path")]
