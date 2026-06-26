@@ -1004,6 +1004,18 @@ def _build_input(body):
         inp["video_filename"] = body.get("video_filename", "driving.mp4")
         inp["ref_b64"] = body.get("ref_b64", "")
         inp["frame_cap"] = int(body.get("frame_cap", 81))
+    elif inp["mode"] == "adv":   # INSTARAW advanced (LOCAL only): t2i + image-guided i2i
+        inp["img2img"] = bool(body.get("img2img", False))
+        inp["aspect"] = body.get("aspect", "3:4 (Portrait)")
+        inp["ref_b64"] = body.get("ref_b64", "")
+        inp["loader_batch_data"] = body.get("loader_batch_data")   # i2i source batch (JSON)
+        inp["prompt_batch_data"] = body.get("prompt_batch_data")   # resolved prompts (JSON)
+        inp["stages"] = body.get("stages") or {}                   # Main Menu: pipeline stage toggles
+        inp["openrouter_key"] = OPENROUTER_API_KEY                 # injected; never from the browser
+        inp["loras_low"] = [{"path": l.get("path", ""), "strength": float(l.get("strength", 0.6))}
+                            for l in body.get("loras_low", []) if l.get("path")]
+        inp["loras_high"] = [{"path": l.get("path", ""), "strength": float(l.get("strength", 0.6))}
+                             for l in body.get("loras_high", []) if l.get("path")]
     return inp
 
 
@@ -1166,6 +1178,138 @@ def api_progress():
     return jsonify(PROGRESS)
 
 
+# --- INSTARAW advanced: interactive popups + prompt-studio proxies (local only) ---
+# Popups arrive as a ComfyUI WS event, which the tunnel drops, so the home agent
+# captures them; the browser polls /api/interaction and answers via /api/interact.
+@app.get("/api/interaction")
+def api_interaction():
+    if AGENT_URL:
+        try:
+            r = requests.get(f"{AGENT_URL}/interaction",
+                             headers={"x-agent-secret": AGENT_SECRET}, timeout=8)
+            return jsonify(r.json()), r.status_code
+        except Exception:
+            return jsonify({"active": False})
+    return jsonify({"active": False})   # local dev w/o agent: no popup relay
+
+
+@app.post("/api/interact")
+def api_interact():
+    body = request.get_json(force=True, silent=True) or {}
+    if AGENT_URL:
+        try:
+            r = requests.post(f"{AGENT_URL}/interact", json=body,
+                              headers={"x-agent-secret": AGENT_SECRET}, timeout=30)
+            return jsonify(r.json()), r.status_code
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 502
+    try:   # local dev: post straight to ComfyUI
+        resp = {"unique": body.get("unique")}
+        for k in ("selection", "masked_data", "masked_image", "special", "extras"):
+            if k in body:
+                resp[k] = body[k]
+        requests.post(f"{LOCAL_COMFY}/instaraw/interactive_message",
+                      data={"response": _json.dumps(resp)},
+                      headers=comfy_common.CF_HEADERS, timeout=30)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+def _instaraw_proxy(path, inject_key=False):
+    """Forward a JSON POST to the home ComfyUI's /instaraw/* route (HTTP works through
+    the tunnel). Injects the server-side OpenRouter key so the browser never holds it."""
+    body = request.get_json(force=True, silent=True) or {}
+    if inject_key and not body.get("openrouter_api_key"):
+        body["openrouter_api_key"] = OPENROUTER_API_KEY
+    try:
+        r = requests.post(f"{LOCAL_COMFY}/instaraw/{path}", json=body,
+                          headers=comfy_common.CF_HEADERS, timeout=120)
+        return (r.content, r.status_code,
+                {"Content-Type": r.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 502
+
+
+@app.post("/api/instaraw/generate_creative_prompts")
+def api_ir_prompts():
+    return _instaraw_proxy("generate_creative_prompts", inject_key=True)
+
+
+@app.post("/api/instaraw/generate_character_description")
+def api_ir_chardesc():
+    return _instaraw_proxy("generate_character_description", inject_key=True)
+
+
+@app.post("/api/instaraw/get_random_prompts")
+def api_ir_random():
+    return _instaraw_proxy("get_random_prompts")
+
+
+@app.post("/api/instaraw/batch_upload")
+def api_ir_upload():
+    """Forward i2i source images to ComfyUI's INSTARAW image pool (multipart)."""
+    files = [("files", (f.filename, f.stream, f.mimetype)) for f in request.files.getlist("files")]
+    try:
+        r = requests.post(f"{LOCAL_COMFY}/instaraw/batch_upload", files=files or None,
+                          data={"node_id": request.form.get("node_id", "atelier")},
+                          headers=comfy_common.CF_HEADERS, timeout=120)
+        return (r.content, r.status_code,
+                {"Content-Type": r.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 502
+
+
+@app.get("/api/instaraw/view/<path:filename>")
+def api_ir_view(filename):
+    """Proxy an uploaded source-image thumbnail/preview from ComfyUI's pool."""
+    try:
+        r = requests.get(f"{LOCAL_COMFY}/instaraw/view/{filename}",
+                         headers=comfy_common.CF_HEADERS, timeout=60, allow_redirects=True)
+        return (r.content, r.status_code,
+                {"Content-Type": r.headers.get("Content-Type", "image/png")})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+# The Prompts Library: the 22MB INSTARAW DB lives on S3 (the node fetches it client-side).
+# We fetch + parse it server-side once (its tags/prompt/classification are Python-repr
+# strings), slim it, and cache in memory. Works even when ComfyUI is down (VPS -> S3).
+_PROMPTS_DB = None
+PROMPTS_DB_URL = "https://instara.s3.us-east-1.amazonaws.com/prompts.db.json"
+
+
+@app.get("/api/instaraw/prompts_db")
+def api_ir_promptsdb():
+    global _PROMPTS_DB
+    if _PROMPTS_DB is None:
+        import ast
+
+        def _lit(v, default):
+            if isinstance(v, str):
+                try:
+                    return ast.literal_eval(v)
+                except Exception:
+                    return default
+            return v if v is not None else default
+        try:
+            raw = requests.get(PROMPTS_DB_URL, timeout=180).json()
+        except Exception as e:
+            return jsonify({"error": f"could not load library: {e}"}), 502
+        out = []
+        for p in raw:
+            pr = _lit(p.get("prompt"), {}) or {}
+            tg = _lit(p.get("tags"), []) or []
+            cl = _lit(p.get("classification"), {}) or {}
+            out.append({"id": p.get("id"), "positive": pr.get("positive", ""),
+                        "negative": pr.get("negative", ""), "tags": tg,
+                        "content_type": cl.get("content_type", ""),
+                        "safety_level": cl.get("safety_level", ""),
+                        "shot_type": cl.get("shot_type", "")})
+        _PROMPTS_DB = out
+    return jsonify({"prompts": _PROMPTS_DB})
+
+
 # --- async generation jobs --------------------------------------------------
 # Cloudflare drops any proxied HTTP request that runs longer than ~100s, and a
 # multi-variation generation takes minutes. So /api/generate kicks the work off
@@ -1279,6 +1423,13 @@ def generate():
             return jsonify({"error": "Upload a driving video."}), 400
         if not body.get("ref_b64"):
             return jsonify({"error": "Upload a reference image."}), 400
+    elif mode == "adv":
+        if target != "local":
+            return jsonify({"error": "Advanced mode runs on Local only."}), 400
+        if not body.get("character_lora_path"):
+            return jsonify({"error": "Pick a character."}), 400
+        if not body.get("prompt_batch_data"):
+            return jsonify({"error": "Generate prompts first."}), 400
     elif not body.get("prompt", "").strip():
         return jsonify({"error": "Type a prompt for text mode."}), 400
 

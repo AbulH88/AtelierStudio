@@ -1,0 +1,3262 @@
+{
+  "25": {
+    "inputs": {
+      "clip_name": "Wan\\umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "28": {
+    "inputs": {
+      "samples": [
+        "41",
+        0
+      ],
+      "vae": [
+        "34",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "29": {
+    "inputs": {
+      "text": [
+        "584",
+        0
+      ],
+      "clip": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "30": {
+    "inputs": {
+      "text": [
+        "584",
+        1
+      ],
+      "clip": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "34": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "36": {
+    "inputs": {
+      "upscale_method": "nearest-exact",
+      "scale_by": 1.33,
+      "samples": [
+        "41",
+        0
+      ]
+    },
+    "class_type": "LatentUpscaleBy",
+    "_meta": {
+      "title": "Upscale Latent By"
+    }
+  },
+  "41": {
+    "inputs": {
+      "eta": 0.5,
+      "sampler_name": "exponential/res_2s",
+      "scheduler": "bong_tangent",
+      "steps": 12,
+      "steps_to_run": 12,
+      "denoise": [
+        "436",
+        0
+      ],
+      "cfg": 1.0000000000000002,
+      "seed": [
+        "584",
+        2
+      ],
+      "sampler_mode": "standard",
+      "bongmath": true,
+      "model": [
+        "287",
+        0
+      ],
+      "positive": [
+        "29",
+        0
+      ],
+      "negative": [
+        "30",
+        0
+      ],
+      "latent_image": [
+        "515",
+        0
+      ],
+      "options 2": [
+        "47",
+        0
+      ]
+    },
+    "class_type": "ClownsharKSampler_Beta",
+    "_meta": {
+      "title": "ClownsharKSampler"
+    }
+  },
+  "42": {
+    "inputs": {
+      "eta": 0.5,
+      "sampler_name": "exponential/res_2s",
+      "scheduler": "bong_tangent",
+      "steps": 12,
+      "steps_to_run": 12,
+      "denoise": [
+        "437",
+        0
+      ],
+      "cfg": 1.0000000000000002,
+      "seed": [
+        "584",
+        2
+      ],
+      "sampler_mode": "standard",
+      "bongmath": true,
+      "model": [
+        "287",
+        0
+      ],
+      "positive": [
+        "29",
+        0
+      ],
+      "negative": [
+        "30",
+        0
+      ],
+      "latent_image": [
+        "36",
+        0
+      ],
+      "options": [
+        "47",
+        0
+      ]
+    },
+    "class_type": "ClownsharKSampler_Beta",
+    "_meta": {
+      "title": "ClownsharKSampler"
+    }
+  },
+  "47": {
+    "inputs": {
+      "weight": 1,
+      "method": "model",
+      "mode": "hard",
+      "eta": 0.5,
+      "start_step": 3,
+      "end_step": 10
+    },
+    "class_type": "ClownOptions_DetailBoost_Beta",
+    "_meta": {
+      "title": "ClownOptions Detail Boost"
+    }
+  },
+  "92": {
+    "inputs": {
+      "unet_name": "WAN\\Wan2.2\\Text\\low_noise_model\\Wan-2.2-T2V-Low-Noise-BF16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "93": {
+    "inputs": {
+      "samples": [
+        "202",
+        0
+      ],
+      "vae": [
+        "34",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "97": {
+    "inputs": {
+      "unet_name": "WAN\\Wan2.2\\Text\\high_noise_model\\Wan-2.2-T2V-High-Noise-BF16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "116": {
+    "inputs": {
+      "ckpt_name": "SDXL\\INSTARAW\\bigLust_v16.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "118": {
+    "inputs": {
+      "model_name": "bbox/face_yolov8m.pt"
+    },
+    "class_type": "UltralyticsDetectorProvider",
+    "_meta": {
+      "title": "UltralyticsDetectorProvider"
+    }
+  },
+  "119": {
+    "inputs": {
+      "model_name": "sam_vit_b_01ec64.pth",
+      "device_mode": "AUTO"
+    },
+    "class_type": "SAMLoader",
+    "_meta": {
+      "title": "SAMLoader (Impact)"
+    }
+  },
+  "127": {
+    "inputs": {
+      "guide_size": 1024,
+      "guide_size_for": true,
+      "max_size": 1024,
+      "seed": 111111,
+      "steps": 12,
+      "cfg": 1,
+      "sampler_name": "res_2s",
+      "scheduler": "bong_tangent",
+      "denoise": 0.42,
+      "feather": 18,
+      "noise_mask": true,
+      "force_inpaint": true,
+      "bbox_threshold": 0.5,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 3,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "drop_size": 10,
+      "wildcard": "",
+      "cycle": 1,
+      "inpaint_model": false,
+      "noise_mask_feather": 20,
+      "tiled_encode": false,
+      "tiled_decode": false,
+      "image": [
+        "590",
+        0
+      ],
+      "model": [
+        "287",
+        0
+      ],
+      "clip": [
+        "25",
+        0
+      ],
+      "vae": [
+        "34",
+        0
+      ],
+      "positive": [
+        "479",
+        0
+      ],
+      "negative": [
+        "602",
+        0
+      ],
+      "bbox_detector": [
+        "118",
+        0
+      ],
+      "sam_model_opt": [
+        "119",
+        0
+      ]
+    },
+    "class_type": "FaceDetailer",
+    "_meta": {
+      "title": "FaceDetailer"
+    }
+  },
+  "131": {
+    "inputs": {
+      "model_name": "sam_vit_b_01ec64.pth",
+      "device_mode": "AUTO"
+    },
+    "class_type": "SAMLoader",
+    "_meta": {
+      "title": "SAMLoader (Impact)"
+    }
+  },
+  "136": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_bnebc_00001_.png&type=temp&subfolder=&rand=0.7096618913470832"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_bnebc_00003_.png&type=temp&subfolder=&rand=0.5121880720701034"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_bnebc_00005_.png&type=temp&subfolder=&rand=0.8649804517643089"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_bnebc_00007_.png&type=temp&subfolder=&rand=0.48626636071188356"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_bnebc_00002_.png&type=temp&subfolder=&rand=0.12620765051869187"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_bnebc_00004_.png&type=temp&subfolder=&rand=0.2010640426130712"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_bnebc_00006_.png&type=temp&subfolder=&rand=0.026115843812535067"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_bnebc_00008_.png&type=temp&subfolder=&rand=0.2654541066183659"
+          }
+        ]
+      },
+      "image_a": [
+        "208",
+        0
+      ],
+      "image_b": [
+        "141",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Before | After: Hands"
+    }
+  },
+  "137": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_edqgu_00001_.png&type=temp&subfolder=&rand=0.6108125006301623"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_edqgu_00003_.png&type=temp&subfolder=&rand=0.24615012501089706"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_edqgu_00005_.png&type=temp&subfolder=&rand=0.3310030484116504"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_edqgu_00007_.png&type=temp&subfolder=&rand=0.1589221018104725"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_edqgu_00002_.png&type=temp&subfolder=&rand=0.6835660519829246"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_edqgu_00004_.png&type=temp&subfolder=&rand=0.4022941148406257"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_edqgu_00006_.png&type=temp&subfolder=&rand=0.4633408483958703"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_edqgu_00008_.png&type=temp&subfolder=&rand=0.7681163237476455"
+          }
+        ]
+      },
+      "image_a": [
+        "208",
+        0
+      ],
+      "image_b": [
+        "147",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Before | After: Pussy"
+    }
+  },
+  "138": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_yfsdu_00001_.png&type=temp&subfolder=&rand=0.8277090237803729"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_yfsdu_00003_.png&type=temp&subfolder=&rand=0.8630339290495799"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_yfsdu_00005_.png&type=temp&subfolder=&rand=0.9086205812924297"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_yfsdu_00007_.png&type=temp&subfolder=&rand=0.44725863959320267"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_yfsdu_00002_.png&type=temp&subfolder=&rand=0.6666250993657896"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_yfsdu_00004_.png&type=temp&subfolder=&rand=0.07400737462446738"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_yfsdu_00006_.png&type=temp&subfolder=&rand=0.06533062824057112"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_yfsdu_00008_.png&type=temp&subfolder=&rand=0.792112204657372"
+          }
+        ]
+      },
+      "image_a": [
+        "208",
+        0
+      ],
+      "image_b": [
+        "140",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Before | After: Breasts"
+    }
+  },
+  "139": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_fjszx_00001_.png&type=temp&subfolder=&rand=0.7712607889501885"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_fjszx_00003_.png&type=temp&subfolder=&rand=0.4055518690524499"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_fjszx_00005_.png&type=temp&subfolder=&rand=0.43289794897817346"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_fjszx_00007_.png&type=temp&subfolder=&rand=0.8618619189967446"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_fjszx_00002_.png&type=temp&subfolder=&rand=0.46957158779868735"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_fjszx_00004_.png&type=temp&subfolder=&rand=0.2331437321185995"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_fjszx_00006_.png&type=temp&subfolder=&rand=0.6215015742306855"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_fjszx_00008_.png&type=temp&subfolder=&rand=0.30905531850912427"
+          }
+        ]
+      },
+      "image_a": [
+        "208",
+        0
+      ],
+      "image_b": [
+        "142",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Before | After: Feet"
+    }
+  },
+  "140": {
+    "inputs": {
+      "guide_size": 1808,
+      "guide_size_for": true,
+      "max_size": 1808,
+      "seed": 111111,
+      "steps": 30,
+      "cfg": 3,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "denoise": 0.42,
+      "feather": 80,
+      "noise_mask": true,
+      "force_inpaint": true,
+      "bbox_threshold": 0.6000000000000001,
+      "bbox_dilation": 20,
+      "bbox_crop_factor": 3,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 20,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 50,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "drop_size": 10,
+      "wildcard": "",
+      "cycle": 1,
+      "inpaint_model": false,
+      "noise_mask_feather": 80,
+      "tiled_encode": false,
+      "tiled_decode": false,
+      "image": [
+        "147",
+        0
+      ],
+      "model": [
+        "154",
+        0
+      ],
+      "clip": [
+        "154",
+        1
+      ],
+      "vae": [
+        "116",
+        2
+      ],
+      "positive": [
+        "148",
+        0
+      ],
+      "negative": [
+        "201",
+        0
+      ],
+      "bbox_detector": [
+        "143",
+        0
+      ],
+      "sam_model_opt": [
+        "131",
+        0
+      ],
+      "segm_detector_opt": [
+        "143",
+        1
+      ]
+    },
+    "class_type": "FaceDetailer",
+    "_meta": {
+      "title": "Nipples Detailer"
+    }
+  },
+  "141": {
+    "inputs": {
+      "guide_size": 1808,
+      "guide_size_for": true,
+      "max_size": 1808,
+      "seed": 111111,
+      "steps": 20,
+      "cfg": 3,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "denoise": 0.3,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": false,
+      "bbox_threshold": 0.6000000000000001,
+      "bbox_dilation": 70,
+      "bbox_crop_factor": 3,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "drop_size": 10,
+      "wildcard": "",
+      "cycle": 1,
+      "inpaint_model": false,
+      "noise_mask_feather": 20,
+      "tiled_encode": false,
+      "tiled_decode": false,
+      "image": [
+        "208",
+        0
+      ],
+      "model": [
+        "146",
+        0
+      ],
+      "clip": [
+        "146",
+        1
+      ],
+      "vae": [
+        "116",
+        2
+      ],
+      "positive": [
+        "145",
+        0
+      ],
+      "negative": [
+        "201",
+        0
+      ],
+      "bbox_detector": [
+        "144",
+        0
+      ],
+      "sam_model_opt": [
+        "131",
+        0
+      ]
+    },
+    "class_type": "FaceDetailer",
+    "_meta": {
+      "title": "Hands Detailer"
+    }
+  },
+  "142": {
+    "inputs": {
+      "guide_size": 1808,
+      "guide_size_for": true,
+      "max_size": 1808,
+      "seed": 111111,
+      "steps": 20,
+      "cfg": 3,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "denoise": 0.25000000000000006,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": false,
+      "bbox_threshold": 0.5000000000000001,
+      "bbox_dilation": 50,
+      "bbox_crop_factor": 3,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "drop_size": 10,
+      "wildcard": "",
+      "cycle": 1,
+      "inpaint_model": false,
+      "noise_mask_feather": 20,
+      "tiled_encode": false,
+      "tiled_decode": false,
+      "image": [
+        "140",
+        0
+      ],
+      "model": [
+        "165",
+        0
+      ],
+      "clip": [
+        "165",
+        1
+      ],
+      "vae": [
+        "116",
+        2
+      ],
+      "positive": [
+        "166",
+        0
+      ],
+      "negative": [
+        "201",
+        0
+      ],
+      "bbox_detector": [
+        "149",
+        0
+      ],
+      "sam_model_opt": [
+        "131",
+        0
+      ]
+    },
+    "class_type": "FaceDetailer",
+    "_meta": {
+      "title": "Foot Detailer"
+    }
+  },
+  "143": {
+    "inputs": {
+      "model_name": "bbox/nipples_yolov8s.pt"
+    },
+    "class_type": "UltralyticsDetectorProvider",
+    "_meta": {
+      "title": "UltralyticsDetectorProvider"
+    }
+  },
+  "144": {
+    "inputs": {
+      "model_name": "bbox/hand_yolov8s.pt"
+    },
+    "class_type": "UltralyticsDetectorProvider",
+    "_meta": {
+      "title": "UltralyticsDetectorProvider"
+    }
+  },
+  "145": {
+    "inputs": {
+      "text": "Detailed hand, detailed fingers, detailed fingernails, XCYP Lady Hand, Lady Hand, natural skin texture,",
+      "clip": [
+        "146",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Hands Detailer Prompt"
+    }
+  },
+  "146": {
+    "inputs": {
+      "lora_name": "SDXL\\Lady_hand.safetensors",
+      "strength_model": 1,
+      "strength_clip": 1,
+      "model": [
+        "116",
+        0
+      ],
+      "clip": [
+        "116",
+        1
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "Load LoRA (Model and CLIP)"
+    }
+  },
+  "147": {
+    "inputs": {
+      "guide_size": 1808,
+      "guide_size_for": true,
+      "max_size": 1808,
+      "seed": 111112,
+      "steps": 30,
+      "cfg": 3,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "denoise": 0.5,
+      "feather": 10,
+      "noise_mask": true,
+      "force_inpaint": true,
+      "bbox_threshold": 0.6000000000000001,
+      "bbox_dilation": 104,
+      "bbox_crop_factor": 3,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "drop_size": 10,
+      "wildcard": "",
+      "cycle": 1,
+      "inpaint_model": false,
+      "noise_mask_feather": 20,
+      "tiled_encode": false,
+      "tiled_decode": false,
+      "image": [
+        "141",
+        0
+      ],
+      "model": [
+        "116",
+        0
+      ],
+      "clip": [
+        "116",
+        1
+      ],
+      "vae": [
+        "116",
+        2
+      ],
+      "positive": [
+        "151",
+        0
+      ],
+      "negative": [
+        "201",
+        0
+      ],
+      "bbox_detector": [
+        "150",
+        0
+      ],
+      "sam_model_opt": [
+        "131",
+        0
+      ]
+    },
+    "class_type": "FaceDetailer",
+    "_meta": {
+      "title": "Pussy Detailer"
+    }
+  },
+  "148": {
+    "inputs": {
+      "text": "Detailed nipples, breasts, natural skin texture, details.",
+      "clip": [
+        "154",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Nipples Detailer Prompt"
+    }
+  },
+  "149": {
+    "inputs": {
+      "model_name": "bbox/foot-yolov8l.pt"
+    },
+    "class_type": "UltralyticsDetectorProvider",
+    "_meta": {
+      "title": "UltralyticsDetectorProvider"
+    }
+  },
+  "150": {
+    "inputs": {
+      "model_name": "bbox/vagina-v3.2.pt"
+    },
+    "class_type": "UltralyticsDetectorProvider",
+    "_meta": {
+      "title": "UltralyticsDetectorProvider"
+    }
+  },
+  "151": {
+    "inputs": {
+      "text": "Detailed pussy, small shiny pussy labias, clitoris, glistening innie pussy, sharp focus, asshole,",
+      "clip": [
+        "116",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Pussy Detailer Prompt"
+    }
+  },
+  "154": {
+    "inputs": {
+      "lora_name": "SDXL\\Detailed_nipples_xl.safetensors",
+      "strength_model": 0.7000000000000002,
+      "strength_clip": 1,
+      "model": [
+        "116",
+        0
+      ],
+      "clip": [
+        "116",
+        1
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "Load LoRA (Model and CLIP)"
+    }
+  },
+  "159": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_gyufm_00001_.png&type=temp&subfolder=&rand=0.6850934518413837"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_gyufm_00003_.png&type=temp&subfolder=&rand=0.5632650729574941"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_gyufm_00005_.png&type=temp&subfolder=&rand=0.9803847047980865"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_gyufm_00007_.png&type=temp&subfolder=&rand=0.9195230553693249"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_gyufm_00002_.png&type=temp&subfolder=&rand=0.7221722367521494"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_gyufm_00004_.png&type=temp&subfolder=&rand=0.8194888776330638"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_gyufm_00006_.png&type=temp&subfolder=&rand=0.014391830544384199"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_gyufm_00008_.png&type=temp&subfolder=&rand=0.2972117504853026"
+          }
+        ]
+      },
+      "image_a": [
+        "208",
+        0
+      ],
+      "image_b": [
+        "498",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "165": {
+    "inputs": {
+      "lora_name": "SDXL\\RealFeet.safetensors",
+      "strength_model": 0.7000000000000002,
+      "strength_clip": 1,
+      "model": [
+        "116",
+        0
+      ],
+      "clip": [
+        "116",
+        1
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "Load LoRA (Model and CLIP)"
+    }
+  },
+  "166": {
+    "inputs": {
+      "text": "Detailed foot, detailed toes, detailed toenails, sharp focus.",
+      "clip": [
+        "116",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Foot Detailer Prompt"
+    }
+  },
+  "170": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_foyrk_00001_.png&type=temp&subfolder=&rand=0.8126976938032787"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_foyrk_00003_.png&type=temp&subfolder=&rand=0.5058140752651179"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_foyrk_00005_.png&type=temp&subfolder=&rand=0.48914841385139607"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_foyrk_00007_.png&type=temp&subfolder=&rand=0.5083889330453489"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_foyrk_00002_.png&type=temp&subfolder=&rand=0.5828258322019121"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_foyrk_00004_.png&type=temp&subfolder=&rand=0.3470614804778046"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_foyrk_00006_.png&type=temp&subfolder=&rand=0.5313094527792881"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_foyrk_00008_.png&type=temp&subfolder=&rand=0.9458346651098287"
+          }
+        ]
+      },
+      "image_a": [
+        "208",
+        0
+      ],
+      "image_b": [
+        "171",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Before | After: Mouth"
+    }
+  },
+  "171": {
+    "inputs": {
+      "guide_size": 1808,
+      "guide_size_for": true,
+      "max_size": 1808,
+      "seed": 111111,
+      "steps": 15,
+      "cfg": 3,
+      "sampler_name": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "denoise": 0.25,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": false,
+      "bbox_threshold": 0.7000000000000002,
+      "bbox_dilation": 50,
+      "bbox_crop_factor": 3,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "drop_size": 10,
+      "wildcard": "",
+      "cycle": 1,
+      "inpaint_model": false,
+      "noise_mask_feather": 20,
+      "tiled_encode": false,
+      "tiled_decode": false,
+      "image": [
+        "142",
+        0
+      ],
+      "model": [
+        "116",
+        0
+      ],
+      "clip": [
+        "116",
+        1
+      ],
+      "vae": [
+        "116",
+        2
+      ],
+      "positive": [
+        "173",
+        0
+      ],
+      "negative": [
+        "201",
+        0
+      ],
+      "bbox_detector": [
+        "172",
+        0
+      ]
+    },
+    "class_type": "FaceDetailer",
+    "_meta": {
+      "title": "Lips Detailer"
+    }
+  },
+  "172": {
+    "inputs": {
+      "model_name": "bbox/lips_v1.pt"
+    },
+    "class_type": "UltralyticsDetectorProvider",
+    "_meta": {
+      "title": "UltralyticsDetectorProvider"
+    }
+  },
+  "173": {
+    "inputs": {
+      "text": "Detailed lips, detailed mouth, detailed teeth, detailed tongue, natural skin texture, sharp focus.",
+      "clip": [
+        "116",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Lips Detailer Prompt"
+    }
+  },
+  "201": {
+    "inputs": {
+      "text": "low quality",
+      "clip": [
+        "116",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative Detailing Prompt"
+    }
+  },
+  "202": {
+    "inputs": {
+      "eta": 0.5,
+      "sampler_name": "exponential/res_2s",
+      "scheduler": "bong_tangent",
+      "steps": 12,
+      "steps_to_run": 12,
+      "denoise": [
+        "438",
+        0
+      ],
+      "cfg": 1,
+      "seed": [
+        "584",
+        2
+      ],
+      "sampler_mode": "standard",
+      "bongmath": true,
+      "model": [
+        "287",
+        0
+      ],
+      "positive": [
+        "29",
+        0
+      ],
+      "negative": [
+        "30",
+        0
+      ],
+      "latent_image": [
+        "203",
+        0
+      ],
+      "options": [
+        "310",
+        0
+      ]
+    },
+    "class_type": "ClownsharKSampler_Beta",
+    "_meta": {
+      "title": "ClownsharKSampler"
+    }
+  },
+  "203": {
+    "inputs": {
+      "upscale_method": "nearest-exact",
+      "scale_by": 1.5,
+      "samples": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "LatentUpscaleBy",
+    "_meta": {
+      "title": "Upscale Latent By"
+    }
+  },
+  "206": {
+    "inputs": {
+      "mask": [
+        "616",
+        0
+      ]
+    },
+    "class_type": "InvertMask",
+    "_meta": {
+      "title": "InvertMask"
+    }
+  },
+  "208": {
+    "inputs": {
+      "color_space": "LAB",
+      "factor": 1,
+      "device": "auto",
+      "batch_size": 0,
+      "image": [
+        "211",
+        0
+      ],
+      "reference": [
+        "218",
+        0
+      ]
+    },
+    "class_type": "ImageColorMatch+",
+    "_meta": {
+      "title": "🔧 Image Color Match"
+    }
+  },
+  "210": {
+    "inputs": {
+      "image": [
+        "498",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Get Image Size"
+    }
+  },
+  "211": {
+    "inputs": {
+      "x": 0,
+      "y": 0,
+      "resize_source": true,
+      "destination": [
+        "218",
+        0
+      ],
+      "source": [
+        "498",
+        0
+      ],
+      "mask": [
+        "288",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "212": {
+    "inputs": {
+      "lora_name": "SDXL\\dmd2_sdxl_4step_lora.safetensors",
+      "strength_model": 1,
+      "strength_clip": 1,
+      "model": [
+        "116",
+        0
+      ],
+      "clip": [
+        "116",
+        1
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "Load LoRA (Model and CLIP)"
+    }
+  },
+  "214": {
+    "inputs": {
+      "model_name": "4x-UltraSharpV2.pth"
+    },
+    "class_type": "UpscaleModelLoader",
+    "_meta": {
+      "title": "Load Upscale Model"
+    }
+  },
+  "216": {
+    "inputs": {
+      "text": "detailed, high quality",
+      "clip": [
+        "212",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "217": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "212",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Upscaling Negative Prompt)"
+    }
+  },
+  "218": {
+    "inputs": {
+      "upscale_by": 1.5,
+      "seed": 1966745047,
+      "steps": 2,
+      "cfg": 1,
+      "sampler_name": "lcm",
+      "scheduler": "sgm_uniform",
+      "denoise": 0.08,
+      "mode_type": "Linear",
+      "tile_width": [
+        "210",
+        0
+      ],
+      "tile_height": [
+        "210",
+        1
+      ],
+      "mask_blur": 12,
+      "tile_padding": 32,
+      "seam_fix_mode": "None",
+      "seam_fix_denoise": 1,
+      "seam_fix_width": 64,
+      "seam_fix_mask_blur": 12,
+      "seam_fix_padding": 16,
+      "force_uniform_tiles": true,
+      "tiled_decode": false,
+      "batch_size": 1,
+      "image": [
+        "498",
+        0
+      ],
+      "model": [
+        "212",
+        0
+      ],
+      "positive": [
+        "216",
+        0
+      ],
+      "negative": [
+        "217",
+        0
+      ],
+      "vae": [
+        "116",
+        2
+      ],
+      "upscale_model": [
+        "214",
+        0
+      ]
+    },
+    "class_type": "UltimateSDUpscale",
+    "_meta": {
+      "title": "Ultimate SD Upscale"
+    }
+  },
+  "244": {
+    "inputs": {
+      "samples": [
+        "515",
+        0
+      ],
+      "vae": [
+        "34",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "256": {
+    "inputs": {
+      "lora_01": "wan\\Own\\Hazil\\hizelHighQualityOnlyLow.safetensors",
+      "strength_01": 1,
+      "lora_02": "None",
+      "strength_02": 0.7,
+      "lora_03": "None",
+      "strength_03": 1,
+      "lora_04": "None",
+      "strength_04": 1,
+      "model": [
+        "97",
+        0
+      ],
+      "clip": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "Lora Loader Stack (rgthree)",
+    "_meta": {
+      "title": "Lora Loader Stack (rgthree)"
+    }
+  },
+  "285": {
+    "inputs": {
+      "enabled": true,
+      "timeout": 600,
+      "if_no_mask": "cancel",
+      "cache_behavior": "Edit previous mask",
+      "tip": "",
+      "extra1": "",
+      "extra2": "",
+      "extra3": "",
+      "node_identifier": 623902,
+      "image": [
+        "498",
+        0
+      ],
+      "mask": [
+        "206",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_MaskImageFilter",
+    "_meta": {
+      "title": "✂️ INSTARAW Mask Filter"
+    }
+  },
+  "287": {
+    "inputs": {
+      "lora_01": "wan\\Own\\Hazil\\hizelHighQualityOnlyLow.safetensors",
+      "strength_01": 1,
+      "lora_02": "wan\\WanLightning\\lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank128_bf16\\lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank128_bf16.safetensors",
+      "strength_02": 0.6,
+      "lora_03": "wan\\WanInsta\\Lenovo\\Lenovo.safetensors",
+      "strength_03": 0.6,
+      "lora_04": "None",
+      "strength_04": 0.6,
+      "model": [
+        "92",
+        0
+      ],
+      "clip": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "Lora Loader Stack (rgthree)",
+    "_meta": {
+      "title": "Lora Loader Stack (rgthree)"
+    }
+  },
+  "288": {
+    "inputs": {
+      "expand_method": "Percentage",
+      "expand_pixels": 10,
+      "expand_percent": 0.42,
+      "incremental_expand_rate_px": 0,
+      "incremental_expand_rate_percent": 0,
+      "tapered_corners": true,
+      "flip_input": false,
+      "blur_radius_multiplier": 0.5,
+      "lerp_alpha": 1,
+      "decay_factor": 1,
+      "fill_holes": false,
+      "mask": [
+        "285",
+        1
+      ]
+    },
+    "class_type": "INSTARAWGrowMask",
+    "_meta": {
+      "title": "🎭 INSTARAW Grow Mask"
+    }
+  },
+  "289": {
+    "inputs": {
+      "mask": [
+        "288",
+        0
+      ]
+    },
+    "class_type": "MaskPreview",
+    "_meta": {
+      "title": "Preview Mask"
+    }
+  },
+  "310": {
+    "inputs": {
+      "weight": 1,
+      "method": "model",
+      "mode": "hard",
+      "eta": 0.5,
+      "start_step": 3,
+      "end_step": 10
+    },
+    "class_type": "ClownOptions_DetailBoost_Beta",
+    "_meta": {
+      "title": "ClownOptions Detail Boost - Last Sampler"
+    }
+  },
+  "312": {
+    "inputs": {
+      "samples": [
+        "42",
+        0
+      ],
+      "vae": [
+        "34",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "335": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_bylbg_00001_.png&type=temp&subfolder=&rand=0.8907077918277001"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_bylbg_00003_.png&type=temp&subfolder=&rand=0.8351229598730936"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_bylbg_00005_.png&type=temp&subfolder=&rand=0.6587235023565708"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_bylbg_00007_.png&type=temp&subfolder=&rand=0.8498641295480197"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_bylbg_00002_.png&type=temp&subfolder=&rand=0.9251892808447139"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_bylbg_00004_.png&type=temp&subfolder=&rand=0.09221148660651424"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_bylbg_00006_.png&type=temp&subfolder=&rand=0.9370091236818398"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_bylbg_00008_.png&type=temp&subfolder=&rand=0.31407815584122467"
+          }
+        ]
+      },
+      "image_a": [
+        "171",
+        0
+      ],
+      "image_b": [
+        "208",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "344": {
+    "inputs": {
+      "timeout": 600,
+      "ontimeout": "send none",
+      "cache_behavior": "Run selector normally",
+      "tip": "",
+      "extra1": "",
+      "extra2": "",
+      "extra3": "",
+      "pick_list_start": 0,
+      "pick_list": "",
+      "video_frames": 1,
+      "node_identifier": 958955,
+      "images": [
+        "477",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_ImageFilter",
+    "_meta": {
+      "title": "🎭 INSTARAW Image Filter"
+    }
+  },
+  "345": {
+    "inputs": {
+      "images": [
+        "590",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "349": {
+    "inputs": {
+      "images": [
+        "93",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "350": {
+    "inputs": {
+      "images": [
+        "28",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "351": {
+    "inputs": {
+      "images": [
+        "244",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "353": {
+    "inputs": {
+      "images": [
+        "127",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "371": {
+    "inputs": {
+      "preview_markdown": "",
+      "preview_text": "",
+      "previewMode": null,
+      "source": [
+        "379",
+        1
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Number of Metadata Tags Injected"
+    }
+  },
+  "379": {
+    "inputs": {
+      "filepath": [
+        "402",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_Metadata_Inspector",
+    "_meta": {
+      "title": "📊 INSTARAW Metadata Inspector"
+    }
+  },
+  "382": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_apldd_00001_.png&type=temp&subfolder=&rand=0.997496762826813"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_apldd_00003_.png&type=temp&subfolder=&rand=0.9720077651993252"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_apldd_00005_.png&type=temp&subfolder=&rand=0.9939509653377372"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_apldd_00007_.png&type=temp&subfolder=&rand=0.6213230366976621"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_apldd_00002_.png&type=temp&subfolder=&rand=0.43537818587125254"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_apldd_00004_.png&type=temp&subfolder=&rand=0.19107360975923948"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_apldd_00006_.png&type=temp&subfolder=&rand=0.22926956845181345"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_apldd_00008_.png&type=temp&subfolder=&rand=0.867398763403956"
+          }
+        ]
+      },
+      "image_a": [
+        "551",
+        0
+      ],
+      "image_b": [
+        "171",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "400": {
+    "inputs": {
+      "preview_markdown": "",
+      "preview_text": "",
+      "previewMode": null,
+      "source": [
+        "379",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "INJECTED METADATA"
+    }
+  },
+  "402": {
+    "inputs": {
+      "seed": "",
+      "inject_color_profile": "",
+      "location_synthesis": "",
+      "datetime_synthesis": "",
+      "start_date": "",
+      "end_date": "",
+      "scene_type": "",
+      "output_subfolder": "",
+      "image": [
+        "551",
+        0
+      ],
+      "profile_path": [
+        "452",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_SynthesizeAuthenticMetadata",
+    "_meta": {
+      "title": "💾 INSTARAW Synthesize & Save w/ Authentic Metadata"
+    }
+  },
+  "406": {
+    "inputs": {
+      "boolean": [
+        "576",
+        0
+      ],
+      "input_false": [
+        "407",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_LatentSwitch",
+    "_meta": {
+      "title": "🔀 INSTARAW Switch (Latent)"
+    }
+  },
+  "407": {
+    "inputs": {
+      "width": [
+        "523",
+        0
+      ],
+      "height": [
+        "523",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "409": {
+    "inputs": {
+      "boolean": [
+        "576",
+        0
+      ],
+      "input_true": 0,
+      "input_false": [
+        "444",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_FloatSwitch",
+    "_meta": {
+      "title": "🔀 INSTARAW Switch (Float)"
+    }
+  },
+  "410": {
+    "inputs": {
+      "boolean": [
+        "576",
+        0
+      ],
+      "invert_input": false,
+      "input_2": [
+        "583",
+        0
+      ],
+      "input_4": [
+        "583",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_BooleanBypass",
+    "_meta": {
+      "title": "🔀 INSTARAW Boolean Bypass"
+    }
+  },
+  "411": {
+    "inputs": {
+      "boolean": [
+        "576",
+        0
+      ],
+      "invert_input": true,
+      "input_1": [
+        "444",
+        0
+      ],
+      "input_2": [
+        "445",
+        0
+      ],
+      "input_3": [
+        "446",
+        0
+      ],
+      "input_4": [
+        "447",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_BooleanBypass",
+    "_meta": {
+      "title": "🔀 INSTARAW Boolean Bypass"
+    }
+  },
+  "414": {
+    "inputs": {
+      "boolean": [
+        "576",
+        0
+      ],
+      "invert_input": false
+    },
+    "class_type": "INSTARAW_BooleanBypass",
+    "_meta": {
+      "title": "🔀 INSTARAW Boolean Bypass"
+    }
+  },
+  "435": {
+    "inputs": {
+      "boolean": [
+        "576",
+        0
+      ],
+      "input_true": 0.3,
+      "input_false": [
+        "444",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_FloatSwitch",
+    "_meta": {
+      "title": "🔀 INSTARAW Switch (Float)"
+    }
+  },
+  "436": {
+    "inputs": {
+      "boolean": [
+        "576",
+        0
+      ],
+      "input_true": 0.3,
+      "input_false": [
+        "445",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_FloatSwitch",
+    "_meta": {
+      "title": "🔀 INSTARAW Switch (Float)"
+    }
+  },
+  "437": {
+    "inputs": {
+      "boolean": [
+        "576",
+        0
+      ],
+      "input_true": 0.3,
+      "input_false": [
+        "446",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_FloatSwitch",
+    "_meta": {
+      "title": "🔀 INSTARAW Switch (Float)"
+    }
+  },
+  "438": {
+    "inputs": {
+      "boolean": [
+        "576",
+        0
+      ],
+      "input_true": 0.3,
+      "input_false": [
+        "447",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_FloatSwitch",
+    "_meta": {
+      "title": "🔀 INSTARAW Switch (Float)"
+    }
+  },
+  "444": {
+    "inputs": {
+      "value": 1
+    },
+    "class_type": "INSTARAW_FloatInput",
+    "_meta": {
+      "title": "T2I Denoise Sampler 1"
+    }
+  },
+  "445": {
+    "inputs": {
+      "value": 0.52
+    },
+    "class_type": "INSTARAW_FloatInput",
+    "_meta": {
+      "title": "T2I Denoise Sampler 2"
+    }
+  },
+  "446": {
+    "inputs": {
+      "value": 0.52
+    },
+    "class_type": "INSTARAW_FloatInput",
+    "_meta": {
+      "title": "T2I Denoise Sampler 3"
+    }
+  },
+  "447": {
+    "inputs": {
+      "value": 0.45
+    },
+    "class_type": "INSTARAW_FloatInput",
+    "_meta": {
+      "title": "T2I Denoise Sampler 4"
+    }
+  },
+  "452": {
+    "inputs": {
+      "profile_name": "iphone_12"
+    },
+    "class_type": "INSTARAW_AuthenticityProfile_Selector",
+    "_meta": {
+      "title": "👑 INSTARAW Authenticity Profile"
+    }
+  },
+  "477": {
+    "inputs": {
+      "images": [
+        "93",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_BatchFromImageList",
+    "_meta": {
+      "title": "🗃️ INSTARAW Batch From Image List"
+    }
+  },
+  "479": {
+    "inputs": {
+      "text": "perfect eyes, detailed skin texture, ",
+      "clip": [
+        "287",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Face Detailer Prompt"
+    }
+  },
+  "484": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_ypkkl_00001_.png&type=temp&subfolder=&rand=0.9180829697289005"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ypkkl_00003_.png&type=temp&subfolder=&rand=0.7822475697945216"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ypkkl_00005_.png&type=temp&subfolder=&rand=0.5117506281090047"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ypkkl_00007_.png&type=temp&subfolder=&rand=0.3516819918098987"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_ypkkl_00002_.png&type=temp&subfolder=&rand=0.7795476836132782"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ypkkl_00004_.png&type=temp&subfolder=&rand=0.8171876871894879"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ypkkl_00006_.png&type=temp&subfolder=&rand=0.5715896523053572"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ypkkl_00008_.png&type=temp&subfolder=&rand=0.30174750654090343"
+          }
+        ]
+      },
+      "image_a": [
+        "498",
+        0
+      ],
+      "image_b": [
+        "490",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "485": {
+    "inputs": {
+      "images": [
+        "501",
+        2
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "486": {
+    "inputs": {
+      "images": [
+        "497",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "487": {
+    "inputs": {
+      "width": [
+        "488",
+        0
+      ],
+      "height": [
+        "488",
+        1
+      ],
+      "fit": "crop",
+      "method": "lanczos",
+      "image": [
+        "501",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_ImageResizeFill",
+    "_meta": {
+      "title": "📐 INSTARAW Image Resize & Fill"
+    }
+  },
+  "488": {
+    "inputs": {
+      "image": [
+        "495",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Get Image Size"
+    }
+  },
+  "489": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "490": {
+    "inputs": {
+      "images": [
+        "127",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_ImageListFromBatch",
+    "_meta": {
+      "title": "📑 INSTARAW Image List From Batch"
+    }
+  },
+  "491": {
+    "inputs": {
+      "text": "perfect eyes, round pupils, round iris, symmetrical eyes, realistic eyes, perfect circles, round",
+      "clip": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "492": {
+    "inputs": {
+      "lora_01": "wan\\WanInsta\\Instareal_low\\Instareal_low.safetensors",
+      "strength_01": 1,
+      "lora_02": "None",
+      "strength_02": 0.6,
+      "lora_03": "None",
+      "strength_03": 0.6,
+      "lora_04": "None",
+      "strength_04": 1,
+      "model": [
+        "92",
+        0
+      ],
+      "clip": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "Lora Loader Stack (rgthree)",
+    "_meta": {
+      "title": "Lora Loader Stack (rgthree)"
+    }
+  },
+  "493": {
+    "inputs": {
+      "segs": [
+        "502",
+        0
+      ]
+    },
+    "class_type": "SegsToCombinedMask",
+    "_meta": {
+      "title": "SEGS to MASK (combined)"
+    }
+  },
+  "494": {
+    "inputs": {
+      "padding": 0,
+      "blur": 0,
+      "mask": [
+        "493",
+        0
+      ]
+    },
+    "class_type": "MaskBoundingBox+",
+    "_meta": {
+      "title": "🔧 Mask Bounding Box"
+    }
+  },
+  "495": {
+    "inputs": {
+      "width": [
+        "494",
+        4
+      ],
+      "height": [
+        "494",
+        5
+      ],
+      "x": [
+        "494",
+        2
+      ],
+      "y": [
+        "494",
+        3
+      ],
+      "image": [
+        "490",
+        0
+      ]
+    },
+    "class_type": "ImageCrop",
+    "_meta": {
+      "title": "Image Crop (Deprecated)"
+    }
+  },
+  "496": {
+    "inputs": {
+      "image": [
+        "497",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Get Image Size"
+    }
+  },
+  "497": {
+    "inputs": {
+      "width": 1920,
+      "height": 1920,
+      "interpolation": "lanczos",
+      "method": "keep proportion",
+      "condition": "always",
+      "multiple_of": 0,
+      "image": [
+        "495",
+        0
+      ]
+    },
+    "class_type": "ImageResize+",
+    "_meta": {
+      "title": "Upscale Face Crop for Detailing"
+    }
+  },
+  "498": {
+    "inputs": {
+      "x": [
+        "494",
+        2
+      ],
+      "y": [
+        "494",
+        3
+      ],
+      "resize_source": false,
+      "destination": [
+        "490",
+        0
+      ],
+      "source": [
+        "487",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "499": {
+    "inputs": {
+      "segs": [
+        "500",
+        0
+      ]
+    },
+    "class_type": "SegsToCombinedMask",
+    "_meta": {
+      "title": "SEGS to MASK (combined)"
+    }
+  },
+  "500": {
+    "inputs": {
+      "crop_factor": 3,
+      "bbox_fill": false,
+      "crop_min_size": 10,
+      "drop_size": 1,
+      "dilation": 0,
+      "face": false,
+      "mouth": false,
+      "left_eyebrow": false,
+      "left_eye": true,
+      "left_pupil": true,
+      "right_eyebrow": false,
+      "right_eye": true,
+      "right_pupil": true,
+      "image": [
+        "504",
+        0
+      ]
+    },
+    "class_type": "MediaPipeFaceMeshToSEGS",
+    "_meta": {
+      "title": "MediaPipe FaceMesh to SEGS"
+    }
+  },
+  "501": {
+    "inputs": {
+      "guide_size": 1920,
+      "guide_size_for": true,
+      "max_size": 1920,
+      "seed": 1111112,
+      "steps": 12,
+      "cfg": 1,
+      "sampler_name": "res_2s",
+      "scheduler": "bong_tangent",
+      "denoise": 0.42,
+      "feather": 2,
+      "noise_mask": true,
+      "force_inpaint": true,
+      "wildcard": "",
+      "cycle": 1,
+      "inpaint_model": false,
+      "noise_mask_feather": 20,
+      "tiled_encode": false,
+      "tiled_decode": false,
+      "image": [
+        "497",
+        0
+      ],
+      "segs": [
+        "505",
+        0
+      ],
+      "model": [
+        "492",
+        0
+      ],
+      "clip": [
+        "25",
+        0
+      ],
+      "vae": [
+        "34",
+        0
+      ],
+      "positive": [
+        "491",
+        0
+      ],
+      "negative": [
+        "489",
+        0
+      ]
+    },
+    "class_type": "DetailerForEachDebug",
+    "_meta": {
+      "title": "DetailerDebug (SEGS)"
+    }
+  },
+  "502": {
+    "inputs": {
+      "threshold": 0.6,
+      "dilation": 10,
+      "crop_factor": 3,
+      "drop_size": 10,
+      "labels": "all",
+      "bbox_detector": [
+        "503",
+        0
+      ],
+      "image": [
+        "490",
+        0
+      ]
+    },
+    "class_type": "BboxDetectorSEGS",
+    "_meta": {
+      "title": "BBOX Detector (SEGS)"
+    }
+  },
+  "503": {
+    "inputs": {
+      "model_name": "bbox/face_yolov8m.pt"
+    },
+    "class_type": "UltralyticsDetectorProvider",
+    "_meta": {
+      "title": "UltralyticsDetectorProvider"
+    }
+  },
+  "504": {
+    "inputs": {
+      "max_faces": 10,
+      "min_confidence": 0.2,
+      "resolution": [
+        "496",
+        0
+      ],
+      "image": [
+        "497",
+        0
+      ]
+    },
+    "class_type": "MediaPipe-FaceMeshPreprocessor",
+    "_meta": {
+      "title": "MediaPipe Face Mesh"
+    }
+  },
+  "505": {
+    "inputs": {
+      "combined": true,
+      "crop_factor": 3,
+      "bbox_fill": false,
+      "drop_size": 10,
+      "contour_fill": false,
+      "mask": [
+        "499",
+        0
+      ]
+    },
+    "class_type": "MaskToSEGS",
+    "_meta": {
+      "title": "MASK to SEGS"
+    }
+  },
+  "511": {
+    "inputs": {
+      "samples": [
+        "42",
+        0
+      ],
+      "vae": [
+        "34",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "512": {
+    "inputs": {
+      "images": [
+        "511",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "515": {
+    "inputs": {
+      "seed": [
+        "584",
+        2
+      ],
+      "steps": 2,
+      "cfg": 1,
+      "sampler_name": "res_2m",
+      "scheduler": "bong_tangent",
+      "denoise": [
+        "435",
+        0
+      ],
+      "model": [
+        "256",
+        0
+      ],
+      "positive": [
+        "29",
+        0
+      ],
+      "negative": [
+        "30",
+        0
+      ],
+      "latent_image": [
+        "406",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "516": {
+    "inputs": {
+      "boolean": [
+        "517",
+        0
+      ],
+      "invert_input": false,
+      "input_1": [
+        "344",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_BooleanBypass",
+    "_meta": {
+      "title": "🔀 INSTARAW Boolean Bypass"
+    }
+  },
+  "517": {
+    "inputs": {
+      "value": true
+    },
+    "class_type": "PrimitiveBoolean",
+    "_meta": {
+      "title": "ENABLE IMAGE FILTERING?"
+    }
+  },
+  "523": {
+    "inputs": {
+      "aspect_ratio": "3:4 (Portrait)"
+    },
+    "class_type": "INSTARAW_WANAspectRatio",
+    "_meta": {
+      "title": "📐 WAN Aspect Ratio"
+    }
+  },
+  "528": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_qyiqo_00001_.png&type=temp&subfolder=&rand=0.939012921959412"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_qyiqo_00003_.png&type=temp&subfolder=&rand=0.12525631456280872"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_qyiqo_00005_.png&type=temp&subfolder=&rand=0.39063156177711456"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_qyiqo_00007_.png&type=temp&subfolder=&rand=0.20716617205624832"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_qyiqo_00002_.png&type=temp&subfolder=&rand=0.8961731286810675"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_qyiqo_00004_.png&type=temp&subfolder=&rand=0.9587008678409112"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_qyiqo_00006_.png&type=temp&subfolder=&rand=0.7907155055555061"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_qyiqo_00008_.png&type=temp&subfolder=&rand=0.7837698516117595"
+          }
+        ]
+      },
+      "image_a": [
+        "543",
+        0
+      ],
+      "image_b": [
+        "171",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "531": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_ezulh_00001_.png&type=temp&subfolder=&rand=0.7191483778302468"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ezulh_00003_.png&type=temp&subfolder=&rand=0.07971887886473117"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ezulh_00005_.png&type=temp&subfolder=&rand=0.09929749442922453"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ezulh_00007_.png&type=temp&subfolder=&rand=0.6209355191940493"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_ezulh_00002_.png&type=temp&subfolder=&rand=0.8161931580258176"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ezulh_00004_.png&type=temp&subfolder=&rand=0.12381111745873397"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ezulh_00006_.png&type=temp&subfolder=&rand=0.8872669541087257"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ezulh_00008_.png&type=temp&subfolder=&rand=0.6864569244018196"
+          }
+        ]
+      },
+      "image_a": [
+        "537",
+        0
+      ],
+      "image_b": [
+        "543",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "532": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_apcsk_00001_.png&type=temp&subfolder=&rand=0.4029406676889973"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_apcsk_00003_.png&type=temp&subfolder=&rand=0.3479842355050121"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_apcsk_00005_.png&type=temp&subfolder=&rand=0.2566954120603362"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_apcsk_00007_.png&type=temp&subfolder=&rand=0.9256241303455942"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_apcsk_00002_.png&type=temp&subfolder=&rand=0.4886323577232732"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_apcsk_00004_.png&type=temp&subfolder=&rand=0.3084212815530534"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_apcsk_00006_.png&type=temp&subfolder=&rand=0.21284609445220326"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_apcsk_00008_.png&type=temp&subfolder=&rand=0.6998670899230199"
+          }
+        ]
+      },
+      "image_a": [
+        "533",
+        0
+      ],
+      "image_b": [
+        "548",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "533": {
+    "inputs": {
+      "magnitude": 0.008,
+      "seed": 1111111,
+      "image": [
+        "548",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_Pixel_Perturb",
+    "_meta": {
+      "title": "🛡️ INSTARAW Pixel Perturb"
+    }
+  },
+  "534": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_ovcri_00001_.png&type=temp&subfolder=&rand=0.15910980661693408"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ovcri_00003_.png&type=temp&subfolder=&rand=0.8166944512747116"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ovcri_00005_.png&type=temp&subfolder=&rand=0.7274062717908781"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ovcri_00007_.png&type=temp&subfolder=&rand=0.8563599595614552"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_ovcri_00002_.png&type=temp&subfolder=&rand=0.7598970609350248"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ovcri_00004_.png&type=temp&subfolder=&rand=0.968809674178482"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ovcri_00006_.png&type=temp&subfolder=&rand=0.7718733009116177"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_ovcri_00008_.png&type=temp&subfolder=&rand=0.9064981166640225"
+          }
+        ]
+      },
+      "image_a": [
+        "551",
+        0
+      ],
+      "image_b": [
+        "533",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "537": {
+    "inputs": {
+      "strength": 0.02,
+      "distances": "2",
+      "seed": 1102442393277424,
+      "image": [
+        "543",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_GLCM_Normalize",
+    "_meta": {
+      "title": "🛡️ INSTARAW GLCM Normalize"
+    }
+  },
+  "543": {
+    "inputs": {
+      "strength": 0.22,
+      "image": [
+        "171",
+        0
+      ],
+      "lut_path": [
+        "553",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_ColorScience",
+    "_meta": {
+      "title": "🎨 INSTARAW Color Science (LUT)"
+    }
+  },
+  "547": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_cpvfx_00001_.png&type=temp&subfolder=&rand=0.930567069848379"
+          },
+          {
+            "name": "A2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_cpvfx_00003_.png&type=temp&subfolder=&rand=0.8420544161508637"
+          },
+          {
+            "name": "A3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_cpvfx_00005_.png&type=temp&subfolder=&rand=0.8930032272927272"
+          },
+          {
+            "name": "A4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_cpvfx_00007_.png&type=temp&subfolder=&rand=0.6870548887384541"
+          },
+          {
+            "name": "B1",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_cpvfx_00002_.png&type=temp&subfolder=&rand=0.5933524161289457"
+          },
+          {
+            "name": "B2",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_cpvfx_00004_.png&type=temp&subfolder=&rand=0.29525705243038625"
+          },
+          {
+            "name": "B3",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_cpvfx_00006_.png&type=temp&subfolder=&rand=0.2668247891656237"
+          },
+          {
+            "name": "B4",
+            "selected": false,
+            "url": "/api/view?filename=rgthree.compare._temp_cpvfx_00008_.png&type=temp&subfolder=&rand=0.4006327623051422"
+          }
+        ]
+      },
+      "image_a": [
+        "548",
+        0
+      ],
+      "image_b": [
+        "537",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "548": {
+    "inputs": {
+      "seed": 1111111,
+      "luma_intensity": 0.04,
+      "chroma_intensity": 0.02,
+      "luma_blur_sigma": 4.2,
+      "chroma_blur_sigma": 2.1,
+      "highlights_protection": 0.77,
+      "image": [
+        "537",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_RealisticNoise",
+    "_meta": {
+      "title": "✨ INSTARAW Realistic Noise"
+    }
+  },
+  "551": {
+    "inputs": {
+      "enabled": true,
+      "cycles": 1,
+      "min_quality": 55,
+      "max_quality": 55,
+      "seed": 1111111,
+      "image": [
+        "533",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_Multi_Compression",
+    "_meta": {
+      "title": "🛡️ INSTARAW Multi-Compression"
+    }
+  },
+  "553": {
+    "inputs": {
+      "lut_name": "natural_look.cube"
+    },
+    "class_type": "INSTARAW_LUT_Selector",
+    "_meta": {
+      "title": "🎨 INSTARAW LUT Selector"
+    }
+  },
+  "576": {
+    "inputs": {
+      "value": false
+    },
+    "class_type": "PrimitiveBoolean",
+    "_meta": {
+      "title": "ENABLE IMG TO IMG?"
+    }
+  },
+  "577": {
+    "inputs": {
+      "prompt_list_positive": [
+        "584",
+        0
+      ],
+      "prompt_list_negative": [
+        "584",
+        1
+      ],
+      "seed_list": [
+        "584",
+        2
+      ]
+    },
+    "class_type": "INSTARAW_PromptBatchPreview",
+    "_meta": {
+      "title": "🔍 INSTARAW Prompt Batch Preview"
+    }
+  },
+  "578": {
+    "inputs": {
+      "preview_markdown": "",
+      "preview_text": "",
+      "previewMode": null,
+      "source": [
+        "577",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview as Text"
+    }
+  },
+  "579": {
+    "inputs": {
+      "value": ""
+    },
+    "class_type": "easy string",
+    "_meta": {
+      "title": "🔑 GEMINI API KEY"
+    }
+  },
+  "580": {
+    "inputs": {
+      "value": ""
+    },
+    "class_type": "easy string",
+    "_meta": {
+      "title": "🔑 XAI API KEY"
+    }
+  },
+  "581": {
+    "inputs": {
+      "image": "Woman_lying_face_202604041547.jpeg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "CHARACTER REF"
+    }
+  },
+  "583": {
+    "inputs": {
+      "mode": "Sequential",
+      "resize_mode": "Center Crop",
+      "batch_index": 3,
+      "width": [
+        "523",
+        0
+      ],
+      "height": [
+        "523",
+        1
+      ],
+      "aspect_label": [
+        "523",
+        2
+      ],
+      "enable_img2img": [
+        "576",
+        0
+      ],
+      "batch_data": "{\"latents\":[{\"id\":\"df9c702a-0b77-467d-92e5-95a9da8b7cf1\",\"width\":512,\"height\":512,\"repeat_count\":4,\"aspect_label\":\"1:1\"}],\"order\":[\"df9c702a-0b77-467d-92e5-95a9da8b7cf1\"],\"total_count\":4}"
+    },
+    "class_type": "INSTARAW_AdvancedImageLoader",
+    "_meta": {
+      "title": "🖼️ INSTARAW Advanced Image Loader"
+    }
+  },
+  "584": {
+    "inputs": {
+      "gemini_api_key": [
+        "579",
+        0
+      ],
+      "grok_api_key": "",
+      "aspect_label": [
+        "523",
+        2
+      ],
+      "trigger_word": "ing2lorance, symmetrical oval face with a softly defined jawline and a small slightly pointed chin, fair light skin tone with neutral-to-cool undertones and smooth even skin texture, almond-shaped eyes with slightly lifted outer corners and light hazel-green irises with a subtle limbal ring, medium-thickness eyebrows with a soft natural arch and light brown tone, straight slender nose with a smooth narrow bridge and a refined rounded tip, medium-full lips with a soft natural pink tone and a gently defined cupid’s bow, long straight platinum blonde hair with cool undertones, sleek smooth texture, center-parted and falling evenly along both sides of the face.She is wearing a microbikini.",
+      "prompt_batch_data": "[{\"id\":\"01KTYE3QYXP18124H5XAY4JJJW\",\"positive_prompt\":\"An authentic iPhone mirror selfie of a conventionally attractive young caucasian woman with long brown hair, lying on her back on a large, grey tufted ottoman in a bedroom. She is in a flexible, suggestive pose with her legs straight up in the air, crossed at the ankles and resting against the mirror. She wears very short, light-wash denim shorts that reveal her underbutt, and white ankle socks. She holds the phone up, looking at the screen with a neutral, seductive expression. The scene is evenly lit by soft, diffused ambient indoor light. The photo has the characteristic quality of a modern smartphone, with good sharpness but some visible digital noise in the background shadows, skin appears smooth due to in-camera processing, casual influencer style, suggestive bedroom selfie.\",\"negative_prompt\":\"deformed, bad anatomy, disfigured, mutated hands, extra limbs, ugly, blurry, cartoon, 3d render, painting, watermark, text\",\"repeat_count\":4,\"tags\":[\"1girl\",\"sfw\",\"young woman\",\"caucasian\",\"conventionally attractive\",\"mirror selfie\",\"smartphone photo\",\"selfie\",\"indoors\",\"bedroom\",\"walk-in closet\",\"day\",\"portrait\",\"full body\",\"lying on back\",\"legs up\",\"legs crossed at ankles\",\"flexible pose\",\"contortion\",\"presenting buttocks to camera\",\"looking at viewer\",\"neutral expression\",\"seductive expression\",\"brown hair\",\"long hair\",\"straight hair\",\"brown eyes\",\"fair skin\",\"curvy build\",\"thick thighs\",\"wide hips\",\"ass\",\"buttocks\",\"underbutt\",\"denim shorts\",\"short shorts\",\"daisy dukes\",\"light-wash denim\",\"frayed hem\",\"white socks\",\"ankle socks\",\"white top\",\"visible tattoo on ankle\",\"ankle tattoo\",\"black nail polish\",\"long nails\",\"no jewelry\",\"phone\",\"smartphone\",\"iphone\",\"phone case\",\"floral phone case\",\"black phone case\",\"natural makeup\",\"blush\",\"skin smoothing\",\"soft ambient light\",\"diffused lighting\",\"medium resolution\",\"sharp focus\",\"amateur photo\",\"suggestive\",\"influencer aesthetic\",\"tufted ottoman\",\"closet\",\"ugg boots\"],\"source_id\":\"01K9GT0W2XXNE4QJHZV9WW5T4A\",\"seed\":1111111,\"seed_control\":\"randomize\"}]",
+      "sdxl_mode": false,
+      "images": [
+        "583",
+        0
+      ],
+      "character_image": [
+        "581",
+        0
+      ],
+      "openrouter_api_key": [
+        "580",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_RealityPromptGenerator",
+    "_meta": {
+      "title": "🎲 INSTARAW Reality Prompt Generator"
+    }
+  },
+  "585": {
+    "inputs": {
+      "images": [
+        "583",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "590": {
+    "inputs": {
+      "images": [
+        "344",
+        0
+      ]
+    },
+    "class_type": "INSTARAW_ImageListFromBatch",
+    "_meta": {
+      "title": "📑 INSTARAW Image List From Batch"
+    }
+  },
+  "602": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "613": {
+    "inputs": {
+      "filename_prefix": "Instaraw/Wan/Metadata/HasMetadata",
+      "images": [
+        "171",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "616": {
+    "inputs": {
+      "face_mask": false,
+      "background_mask": true,
+      "hair_mask": false,
+      "body_mask": false,
+      "clothes_mask": true,
+      "confidence": 0.4,
+      "refine_mask": true,
+      "images": [
+        "498",
+        0
+      ]
+    },
+    "class_type": "APersonMaskGenerator",
+    "_meta": {
+      "title": "A Person Mask Generator"
+    }
+  },
+  "619": {
+    "inputs": {
+      "text": "ing2lorance, symmetrical oval face with a softly defined jawline and a small slightly pointed chin, fair light skin tone with neutral-to-cool undertones and smooth even skin texture, almond-shaped eyes with slightly lifted outer corners and light hazel-green irises with a subtle limbal ring, medium-thickness eyebrows with a soft natural arch and light brown tone, straight slender nose with a smooth narrow bridge and a refined rounded tip, medium-full lips with a soft natural pink tone and a gently defined cupid’s bow, long straight platinum blonde hair with cool undertones, sleek smooth texture, center-parted and falling evenly along both sides of the face.She is wearing a microbikini."
+    },
+    "class_type": "Text Prompt (JPS)",
+    "_meta": {
+      "title": "Text Prompt (JPS)"
+    }
+  }
+}

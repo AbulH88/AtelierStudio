@@ -9,11 +9,13 @@ Run via Start_Agent.bat (which sets AGENT_SECRET). Binds to 127.0.0.1 only —
 the outside world reaches it solely through the Cloudflare tunnel + the secret.
 """
 
+import base64
 import json
 import os
 import subprocess
 import threading
 import time
+import urllib.parse
 import urllib.request
 
 from flask import Flask, request, jsonify
@@ -43,6 +45,41 @@ def comfy_up():
 CLIENT_ID = "atelier-progress"
 PROGRESS = {"running": False, "value": 0, "max": 0}
 
+# --- interactive popups (INSTARAW image picker / mask editor) -----------------
+# ComfyUI broadcasts 'instaraw-interactive-images' over the WS when a workflow pauses
+# for user input. The VPS can't receive WS through the tunnel, so we capture it here
+# (local to ComfyUI), expose it via /interaction, and relay the user's answer back to
+# ComfyUI locally via /interact -> POST /instaraw/interactive_message.
+PENDING = {"active": False}
+
+
+def _fetch_view_b64(meta):
+    """Fetch one preview image from local ComfyUI /view and return it base64."""
+    try:
+        q = urllib.parse.urlencode({"filename": meta.get("filename", ""),
+                                    "subfolder": meta.get("subfolder", ""),
+                                    "type": meta.get("type", "temp")})
+        with urllib.request.urlopen(f"{COMFY_URL}/view?{q}", timeout=20) as r:
+            return base64.b64encode(r.read()).decode()
+    except Exception as e:
+        print(f"[agent] interactive view fetch failed: {e}")
+        return None
+
+
+def _capture_interactive(data):
+    """Handle an 'instaraw-interactive-images' WS payload: a popup request (has urls)
+    or a timeout. Ticks are ignored."""
+    if data.get("urls"):
+        imgs = [b for b in (_fetch_view_b64(u) for u in data["urls"]) if b]
+        PENDING.clear()
+        PENDING.update(active=True, unique=str(data.get("unique")), uid=str(data.get("uid")),
+                       maskedit=bool(data.get("maskedit")), allsame=bool(data.get("allsame")),
+                       tip=data.get("tip", ""), images=imgs)
+        print(f"[agent] popup captured: {'mask' if PENDING['maskedit'] else 'picker'} "
+              f"unique={PENDING['unique']} previews={len(imgs)}")
+    elif data.get("timeout"):
+        PENDING.update(active=False)
+
 
 def _ws_loop():
     try:
@@ -65,8 +102,11 @@ def _ws_loop():
                     PROGRESS.update(running=True, value=0, max=0)
                 elif t == "executing" and data.get("node") is None:
                     PROGRESS.update(running=False, value=0, max=0)
+                elif t == "instaraw-interactive-images" and isinstance(data, dict):
+                    _capture_interactive(data)
                 elif t in ("execution_success", "execution_error", "execution_interrupted"):
                     PROGRESS.update(running=False, value=0, max=0)
+                    PENDING.update(active=False)
         except Exception:
             PROGRESS.update(running=False)
             time.sleep(3)
@@ -80,6 +120,35 @@ def progress():
     if not authed():
         return jsonify({"error": "unauthorized"}), 401
     return jsonify(PROGRESS)
+
+
+@app.get("/interaction")
+def interaction():
+    """Return the pending interactive popup (image picker / mask editor), if any."""
+    if not authed():
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify(PENDING if PENDING.get("active") else {"active": False})
+
+
+@app.post("/interact")
+def interact():
+    """Relay the user's answer back to ComfyUI: {unique, selection|masked_data|special}."""
+    if not authed():
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(force=True, silent=True) or {}
+    resp = {"unique": body.get("unique") or PENDING.get("unique")}
+    for k in ("selection", "masked_data", "masked_image", "special", "extras"):
+        if k in body:
+            resp[k] = body[k]
+    try:
+        data = urllib.parse.urlencode({"response": json.dumps(resp)}).encode()
+        req = urllib.request.Request(f"{COMFY_URL}/instaraw/interactive_message", data=data)
+        with urllib.request.urlopen(req, timeout=30) as r:
+            r.read()
+        PENDING.update(active=False)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.get("/status")

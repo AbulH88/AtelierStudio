@@ -33,11 +33,14 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:9;opac
 /* header */
 header{display:flex;align-items:center;gap:16px;padding:22px 34px;border-bottom:1px solid var(--line);
   position:sticky;top:0;background:rgba(12,12,14,.78);backdrop-filter:blur(12px);z-index:8}
-.mark{width:30px;height:30px;border-radius:8px;border:1px solid var(--amber-dim);
-  display:grid;place-items:center;color:var(--amber);font-family:var(--serif);font-size:18px;
-  box-shadow:inset 0 0 14px rgba(233,184,100,.18)}
-.brand{font-family:var(--serif);font-weight:500;font-size:20px;letter-spacing:.5px}
-.brand em{font-style:italic;color:var(--amber)}
+header::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,#6366f1,#a78bfa 42%,var(--amber))}
+.mark{width:30px;height:30px;border-radius:8px;
+  display:grid;place-items:center;color:#15102b;font-family:var(--serif);font-size:18px;font-weight:600;
+  background:linear-gradient(135deg,#8b5cf6,var(--amber))}
+.brand{font-family:var(--serif);font-weight:500;font-size:20px;letter-spacing:1px;
+  background:linear-gradient(90deg,#c4b5fd,var(--amber) 72%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand em{font-style:italic}
 .tagline{font-size:12px;color:var(--faint);letter-spacing:2.5px;text-transform:uppercase;margin-left:2px}
 .nav{margin-left:32px;display:flex;gap:4px}
 .navitem{font-family:var(--sans);font-size:14.5px;color:var(--mut);background:transparent;border:0;
@@ -46,6 +49,14 @@ header{display:flex;align-items:center;gap:16px;padding:22px 34px;border-bottom:
 .navitem.on{color:var(--txt)}
 .navitem.on::after{content:"";position:absolute;left:16px;right:16px;bottom:-1px;height:2px;
   background:var(--amber);border-radius:2px}
+/* Advanced = INSTARAW: violet-accented studio (the rest of the app stays amber) */
+#paneAdv{border-color:rgba(167,139,250,.3)}
+#paneAdv .hd .step{background:linear-gradient(135deg,#8b5cf6,#a78bfa);color:#15102b;border-color:transparent;box-shadow:none}
+#paneAdv .hd .sub{color:#a78bfa}
+#paneAdv .drop{border-color:rgba(167,139,250,.4);background:rgba(167,139,250,.05)}
+#paneAdv .drop:hover{border-color:rgba(167,139,250,.7);background:rgba(167,139,250,.09)}
+#mAdv.on{background:linear-gradient(180deg,#241f33,#1a1726)!important;color:#d7caff}
+#mAdv.on .k{color:#a78bfa}
 .page{max-width:1180px;margin:0 auto;padding:26px 34px 80px}
 .page-head{display:flex;align-items:baseline;gap:16px;margin:8px 0 22px}
 .page-title{font-family:var(--serif);font-weight:500;font-size:30px;margin:0;letter-spacing:.3px}
@@ -338,6 +349,8 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 .genbar{width:min(280px,70%);height:6px;border-radius:6px;background:var(--line2);margin:14px auto 0;overflow:hidden}
 .genbar span{display:block;height:100%;background:linear-gradient(90deg,var(--amber-dim),var(--amber));
   border-radius:6px;transition:width .3s ease}
+.genbar.indet span{width:35%!important;transition:none;animation:indet 1.1s ease-in-out infinite}
+@keyframes indet{0%{margin-left:-40%}100%{margin-left:105%}}
 
 /* gallery */
 .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
@@ -692,6 +705,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <button id="mVid" class="on" data-mode="i2i"><span class="k">i</span>Frame → Character</button>
     <button id="mTxt" data-mode="t2i"><span class="k">t</span>Text → Character</button>
     <button id="mMotion" data-mode="video"><span class="k">m</span>Motion → Video</button>
+    <button id="mAdv" data-mode="adv"><span class="k">a</span>⚡ Advanced</button>
   </div>
 </div>
 
@@ -826,6 +840,78 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
       </div>
     </section>
 
+    <!-- advanced (INSTARAW) workspace -->
+    <section class="card d1 hide" id="paneAdv">
+      <div class="hd"><span class="step">1</span><h2>Advanced — Prompt Studio</h2><span class="sub">INSTARAW · local</span></div>
+      <div class="bd">
+        <div class="seg" style="margin-bottom:14px;max-width:330px">
+          <button id="advTabGen" class="on" type="button" style="padding:6px 14px;font-size:13px">✦ Generate</button>
+          <button id="advTabLib" type="button" style="padding:6px 14px;font-size:13px">⛁ Library</button>
+        </div>
+        <div id="advGenView">
+        <div class="lab">Character reference <span style="color:var(--faint)">(optional · helps identity)</span></div>
+        <div class="drop" id="advDropRef" style="padding:18px"><div class="ic">🖼</div><p><b>Drop a face photo</b> or click</p></div>
+        <input type="file" id="advRefFile" accept="image/*" class="hide">
+        <img id="advRefPreview" class="hide" style="width:100%;margin:10px 0 0;border-radius:10px;max-height:200px;object-fit:contain;background:#000">
+        <button id="advGenDesc" type="button" class="go ghost" style="width:auto;margin:10px 0 0;padding:7px 13px;font-size:12px;border-color:rgba(167,139,250,.4);color:#cdbcff">✦ Describe character from image</button>
+        <div id="advCharDesc" class="hide" style="margin-top:8px;font-size:11.5px;color:#cdbcff;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);border-radius:8px;padding:8px 10px;line-height:1.5"></div>
+        <div class="lab" style="margin-top:14px">Scene / intent</div>
+        <textarea id="advScene" placeholder="what's happening — outfit, pose, setting, vibe… the AI writes the full prompt from this"></textarea>
+        <div class="lab" style="margin-top:12px;font-size:11px">Expressions <span style="color:var(--faint)">(optional · cycles across variations)</span></div>
+        <div id="advExpr" style="display:flex;flex-wrap:wrap;gap:5px"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:11px">
+          <label style="font-size:11.5px;color:var(--mut)">✦ Library inspiration</label>
+          <input type="number" id="advInspo" value="0" min="0" max="10" style="width:52px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:5px;font-family:var(--mono);font-size:12px;text-align:center">
+          <span style="font-size:10.5px;color:var(--faint)">prompts pulled from the 8k library</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+          <select id="advModel" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:12px">
+            <option value="x-ai/grok-4.3">Grok 4.3 · handles NSFW</option>
+            <option value="openai/gpt-4o">GPT-4o · SFW</option>
+            <option value="anthropic/claude-3.7-sonnet">Claude 3.7 · SFW</option>
+          </select>
+          <button id="advGenPrompts" type="button" class="go" style="width:auto;margin:0;padding:9px 16px;font-size:13px;background:linear-gradient(135deg,#6366f1,#8b5cf6 50%,#a78bfa);border:none;color:#15102b">✦ Generate prompts</button>
+          <span id="advGenStatus" style="font-size:11px;color:var(--mut)"></span>
+        </div>
+        <div id="advPromptCards" style="margin-top:10px;display:flex;flex-direction:column;gap:8px"></div>
+        <div class="inline" style="margin-top:14px">
+          <label>Aspect</label>
+          <select id="advAspect" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+            <option value="3:4 (Portrait)" selected>3:4 Portrait</option>
+            <option value="9:16 (Tall Portrait)">9:16 Tall</option>
+            <option value="1:1 (Square)">1:1 Square</option>
+            <option value="16:9 (Landscape)">16:9 Landscape</option>
+          </select>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;color:var(--mut);cursor:pointer">
+          <input type="checkbox" id="advInteractive"> Interactive — pick images + paint mask during generation
+        </label>
+        <details style="margin-top:12px;border:1px solid rgba(167,139,250,.25);border-radius:8px;padding:0 11px;background:rgba(167,139,250,.04)">
+          <summary style="cursor:pointer;font-size:12px;color:#cdbcff;padding:9px 0">⚙ Pipeline stages <span style="color:var(--faint);font-size:11px">(Main Menu — all on)</span></summary>
+          <div id="advStages" style="display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;padding:2px 0 11px"></div>
+        </details>
+        <p class="hint" style="margin:12px 0 0">✦ Generate prompts uses the INSTARAW engine (Grok via OpenRouter) to write full prompts from your scene + expressions + library. Skip it and the raw scene is used directly.</p>
+        </div><!-- /advGenView -->
+        <div id="advLibView" class="hide">
+          <input id="libSearch" placeholder="search prompts, tags, id…" style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 11px;font-size:12.5px;margin-bottom:9px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+            <select id="libContent" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:6px 8px;font-size:11.5px"></select>
+            <select id="libSafety" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:6px 8px;font-size:11.5px"></select>
+            <select id="libShot" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:6px 8px;font-size:11.5px"></select>
+            <label style="font-size:11.5px;color:var(--mut);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="libFav"> ★ favs</label>
+            <button id="libClear" class="go ghost" type="button" style="width:auto;padding:6px 10px;font-size:11.5px">clear</button>
+          </div>
+          <div id="libCount" style="font-size:11px;color:var(--mut);margin-bottom:8px"></div>
+          <div id="libGrid" style="display:flex;flex-direction:column;gap:8px"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+            <button id="libPrev" class="go ghost" type="button" style="width:auto;padding:6px 12px;font-size:12px">← prev</button>
+            <span id="libPage" style="font-size:11px;color:var(--mut)"></span>
+            <button id="libNext" class="go ghost" type="button" style="width:auto;padding:6px 12px;font-size:12px">next →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- results -->
     <section class="card d3" style="margin-top:24px">
       <div class="hd"><span class="step">3</span><h2>Gallery</h2><span class="sub" id="seedTag"></span></div>
@@ -841,6 +927,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   <aside class="card d2 rail">
     <div class="hd"><span class="step">2</span><h2>Options</h2></div>
     <div class="bd">
+      <button class="go" id="goTop" style="width:100%;margin:0 0 16px" disabled>Develop</button>
       <div class="field">
         <div class="lab">Character</div>
         <div class="sel"><select id="character"></select></div>
@@ -955,7 +1042,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <input type="text" id="triggerWord" value="ing2lorance" placeholder="e.g. ing2lorance"
           style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--amber);border-radius:10px;padding:10px;font-family:var(--mono);font-size:13px">
       </div>
-      <div class="field imgonly">
+      <div class="field imgonly stdlora">
         <div class="lab">⚡ Lightning <span class="num" style="font-size:10px;color:var(--faint)">required · tweakable</span></div>
         <div class="tog" style="align-items:center;gap:8px;padding:6px 0">
           <div class="sel" style="flex:1;min-width:0"><select id="lightningPick" style="padding:8px 28px 8px 10px;font-size:12.5px;border-radius:8px;width:100%"></select></div>
@@ -963,10 +1050,27 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
             style="width:54px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 4px;font-family:var(--mono);font-size:12px;text-align:center">
         </div>
       </div>
-      <div class="field imgonly">
+      <div class="field imgonly stdlora">
         <div class="lab">LoRAs</div>
         <div id="extraLoras"></div>
         <button class="go ghost" id="addLoraBtn" type="button" style="width:100%;margin-top:10px;font-size:13px;padding:9px">+ Add LoRA</button>
+      </div>
+      <div class="field advlora hide">
+        <div class="lab">⚡ LoRA groups <span class="num" style="font-size:10px;color:var(--faint)">high + low noise</span></div>
+        <div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.28);border-radius:10px;padding:10px 11px;margin-bottom:10px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#a78bfa;margin-bottom:7px">Group A · high-noise</div>
+          <div id="advLorasHigh"></div>
+          <button class="go ghost" id="advAddHigh" type="button" style="width:100%;margin-top:8px;font-size:12px;padding:7px;border-color:rgba(167,139,250,.35);color:#cdbcff">+ add LoRA</button>
+        </div>
+        <div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.28);border-radius:10px;padding:10px 11px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#a78bfa;margin-bottom:7px">Group B · low-noise</div>
+          <div class="tog" style="align-items:center;gap:8px;padding:2px 0 8px">
+            <div class="sel" style="flex:1;min-width:0"><select id="advLightningPick" style="padding:7px 26px 7px 10px;font-size:12px;border-radius:8px;width:100%"></select></div>
+            <input type="number" id="advLightningStr" value="0.6" step="0.05" min="0" max="2" style="width:50px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:5px 4px;font-family:var(--mono);font-size:12px;text-align:center">
+          </div>
+          <div id="advLorasLow"></div>
+          <button class="go ghost" id="advAddLow" type="button" style="width:100%;margin-top:8px;font-size:12px;padding:7px;border-color:rgba(167,139,250,.35);color:#cdbcff">+ add LoRA</button>
+        </div>
       </div>
       <div class="field">
         <div class="lab">Seed</div>
@@ -1135,6 +1239,45 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 
 <!-- result image viewer -->
 <div class="imgview" id="imgview"><img id="imgviewImg" alt=""></div>
+
+<!-- Advanced interactive: image picker -->
+<div id="advPicker" class="hide" style="position:fixed;inset:0;background:rgba(8,8,11,.88);z-index:60;display:flex;align-items:center;justify-content:center;padding:24px">
+  <div style="background:#15131c;border:1px solid rgba(167,139,250,.35);border-radius:14px;max-width:780px;width:100%;max-height:88vh;overflow:auto;padding:20px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:12px;color:#15102b;font-weight:500;background:linear-gradient(135deg,#8b5cf6,#a78bfa);padding:3px 10px;border-radius:6px">Pick images</span>
+      <span style="font-size:12px;color:var(--mut)">tap the ones to keep, then continue</span>
+      <span style="margin-left:auto;font-size:11px;color:#cdbcff" id="advPickerCount"></span>
+    </div>
+    <div id="advPickerGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:14px 0"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button id="advPickerAll" class="go ghost" type="button" style="width:auto;padding:8px 14px">select all</button>
+      <button id="advPickerGo" class="go" type="button" style="width:auto;padding:8px 18px;background:linear-gradient(135deg,#6366f1,#a78bfa);border:none;color:#15102b">Continue →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Advanced interactive: mask editor -->
+<div id="advMask" class="hide" style="position:fixed;inset:0;background:rgba(8,8,11,.88);z-index:60;display:flex;align-items:center;justify-content:center;padding:24px">
+  <div style="background:#15131c;border:1px solid rgba(167,139,250,.35);border-radius:14px;max-width:680px;width:100%;max-height:92vh;overflow:auto;padding:20px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <span style="font-size:12px;color:#15102b;font-weight:500;background:linear-gradient(135deg,#8b5cf6,#a78bfa);padding:3px 10px;border-radius:6px">Paint mask</span>
+      <span style="font-size:12px;color:var(--mut)">brush over the area, then continue</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <label style="font-size:11px;color:var(--mut)">brush</label>
+        <input type="range" id="advMaskBrush" min="6" max="140" value="44" style="width:90px;accent-color:#8b5cf6">
+        <button id="advMaskClear" class="go ghost" type="button" style="width:auto;padding:6px 12px">clear</button>
+      </span>
+    </div>
+    <div style="position:relative;display:inline-block;max-width:100%;line-height:0">
+      <img id="advMaskImg" style="display:block;max-width:100%;border-radius:8px" alt="">
+      <canvas id="advMaskCanvas" style="position:absolute;left:0;top:0;cursor:crosshair;touch-action:none"></canvas>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+      <button id="advMaskSkip" class="go ghost" type="button" style="width:auto;padding:8px 14px">skip (blank mask)</button>
+      <button id="advMaskGo" class="go" type="button" style="width:auto;padding:8px 18px;background:linear-gradient(135deg,#6366f1,#a78bfa);border:none;color:#15102b">Continue →</button>
+    </div>
+  </div>
+</div>
 
 <!-- reel video player (with sound) -->
 <div class="imgview" id="vidview" style="flex-direction:column;gap:14px">
@@ -1452,6 +1595,7 @@ function onTargetChange(){
   const cloudOnly = isCloud();
   $('#mVid').classList.toggle('hide', cloudOnly);
   $('#mTxt').classList.toggle('hide', cloudOnly);
+  $('#mAdv').classList.toggle('hide', cloudOnly);   // advanced = local only
   if(cloudOnly && S.mode!=='video') setMode('video');
   if(typeof applyCharList==='function') applyCharList();   // cloud vs local character list
   renderCloudCard();
@@ -1472,19 +1616,109 @@ function setMode(m){
   S.mode=m;
   $('#mVid').classList.toggle('on',m==='i2i');$('#mTxt').classList.toggle('on',m==='t2i');
   $('#mMotion').classList.toggle('on',m==='video');
+  $('#mAdv').classList.toggle('on',m==='adv');
   $('#paneVideo').classList.toggle('hide',m!=='i2i');
   $('#paneText').classList.toggle('hide',m!=='t2i');
   $('#paneMotion').classList.toggle('hide',m!=='video');
+  $('#paneAdv').classList.toggle('hide',m!=='adv');
   // Steps + Denoise only apply to I2I; T2I uses its fixed schedule; video uses its own
   $('#denoiseField').classList.toggle('hide',m!=='i2i');
   $('#stepsField').classList.toggle('hide',m!=='i2i');
   // Lightning + the helper-LoRA / lightning controls are image-only
   $$('.imgonly').forEach(el=>el.classList.toggle('hide', m==='video'));
+  $$('.stdlora').forEach(el=>el.classList.toggle('hide', m==='adv'));   // generic lightning/LoRAs hidden in adv
+  $$('.advlora').forEach(el=>el.classList.toggle('hide', m!=='adv'));   // two LoRA groups shown only in adv
   applyLightningDefault(m);
   refreshGo();
   if(typeof renderCloudCard==='function') renderCloudCard();
 }
 $('#mVid').onclick=()=>setMode('i2i');$('#mTxt').onclick=()=>setMode('t2i');$('#mMotion').onclick=()=>setMode('video');
+$('#mAdv').onclick=()=>setMode('adv');
+// --- Advanced (INSTARAW) panel wiring (increment A: scene -> prompt_batch_data) ---
+$('#advDropRef').onclick=()=>$('#advRefFile').click();
+$('#advRefFile').onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
+  $('#advRefPreview').src=URL.createObjectURL(f); $('#advRefPreview').classList.remove('hide');
+  try{ S.advRefB64=await _fileToB64(f); }catch(_){ }
+  refreshGo();
+};
+$('#advScene').oninput=()=>{ S.advPrompts=null; const b=$('#advPromptCards'); if(b)b.innerHTML=''; const st=$('#advGenStatus'); if(st){st.textContent='';st.style.color='var(--mut)';} refreshGo(); };
+const _abBtn='background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--mut);width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:12px;line-height:1';
+function renderAdvPrompts(){
+  const box=$('#advPromptCards'); if(!box)return;
+  const ps=S.advPrompts||[];
+  if(!ps.length){ box.innerHTML=''; return; }
+  box.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin:2px 0 8px">
+      <span style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#a78bfa">Generation batch · ${ps.length}</span>
+      <span id="advBatchClear" style="margin-left:auto;font-size:11px;color:#f87171;cursor:pointer">clear all</span>
+    </div>`+
+    ps.map((p,i)=>`<div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.3);border-radius:8px;padding:9px 11px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <span style="font-size:10px;color:#a78bfa">#${i+1}</span>
+        <span style="margin-left:auto;display:flex;gap:5px">
+          <button class="ab-up" data-i="${i}" type="button" style="${_abBtn}">↑</button>
+          <button class="ab-dn" data-i="${i}" type="button" style="${_abBtn}">↓</button>
+          <button class="ab-rm" data-i="${i}" type="button" style="${_abBtn};color:#f87171">✕</button>
+        </span>
+      </div>
+      <textarea class="ab-pos" data-i="${i}" rows="3" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,.25);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:7px;font-size:11.5px;line-height:1.5;resize:vertical">${_esc(p.positive||'')}</textarea>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:11px;color:var(--mut);flex-wrap:wrap">
+        <label>repeat</label><input type="number" class="ab-rep" data-i="${i}" value="${p.repeat||1}" min="1" max="20" style="width:44px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:3px;font-family:var(--mono);font-size:11px;text-align:center">
+        <label>seed</label><input type="number" class="ab-seed" data-i="${i}" value="${p.seed||0}" style="width:96px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:3px;font-family:var(--mono);font-size:11px;text-align:center">
+        <button class="ab-rand" data-i="${i}" type="button" title="random seed" style="${_abBtn}">🎲</button>
+        <span style="margin-left:auto">${(p.tags||[]).length} tags</span>
+      </div>
+    </div>`).join('');
+  box.querySelector('#advBatchClear').onclick=()=>{ S.advPrompts=[]; renderAdvPrompts(); refreshGo(); };
+  box.querySelectorAll('.ab-pos').forEach(t=>t.oninput=()=>{ S.advPrompts[+t.dataset.i].positive=t.value; });
+  box.querySelectorAll('.ab-rep').forEach(t=>t.oninput=()=>{ S.advPrompts[+t.dataset.i].repeat=Math.max(1,+t.value||1); });
+  box.querySelectorAll('.ab-seed').forEach(t=>t.oninput=()=>{ S.advPrompts[+t.dataset.i].seed=+t.value||0; });
+  box.querySelectorAll('.ab-rand').forEach(b=>b.onclick=()=>{ S.advPrompts[+b.dataset.i].seed=Math.floor(Math.random()*1e9); renderAdvPrompts(); });
+  box.querySelectorAll('.ab-rm').forEach(b=>b.onclick=()=>{ S.advPrompts.splice(+b.dataset.i,1); renderAdvPrompts(); refreshGo(); });
+  box.querySelectorAll('.ab-up').forEach(b=>b.onclick=()=>{ const i=+b.dataset.i, a=S.advPrompts; if(i>0){ [a[i-1],a[i]]=[a[i],a[i-1]]; renderAdvPrompts(); } });
+  box.querySelectorAll('.ab-dn').forEach(b=>b.onclick=()=>{ const i=+b.dataset.i, a=S.advPrompts; if(i<a.length-1){ [a[i+1],a[i]]=[a[i],a[i+1]]; renderAdvPrompts(); } });
+}
+// expression chips
+const ADV_EXPRESSIONS=['Neutral','Smiling','Laughing','Sexy/Seductive','Flirty','Blowing a kiss','Winking','Pouty','Surprised','Confident','Shy','Ahegao','Biting lip','Tongue out','Sultry'];
+S.advExpr=new Set();
+(function renderAdvExpr(){ const box=$('#advExpr'); if(!box)return;
+  box.innerHTML=ADV_EXPRESSIONS.map(e=>`<span class="adv-ec" data-e="${_esc(e)}" style="font-size:10.5px;padding:4px 8px;border-radius:5px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--mut);cursor:pointer">${_esc(e)}</span>`).join('');
+  box.querySelectorAll('.adv-ec').forEach(c=>c.onclick=()=>{ const e=c.dataset.e, on=S.advExpr.has(e);
+    if(on){ S.advExpr.delete(e); c.style.borderColor='var(--line)'; c.style.background='rgba(255,255,255,.03)'; c.style.color='var(--mut)'; }
+    else { S.advExpr.add(e); c.style.borderColor='rgba(167,139,250,.5)'; c.style.background='rgba(167,139,250,.14)'; c.style.color='#cdbcff'; } });
+})();
+// describe character from the reference image
+$('#advGenDesc').onclick=async()=>{
+  if(!S.advRefB64){ alert('Drop a character reference photo first.'); return; }
+  const btn=$('#advGenDesc'), t=btn.textContent; btn.disabled=true; btn.textContent='✦ describing…';
+  try{
+    const d=await safeJson(await fetch('/api/instaraw/generate_character_description',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({character_image:S.advRefB64,model:$('#advModel').value,complexity:'balanced'})}));
+    if(d.success && d.description){ S.advCharDesc=d.description; const box=$('#advCharDesc'); box.textContent=d.description; box.classList.remove('hide'); }
+    else alert('Describe failed: '+(d.error||'unknown'));
+  }catch(e){ alert('Describe failed: '+e); }
+  finally{ btn.disabled=false; btn.textContent=t; }
+};
+$('#advGenPrompts').onclick=async()=>{
+  const scene=$('#advScene').value.trim(), st=$('#advGenStatus');
+  if(scene.length<3){ st.textContent='type a scene first'; st.style.color='var(--rose)'; return; }
+  const btn=$('#advGenPrompts'), t=btn.innerHTML; btn.innerHTML='<span class="spin"></span>generating…'; btn.disabled=true;
+  st.textContent='thinking…'; st.style.color='var(--mut)';
+  try{
+    const exprs=[...(S.advExpr||[])];
+    const userText=scene + (exprs.length? (', expression: '+exprs.join(' / ')):'');
+    const inspo=Math.max(0,Math.min(10,+$('#advInspo').value||0));
+    let randomInspo=[];
+    if(inspo>0){ try{ const ri=await safeJson(await fetch('/api/instaraw/get_random_prompts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count:inspo,filters:{}})})); randomInspo=ri.prompts||[]; }catch(_){} }
+    const d=await safeJson(await fetch('/api/instaraw/generate_creative_prompts',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({generation_count:S.variations||2,model:$('#advModel').value,is_sdxl:false,generation_mode:'txt2img',
+        user_text_input:userText,character_description:S.advCharDesc||'',affect_elements:[],
+        inspiration_count:inspo,random_inspiration_prompts:randomInspo})}));
+    if(d.success && (d.prompts||[]).length){ S.advPrompts=d.prompts; renderAdvPrompts();
+      st.textContent='✓ '+d.prompts.length+' prompt(s) ready'; st.style.color='#6ee7b7'; }
+    else { st.textContent=d.error||'generation failed'; st.style.color='var(--rose)'; }
+  }catch(e){ st.textContent=String(e); st.style.color='var(--rose)'; }
+  finally{ btn.innerHTML=t; btn.disabled=false; refreshGo(); }
+};
 
 // ===== Motion (Wan Animate) inputs: driving video + ref photo =====
 S.motionVid=null; S.motionRef=null;
@@ -1586,11 +1820,17 @@ async function loadConfig(){
   S.lightning = c.lightning || {options:[], defaults:{}};
   $('#lightningPick').innerHTML = (S.lightning.options||[])
     .map(o=>`<option value="${o.path}">${o.label}</option>`).join('');
+  const _alp=$('#advLightningPick'); if(_alp) _alp.innerHTML=$('#lightningPick').innerHTML;   // group B lightning
   applyLightningDefault(S.mode);
 }
 
 // set Lightning pick + strength to the safe default for the given mode
 function applyLightningDefault(mode){
+  if(mode==='adv'){   // group B (low-noise) uses the t2i v2-distill default @0.6
+    const d=(S.lightning && S.lightning.defaults && S.lightning.defaults['t2i'])||null;
+    if(d){ const p=$('#advLightningPick'); if(p)p.value=d.path; const s=$('#advLightningStr'); if(s)s.value=d.strength; }
+    return;
+  }
   const d = (S.lightning && S.lightning.defaults && S.lightning.defaults[mode]) || null;
   if(!d) return;
   $('#lightningPick').value = d.path;
@@ -1621,6 +1861,7 @@ async function loadLoras(){
   $('#extraLoras').innerHTML = '';
   let saved=[]; try{ saved=JSON.parse(localStorage.getItem(HELPERS_KEY)||'[]'); }catch(e){}
   saved.forEach(s=>addLoraSlot(s.path, s.strength));
+  initAdvLoraDefaults();   // seed the adv LoRA groups with the workflow's baked helpers
 }
 
 function addLoraSlot(path='', strength=1.0){
@@ -1642,6 +1883,146 @@ function addLoraSlot(path='', strength=1.0){
   row.querySelector('.lora-rm').onclick = () => { row.remove(); saveHelperLoras(); };
 }
 $('#addLoraBtn').onclick = () => addLoraSlot();
+// Advanced mode: generic LoRA rows for the two groups (high / low noise)
+function addLoraInto(container, path='', strength=0.6){
+  const row=document.createElement('div'); row.className='tog'; row.style.cssText='align-items:center;gap:8px;padding:6px 0';
+  row.innerHTML=`<div class="sel" style="flex:1;min-width:0"><select class="lora-pick" style="padding:7px 26px 7px 10px;font-size:12px;border-radius:8px;width:100%">${LORA_OPTIONS_HTML}</select></div>
+    <input type="number" class="lora-str" value="${strength}" step="0.05" min="0" max="2" style="width:50px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:5px 4px;font-family:var(--mono);font-size:12px;text-align:center">
+    <button class="lora-rm" type="button" style="flex:none;background:rgba(217,139,122,.1);border:1px solid rgba(217,139,122,.3);color:var(--rose);width:28px;height:28px;border-radius:8px;cursor:pointer">✕</button>`;
+  container.appendChild(row);
+  if(path) row.querySelector('.lora-pick').value=path;
+  row.querySelector('.lora-rm').onclick=()=>row.remove();
+}
+$('#advAddHigh').onclick=()=>addLoraInto($('#advLorasHigh'));
+$('#advAddLow').onclick=()=>addLoraInto($('#advLorasLow'));
+// pre-populate the groups with the workflow's baked helper LoRAs (low-noise = Lenovo @0.6;
+// high-noise had none). Matches node 287 slot3 of the INSTARAW workflow.
+let _advLoraInit=false;
+function _findLora(needle){ const tmp=document.createElement('select'); tmp.innerHTML=LORA_OPTIONS_HTML;
+  for(const o of tmp.options){ if((o.value+' '+o.text).toLowerCase().includes(needle.toLowerCase())) return o.value; } return ''; }
+function initAdvLoraDefaults(){ if(_advLoraInit)return; _advLoraInit=true;
+  if($('#advLorasLow') && $('#advLorasLow').children.length===0){ const lenovo=_findLora('Lenovo'); if(lenovo) addLoraInto($('#advLorasLow'), lenovo, 0.6); }
+}
+
+// ===== Advanced interactive popups (image picker + mask editor) =====
+let _interactTimer=null, _interactBusy=false;
+function startInteractionPolling(){ if(_interactTimer)return;
+  _interactTimer=setInterval(async()=>{ if(_interactBusy)return;
+    try{ const d=await(await fetch('/api/interaction')).json();
+      if(d&&d.active){ _interactBusy=true; if(d.maskedit) showMaskModal(d); else showPickerModal(d); }
+    }catch(e){} }, 1200);
+}
+function stopInteractionPolling(){ if(_interactTimer){clearInterval(_interactTimer);_interactTimer=null;} _interactBusy=false;
+  $('#advPicker').classList.add('hide'); $('#advMask').classList.add('hide'); }
+async function _sendInteract(p){ try{ await fetch('/api/interact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}); }catch(e){} }
+// --- image picker ---
+let _pickSel=new Set();
+function showPickerModal(d){ _pickSel=new Set();
+  $('#advPickerGrid').innerHTML=(d.images||[]).map((b,i)=>`<div class="advpick" data-i="${i}" style="position:relative;border:2px solid transparent;border-radius:8px;overflow:hidden;cursor:pointer"><img src="data:image/png;base64,${b}" style="width:100%;display:block"></div>`).join('');
+  $('#advPickerGrid').querySelectorAll('.advpick').forEach(el=>el.onclick=()=>{ const i=+el.dataset.i;
+    if(_pickSel.has(i)){_pickSel.delete(i); el.style.borderColor='transparent';} else {_pickSel.add(i); el.style.borderColor='#a78bfa';}
+    $('#advPickerCount').textContent=_pickSel.size+' selected'; });
+  $('#advPickerCount').textContent=''; $('#advPicker')._unique=d.unique; $('#advPicker').classList.remove('hide');
+}
+$('#advPickerAll').onclick=()=>{ $('#advPickerGrid').querySelectorAll('.advpick').forEach(el=>{_pickSel.add(+el.dataset.i); el.style.borderColor='#a78bfa';}); $('#advPickerCount').textContent=_pickSel.size+' selected'; };
+$('#advPickerGo').onclick=async()=>{ const sel=[..._pickSel]; $('#advPicker').classList.add('hide');
+  await _sendInteract({unique:$('#advPicker')._unique, selection:sel.length?sel:[0]}); _interactBusy=false; };
+// --- mask editor ---
+let _mPaint=false, _mCtx=null, _mLast=null;
+function showMaskModal(d){ const img=$('#advMaskImg'), cv=$('#advMaskCanvas');
+  img.onload=()=>{ cv.width=img.naturalWidth; cv.height=img.naturalHeight;
+    cv.style.width=img.clientWidth+'px'; cv.style.height=img.clientHeight+'px';
+    _mCtx=cv.getContext('2d'); _mCtx.clearRect(0,0,cv.width,cv.height);
+    _mCtx.fillStyle='rgba(167,139,250,.55)'; _mCtx.strokeStyle='rgba(167,139,250,.55)'; _mCtx.lineCap='round'; _mCtx.lineJoin='round'; };
+  img.src='data:image/png;base64,'+((d.images||[])[0]||'');
+  $('#advMask')._unique=d.unique; $('#advMask').classList.remove('hide');
+}
+function _mPos(e){ const cv=$('#advMaskCanvas'), r=cv.getBoundingClientRect();
+  const cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left, cy=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+  return {x:cx*cv.width/r.width, y:cy*cv.height/r.height, scale:cv.width/r.width}; }
+function _mDot(p){ const r=(+$('#advMaskBrush').value)*p.scale/2; _mCtx.beginPath(); _mCtx.arc(p.x,p.y,r,0,Math.PI*2); _mCtx.fill(); }
+(function(){ const cv=$('#advMaskCanvas'); if(!cv)return;
+  const down=e=>{ if(!_mCtx)return; e.preventDefault(); _mPaint=true; _mLast=_mPos(e); _mDot(_mLast); };
+  const move=e=>{ if(!_mPaint||!_mCtx)return; e.preventDefault(); const p=_mPos(e);
+    _mCtx.lineWidth=(+$('#advMaskBrush').value)*p.scale; _mCtx.beginPath(); _mCtx.moveTo(_mLast.x,_mLast.y); _mCtx.lineTo(p.x,p.y); _mCtx.stroke(); _mDot(p); _mLast=p; };
+  const up=()=>{ _mPaint=false; _mLast=null; };
+  cv.addEventListener('mousedown',down); cv.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+  cv.addEventListener('touchstart',down,{passive:false}); cv.addEventListener('touchmove',move,{passive:false}); cv.addEventListener('touchend',up);
+})();
+$('#advMaskClear').onclick=()=>{ const cv=$('#advMaskCanvas'); if(_mCtx)_mCtx.clearRect(0,0,cv.width,cv.height); };
+async function _finishMask(){ const cv=$('#advMaskCanvas');
+  const id=_mCtx.getImageData(0,0,cv.width,cv.height), px=id.data;
+  for(let i=0;i<px.length;i+=4){ if(px[i+3]>10){px[i]=px[i+1]=px[i+2]=255;px[i+3]=255;} else px[i+3]=0; }
+  const out=document.createElement('canvas'); out.width=cv.width; out.height=cv.height; out.getContext('2d').putImageData(id,0,0);
+  $('#advMask').classList.add('hide');
+  await _sendInteract({unique:$('#advMask')._unique, masked_data:out.toDataURL('image/png')}); _interactBusy=false;
+}
+$('#advMaskGo').onclick=_finishMask;
+$('#advMaskSkip').onclick=()=>{ const cv=$('#advMaskCanvas'); if(_mCtx)_mCtx.clearRect(0,0,cv.width,cv.height); _finishMask(); };
+
+// ===== Prompts Library (browse the 7.9k INSTARAW DB; + Add into the batch) =====
+S.promptDb=null; S.libPage=0; S.libFiltered=[];
+try{ S.libFavs=new Set(JSON.parse(localStorage.getItem('adv_lib_favs')||'[]')); }catch(e){ S.libFavs=new Set(); }
+$('#advTabGen').onclick=()=>{ $('#advTabGen').classList.add('on'); $('#advTabLib').classList.remove('on'); $('#advGenView').classList.remove('hide'); $('#advLibView').classList.add('hide'); };
+$('#advTabLib').onclick=()=>{ $('#advTabLib').classList.add('on'); $('#advTabGen').classList.remove('on'); $('#advLibView').classList.remove('hide'); $('#advGenView').classList.add('hide'); loadPromptDb(); };
+async function loadPromptDb(){ if(S.promptDb)return;
+  $('#libCount').textContent='loading 7.9k prompts…';
+  try{ const d=await safeJson(await fetch('/api/instaraw/prompts_db')); if(d.error)throw new Error(d.error);
+    S.promptDb=d.prompts||[]; populateLibFilters(); libApply();
+  }catch(e){ $('#libCount').textContent='failed to load library: '+e.message; }
+}
+function populateLibFilters(){
+  const uniq=k=>[...new Set(S.promptDb.map(p=>p[k]).filter(Boolean))].sort();
+  const opt=arr=>'<option value="">all</option>'+arr.map(v=>`<option value="${_esc(v)}">${_esc(v)}</option>`).join('');
+  $('#libContent').innerHTML=opt(uniq('content_type')); $('#libSafety').innerHTML=opt(uniq('safety_level')); $('#libShot').innerHTML=opt(uniq('shot_type'));
+}
+function libApply(){
+  const q=$('#libSearch').value.trim().toLowerCase(), c=$('#libContent').value, s=$('#libSafety').value, sh=$('#libShot').value, fav=$('#libFav').checked;
+  S.libFiltered=(S.promptDb||[]).filter(p=>{
+    if(c&&p.content_type!==c)return false; if(s&&p.safety_level!==s)return false; if(sh&&p.shot_type!==sh)return false;
+    if(fav&&!S.libFavs.has(p.id))return false;
+    if(q){ if(!((p.positive||'')+' '+(p.tags||[]).join(' ')+' '+(p.id||'')).toLowerCase().includes(q))return false; }
+    return true; });
+  S.libPage=0; renderLib();
+}
+function renderLib(){
+  const per=12, total=S.libFiltered.length, pages=Math.max(1,Math.ceil(total/per));
+  if(S.libPage>=pages)S.libPage=0;
+  const start=S.libPage*per, slice=S.libFiltered.slice(start,start+per);
+  $('#libCount').textContent=total.toLocaleString()+' prompts';
+  $('#libPage').textContent='page '+(S.libPage+1)+' / '+pages;
+  $('#libGrid').innerHTML=slice.map((p,i)=>{ const gi=start+i, fav=S.libFavs.has(p.id);
+    return `<div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:8px;padding:9px 11px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+        <span style="font-size:9.5px;color:var(--faint);font-family:var(--mono)">${_esc((p.id||'').slice(0,10))}</span>
+        <span style="font-size:9px;color:#cdbcff;background:rgba(139,92,246,.15);border-radius:4px;padding:1px 5px">${_esc(p.safety_level||'')}</span>
+        <button class="lib-fav" data-id="${_esc(p.id)}" type="button" style="margin-left:auto;background:none;border:none;font-size:14px;cursor:pointer;color:${fav?'#fbbf24':'var(--faint)'}">★</button>
+        <button class="lib-add" data-i="${gi}" type="button" style="background:linear-gradient(135deg,#8b5cf6,#a78bfa);border:none;color:#15102b;font-size:11px;padding:4px 11px;border-radius:6px;cursor:pointer">+ Add</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--txt);line-height:1.5">${_esc((p.positive||'').slice(0,240))}${(p.positive||'').length>240?'…':''}</div>
+      <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">${(p.tags||[]).slice(0,6).map(t=>`<span style="font-size:10px;color:#cdbcff;background:rgba(139,92,246,.12);border:1px solid rgba(167,139,250,.3);border-radius:4px;padding:1px 6px">${_esc(t)}</span>`).join('')}</div>
+    </div>`; }).join('');
+  $('#libGrid').querySelectorAll('.lib-add').forEach(b=>b.onclick=()=>libAdd(+b.dataset.i));
+  $('#libGrid').querySelectorAll('.lib-fav').forEach(b=>b.onclick=()=>{ const id=b.dataset.id;
+    if(S.libFavs.has(id))S.libFavs.delete(id); else S.libFavs.add(id);
+    try{localStorage.setItem('adv_lib_favs',JSON.stringify([...S.libFavs]));}catch(e){} renderLib(); });
+}
+function libAdd(i){ const p=S.libFiltered[i]; if(!p)return;
+  S.advPrompts=S.advPrompts||[]; S.advPrompts.push({positive:p.positive,negative:p.negative||'',tags:p.tags||[]});
+  renderAdvPrompts(); const st=$('#advGenStatus'); if(st){ st.textContent='✓ added — '+S.advPrompts.length+' in batch'; st.style.color='#6ee7b7'; }
+  refreshGo();
+}
+$('#libSearch').oninput=libApply; ['#libContent','#libSafety','#libShot'].forEach(s=>$(s).onchange=libApply); $('#libFav').onchange=libApply;
+$('#libClear').onclick=()=>{ $('#libSearch').value=''; $('#libContent').value=''; $('#libSafety').value=''; $('#libShot').value=''; $('#libFav').checked=false; libApply(); };
+$('#libPrev').onclick=()=>{ if(S.libPage>0){S.libPage--; renderLib(); window.scrollTo({top:0,behavior:'smooth'});} };
+$('#libNext').onclick=()=>{ if(S.libPage<Math.ceil(S.libFiltered.length/12)-1){S.libPage++; renderLib(); window.scrollTo({top:0,behavior:'smooth'});} };
+
+// ===== Main Menu: pipeline stage toggles =====
+const ADV_STAGE_DEFS=[['face','Face detailer'],['eyes','Eye detailer'],['hands','Hand detailer'],['pussy','Pussy detailer'],['nipples','Breast detailer'],['feet','Feet detailer'],['lips','Mouth / lips'],['color','Color science'],['glcm','GLCM normalize'],['grain','Neural grain'],['perturb','Pixel perturb'],['compress','Multi-compression']];
+(function(){ const box=$('#advStages'); if(!box)return;
+  box.innerHTML=ADV_STAGE_DEFS.map(([k,l])=>`<label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--mut);cursor:pointer"><input type="checkbox" class="adv-stage" data-k="${k}" checked> ${l}</label>`).join('');
+})();
+function advStages(){ const o={}; $$('#advStages .adv-stage').forEach(c=>o[c.dataset.k]=c.checked); return o; }
 
 // variations chips
 $$('#variations button').forEach(b=>b.onclick=()=>{$$('#variations button').forEach(x=>x.classList.remove('on'));
@@ -1662,11 +2043,13 @@ $('#video').onchange=()=>{if($('#video').files[0])$('#drop').querySelector('p').
 function refreshGo(){
   let ok;
   if(S.mode==='video') ok = !!(S.motionVid && S.motionRef);   // need driving video + ref photo
+  else if(S.mode==='adv') ok = !!($('#variant').value && ($('#advScene').value.trim().length>3 || (S.advPrompts&&S.advPrompts.length)));
   else ok = S.mode==='i2i' ? !!S.frame : $('#prompt').value.trim().length>3;
   if(ok && cloudMissing().length) ok=false;   // grey out: a selected LoRA isn't on the cloud volume
-  $('#go').disabled=!ok;
+  $('#go').disabled=!ok; $('#goTop').disabled=!ok;
 }
 $('#prompt').oninput=refreshGo;
+$('#goTop').onclick=()=>{ if(!$('#go').disabled) $('#go').click(); };
 
 $('#extractBtn').onclick=async()=>{
   const v=$('#video').files[0];$('#extractErr').textContent='';
@@ -1988,15 +2371,47 @@ $('#go').onclick=async()=>{
     body.fps=+$('#mFps').value||30;
     body.prompt=$('#mPrompt').value.trim();
   }
+  else if(S.mode==='adv'){   // INSTARAW advanced — AI prompts if generated, else the raw scene
+    body.ref_b64=S.advRefB64||'';
+    body.aspect=$('#advAspect').value;
+    body.img2img=false;
+    if(S.advPrompts && S.advPrompts.length){
+      body.prompt_batch_data=JSON.stringify(S.advPrompts.map(p=>({positive_prompt:p.positive||'',
+        negative_prompt:p.negative||'', tags:p.tags||[], seed:(+p.seed||Math.floor(Math.random()*1e9)), repeat_count:Math.max(1,+p.repeat||1)})));
+    } else {
+      body.prompt_batch_data=JSON.stringify([{positive_prompt:$('#advScene').value.trim(),
+        negative_prompt:"deformed, bad anatomy, disfigured, extra limbs, blurry, cartoon, watermark, text",
+        seed:Math.floor(Math.random()*1e9), repeat_count:S.variations||1}]);
+    }
+    const _grp=c=>$$(c+' .tog').map(r=>({path:r.querySelector('.lora-pick').value,strength:+r.querySelector('.lora-str').value})).filter(l=>l.path);
+    body.loras_high=_grp('#advLorasHigh'); body.loras_low=_grp('#advLorasLow');
+    body.lightning={path:$('#advLightningPick').value,strength:+$('#advLightningStr').value};
+    body.interactive=$('#advInteractive') ? $('#advInteractive').checked : false;
+    body.stages=advStages();
+  }
   else{
     body.prompt=$('#prompt').value.trim();
   }
-  const t=$('#go').textContent;$('#go').innerHTML='<span class="spin"></span>developing…';$('#go').disabled=true;
+  const _setBusy=b=>{['#go','#goTop'].forEach(s=>{const el=$(s);if(!el)return;
+    el.innerHTML=b?'<span class="spin"></span>developing…':'Develop';el.disabled=b;});};
+  _setBusy(true);
   const _t0=Date.now(), _wasCloud=isCloud(), _vars=S.variations||1;
   $('#stopGen').classList.remove('hide');
-  $('#empty').innerHTML='<div class="g">developing…</div><p class="hint">First run wakes the GPU (~60s).</p>';
+  $('#empty').innerHTML='<div class="g" id="genLbl">developing…</div>'
+    +'<div class="genbar indet" id="genBar"><span id="genFill" style="width:35%"></span></div>'
+    +'<p class="hint" id="genHint">First run wakes the GPU (~60s).</p>';
   $('#empty').classList.remove('hide');$('#results').innerHTML='';
-  const done=()=>{$('#go').textContent=t;$('#go').disabled=false;$('#stopGen').classList.add('hide');refreshGo();};
+  let progTimer=null, poll=null;
+  const done=()=>{ if(progTimer)clearInterval(progTimer); if(poll)clearInterval(poll); stopInteractionPolling();
+    _setBusy(false);$('#stopGen').classList.add('hide');refreshGo();};
+  // live progress: poll fast and mutate the SAME bar element so it animates smoothly
+  progTimer=setInterval(async()=>{
+    let p; try{ p=await(await fetch('/api/progress')).json(); }catch(e){ return; }
+    const lbl=$('#genLbl'), bar=$('#genBar'), fill=$('#genFill'); if(!lbl||!bar||!fill) return;
+    if(p.running && p.max>0){ bar.classList.remove('indet');
+      fill.style.width=Math.round(p.value/p.max*100)+'%'; lbl.textContent=`developing… ${p.value}/${p.max}`;
+    } else { bar.classList.add('indet'); lbl.textContent='developing…'; }
+  }, 700);
 
   // Cloudflare cuts requests at ~100s, so generation is async: kick it off, get a
   // job id, then poll for the result (each request stays short).
@@ -2005,16 +2420,11 @@ $('#go').onclick=async()=>{
     const start=await safeJson(await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
     if(start.error){$('#genErr').textContent=start.error;$('#empty').innerHTML='<div class="g">failed</div><p class="hint">'+start.error+'</p>';done();return;}
     jobId=start.job_id;
+    if(S.mode==='adv' && body.interactive) startInteractionPolling();
   }catch(e){$('#genErr').textContent=String(e);$('#empty').innerHTML='<div class="g">error</div>';done();return;}
 
   let misses=0;
-  const poll=setInterval(async()=>{
-    try{ const p=await(await fetch('/api/progress')).json();
-      if(p.running && p.max>0){ const pct=Math.round(p.value/p.max*100);
-        $('#empty').innerHTML=`<div class="g">developing… ${p.value}/${p.max}</div>
-          <div class="genbar"><span style="width:${pct}%"></span></div>`;
-      }
-    }catch(e){}
+  poll=setInterval(async()=>{
     try{
       const r=await fetch('/api/generate/result?job_id='+encodeURIComponent(jobId));
       if(r.status===404){ if(++misses>5){clearInterval(poll);

@@ -48,6 +48,37 @@ T2I = {"positive": "5", "negative": "6", "char": "12",
 VIDEO = {"load_video": "75", "ref_image": "515", "prompt": "549",
          "char": "544", "sampler": "273", "output": "319"}
 
+# INSTARAW advanced (workflow_adv.json) — LOCAL ONLY. One graph does t2i + image-guided
+# "i2i" via the 576 toggle. Generation is ALWAYS txt2img on the empty latent (407); there
+# is no real img2img (verified) — uploaded images only steer the in-workflow LLM prompt
+# generator (584). Character LoRA goes into slot 1 of BOTH rgthree stacks (287 low / 256
+# high). Interactive popups (344 picker / 285 mask) stay active, surfaced in the app.
+# Final image = node 402 (authenticity-processed, saved w/ EXIF).
+ADV = {"toggle": "576", "aspect": "523", "char_ref": "581", "loader": "583",
+       "prompt_gen": "584", "lora_low": "287", "lora_high": "256", "or_key": "580",
+       "latent_switch": "406", "empty_latent": "407", "img_picker": "344",
+       "mask_filter": "285", "output": "402"}
+
+# Main Menu: pipeline stages the UI can toggle off. Each is a clean image->image node;
+# disabling = bypass (rewire its consumers to its image input, then drop it).
+ADV_STAGES = {"face": "127", "eyes": "501", "hands": "141", "pussy": "147",
+              "nipples": "140", "feet": "142", "lips": "171", "color": "543",
+              "glcm": "537", "grain": "548", "perturb": "533", "compress": "551"}
+
+
+def _bypass_node(graph, nid, in_key="image"):
+    """Bypass an image->image node: rewire every consumer of its output to its image
+    input (incl. the preview/comparer nodes so nothing dangles), then remove it."""
+    if nid not in graph:
+        return
+    src = graph[nid]["inputs"].get(in_key)
+    if isinstance(src, list):
+        for n in graph.values():
+            for k, v in (n.get("inputs") or {}).items():
+                if isinstance(v, list) and len(v) == 2 and str(v[0]) == str(nid):
+                    n["inputs"][k] = src
+    graph.pop(nid, None)
+
 
 # --- low-level ComfyUI API ----------------------------------------------------
 def upload_image(base, raw_bytes):
@@ -73,9 +104,11 @@ def upload_video(base, raw_bytes, filename="driving.mp4"):
     return f"{j['subfolder']}/{j['name']}" if j.get("subfolder") else j["name"]
 
 
-def run(base, graph, timeout=900, client_id=None):
+def run(base, graph, timeout=900, client_id=None, out_node=None):
     """Queue a graph, wait, return list of base64 PNGs via the /view API.
-    client_id lets a WS listener (the web app) receive progress for this job."""
+    client_id lets a WS listener (the web app) receive progress for this job.
+    out_node: if set, return ONLY that node's images (e.g. the final save node in a
+    graph full of preview/comparer nodes, like the INSTARAW advanced workflow)."""
     pid = requests.post(f"{base}/prompt",
                         json={"prompt": graph, "client_id": client_id or uuid.uuid4().hex},
                         headers=CF_HEADERS, timeout=60).json()["prompt_id"]
@@ -84,8 +117,10 @@ def run(base, graph, timeout=900, client_id=None):
         hist = requests.get(f"{base}/history/{pid}", headers=CF_HEADERS, timeout=30).json()
         if pid in hist:
             h = hist[pid]
+            outs = h.get("outputs", {}) or {}
+            sel = {out_node: outs[out_node]} if (out_node and out_node in outs) else outs
             imgs = []
-            for out in h.get("outputs", {}).values():
+            for out in sel.values():
                 for im in out.get("images", []):
                     v = requests.get(f"{base}/view", params={
                         "filename": im["filename"], "subfolder": im.get("subfolder", ""),
@@ -284,6 +319,90 @@ def _build_video(graph, inp, seed, video_name, ref_name):
     return graph
 
 
+def _set_stack_slot(node, slot, path, strength=0.6):
+    """Set one slot of an rgthree 'Lora Loader Stack' (lora_01..04 / strength_01..04).
+    Empty path -> 'None' (the pack's no-op sentinel)."""
+    node["inputs"][f"lora_0{slot}"] = path or "None"
+    if path:
+        node["inputs"][f"strength_0{slot}"] = float(strength)
+
+
+def _build_adv(graph, inp, seed, ref_name=None):
+    """INSTARAW advanced pipeline (t2i + image-guided 'i2i'), LOCAL only. Generation is
+    always txt2img on the empty latent; uploaded images steer the in-workflow prompt
+    generator (584). Drives aspect, character ref, the resolved prompt batch, the
+    OpenRouter key (from env — never stored in the file), and the two rgthree LoRA stacks
+    (character synced to slot 1 of both; lightning -> low stack slot 2; helpers per group)."""
+    nm = ADV
+    if inp.get("aspect"):
+        graph[nm["aspect"]]["inputs"]["aspect_ratio"] = inp["aspect"]
+    # The 576 toggle only affects prompt-from-image. Keep the sampler latent on the empty
+    # latent either way (406.input_true is otherwise unwired -> None when toggled on).
+    graph[nm["toggle"]]["inputs"]["value"] = bool(inp.get("img2img", False))
+    graph[nm["latent_switch"]]["inputs"]["input_true"] = [nm["empty_latent"], 0]
+    graph[nm["loader"]]["inputs"]["enable_img2img"] = bool(inp.get("img2img", False))
+    if inp.get("loader_batch_data") is not None:
+        bd = inp["loader_batch_data"]
+        graph[nm["loader"]]["inputs"]["batch_data"] = bd if isinstance(bd, str) else json.dumps(bd)
+
+    if ref_name:
+        graph[nm["char_ref"]]["inputs"]["image"] = ref_name
+
+    pg = graph[nm["prompt_gen"]]["inputs"]
+    if inp.get("prompt_batch_data") is not None:
+        pbd = inp["prompt_batch_data"]
+        pg["prompt_batch_data"] = pbd if isinstance(pbd, str) else json.dumps(pbd)
+    if inp.get("trigger") is not None:
+        pg["trigger_word"] = inp["trigger"]
+
+    key = inp.get("openrouter_key") or os.environ.get("OPENROUTER_API_KEY", "")
+    if key:
+        graph[nm["or_key"]]["inputs"]["value"] = key
+
+    # character LoRA -> slot 1 of BOTH stacks (synced); lightning -> low stack slot 2
+    cp = inp.get("character_lora_path")
+    if cp:
+        for sid in (nm["lora_low"], nm["lora_high"]):
+            _set_stack_slot(graph[sid], 1, cp, inp.get("character_strength", 1.0))
+    lt = inp.get("lightning") or {}
+    if (lt.get("path") or "").strip():
+        _set_stack_slot(graph[nm["lora_low"]], 2, lt["path"].strip(), lt.get("strength", 0.6))
+
+    # helper LoRAs per group: low stack fills free slots 3-4, high stack fills 2-4
+    for sid, list_key, start in ((nm["lora_low"], "loras_low", 3), (nm["lora_high"], "loras_high", 2)):
+        slot = start
+        for lo in (inp.get(list_key) or []):
+            if slot > 4:
+                break
+            p = (lo.get("path") or "").strip()
+            if not p:
+                continue
+            _set_stack_slot(graph[sid], slot, p, lo.get("strength", 0.6))
+            slot += 1
+
+    # Interactive popups: when inp["interactive"] is set, keep the picker/mask nodes
+    # active so the app's modals can drive them. Otherwise auto-resolve (keep all
+    # generated images, use the automatic person-mask) so a gen completes unattended.
+    if inp.get("interactive"):
+        if nm["img_picker"] in graph:
+            graph[nm["img_picker"]]["inputs"]["cache_behavior"] = "Run selector normally"
+        if nm["mask_filter"] in graph:
+            graph[nm["mask_filter"]]["inputs"]["enabled"] = True
+            graph[nm["mask_filter"]]["inputs"]["cache_behavior"] = "Run editor normally"
+            graph[nm["mask_filter"]]["inputs"]["if_no_mask"] = "send blank"   # skip -> blank, never cancel
+    else:
+        n = max(1, int(inp.get("variations", 1)))
+        if nm["img_picker"] in graph:
+            graph[nm["img_picker"]]["inputs"]["pick_list"] = ",".join(str(i) for i in range(n))
+        if nm["mask_filter"] in graph:
+            graph[nm["mask_filter"]]["inputs"]["enabled"] = False
+    # Main Menu: bypass any pipeline stage the UI turned off
+    for name, on in (inp.get("stages") or {}).items():
+        if not on and name in ADV_STAGES:
+            _bypass_node(graph, ADV_STAGES[name])
+    return graph
+
+
 def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
     """Build + run the right workflow against ComfyUI. Large variation counts are
     split into chunks of `max_batch` (looped) to avoid VRAM OOM on big batches.
@@ -305,6 +424,20 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
         if not vids:
             return {"error": "No video produced — check ComfyUI node errors / model paths."}
         return {"videos": vids, "seed": seed}
+
+    # INSTARAW advanced (local only): one heavy graph; return ONLY the final image
+    # (node 402), not the many preview/comparer nodes. Interactive popups handled live.
+    if mode == "adv":
+        ref_name = None
+        if inp.get("ref_b64"):
+            ref_name = upload_image(base, base64.b64decode(inp["ref_b64"]))
+        with open(wf_path, encoding="utf-8") as f:
+            graph = json.load(f)
+        graph = _build_adv(graph, inp, seed, ref_name=ref_name)
+        images = run(base, graph, client_id=client_id, out_node=ADV["output"], timeout=1800)
+        if not images:
+            return {"error": "No image produced — check ComfyUI node errors / model paths."}
+        return {"images": images, "seed": seed}
 
     frame_name = None
     if mode == "i2i":
