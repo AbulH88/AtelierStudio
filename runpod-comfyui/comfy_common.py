@@ -118,7 +118,16 @@ def run(base, graph, timeout=900, client_id=None, out_node=None):
         if pid in hist:
             h = hist[pid]
             outs = h.get("outputs", {}) or {}
-            sel = {out_node: outs[out_node]} if (out_node and out_node in outs) else outs
+            if out_node and out_node not in outs:
+                # The named save node didn't produce output (it errored, was bypassed,
+                # or never ran). Do NOT fall back to every output node — in graphs full
+                # of preview/comparer nodes (like adv) that floods the gallery with
+                # dozens of intermediate images. Surface the real failure instead.
+                err = _history_error(h.get("status", {}) or {})
+                raise RuntimeError("ComfyUI: save node %s produced no image%s"
+                                   % (out_node, (" — " + err) if err else
+                                      " (it may have been bypassed or failed upstream)."))
+            sel = {out_node: outs[out_node]} if out_node else outs
             imgs = []
             for out in sel.values():
                 for im in out.get("images", []):
