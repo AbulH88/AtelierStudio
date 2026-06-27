@@ -1743,7 +1743,7 @@ $('#advGenPrompts').onclick=async()=>{
         user_text_input:userText,character_description:S.advCharDesc||'',affect_elements:[],
         inspiration_count:inspo,random_inspiration_prompts:randomInspo})}));
     if(d.success && (d.prompts||[]).length){
-      S.advPrompts=(d.prompts||[]).map(p=>({positive:p.positive||'',negative:p.negative||'',tags:p.tags||[],source:'AI'})); renderAdvPrompts();
+      S.advPrompts=(d.prompts||[]).map(p=>({positive:p.positive||'',negative:p.negative||'',tags:p.tags||[],source:'AI',repeat:Math.max(1,+S.variations||1)})); renderAdvPrompts();
       st.textContent='✓ '+d.prompts.length+' prompt(s) ready'; st.style.color='#6ee7b7'; }
     else { st.textContent=d.error||'generation failed'; st.style.color='var(--rose)'; }
   }catch(e){ st.textContent=String(e); st.style.color='var(--rose)'; }
@@ -2065,7 +2065,7 @@ function renderLib(){ const per=12, pages=Math.max(1,Math.ceil(S.libTotal/per));
     if($('#libFav').checked) libFetch(S.libPage); else renderLib(); });
 }
 function libAdd(i){ const p=S.libPagePrompts[i]; if(!p)return;
-  S.advPrompts=S.advPrompts||[]; S.advPrompts.push({positive:p.positive,negative:p.negative||'',tags:p.tags||[],source:'Library'});
+  S.advPrompts=S.advPrompts||[]; S.advPrompts.push({positive:p.positive,negative:p.negative||'',tags:p.tags||[],source:'Library',repeat:Math.max(1,+S.variations||1)});
   renderAdvPrompts(); const st=$('#advGenStatus'); if(st){ st.textContent='✓ added — '+S.advPrompts.length+' in batch'; st.style.color='#6ee7b7'; }
   refreshGo();
 }
@@ -2082,11 +2082,15 @@ const ADV_STAGE_DEFS=[['face','Face detailer'],['eyes','Eye detailer'],['hands',
 })();
 function advStages(){ const o={}; $$('#advStages .adv-stage').forEach(c=>o[c.dataset.k]=c.checked); return o; }
 
-// variations chips
+// variations chips. In Advanced mode "Variations" IS the workflow's per-prompt
+// repeat count, so keep every prompt card's repeat locked to it — one number =
+// exactly what runs (N images, N popups, one at a time), matching the wf.
+function _advSyncRep(){ if(S.mode!=='adv')return; const v=Math.max(1,+S.variations||1);
+  (S.advPrompts||[]).forEach(p=>p.repeat=v); if((S.advPrompts||[]).length) renderAdvPrompts(); }
 $$('#variations button').forEach(b=>b.onclick=()=>{$$('#variations button').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on');S.variations=+b.dataset.v;$('#varNum').value=S.variations;updateGenCost();});
+  b.classList.add('on');S.variations=+b.dataset.v;$('#varNum').value=S.variations;_advSyncRep();updateGenCost();});
 $('#varNum').oninput=()=>{const v=Math.max(1,+$('#varNum').value||1);S.variations=v;
-  $$('#variations button').forEach(x=>x.classList.toggle('on',+x.dataset.v===v));updateGenCost();};
+  $$('#variations button').forEach(x=>x.classList.toggle('on',+x.dataset.v===v));_advSyncRep();updateGenCost();};
 
 // seed random
 $('#randSw').onclick=()=>{S.rand=!S.rand;$('#randSw').classList.toggle('on',S.rand);$('#seed').disabled=S.rand;};
