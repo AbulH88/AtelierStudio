@@ -1258,6 +1258,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     </div>
     <div id="advPickerGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:14px 0"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button id="advPickerCancel" class="go ghost" type="button" style="width:auto;padding:8px 14px;margin-right:auto;color:#f87171;border-color:rgba(248,113,113,.4)">✕ Cancel &amp; restart</button>
       <button id="advPickerAll" class="go ghost" type="button" style="width:auto;padding:8px 14px">select all</button>
       <button id="advPickerGo" class="go" type="button" style="width:auto;padding:8px 18px;background:linear-gradient(135deg,#6366f1,#a78bfa);border:none;color:#15102b">Continue →</button>
     </div>
@@ -1281,10 +1282,17 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
       <canvas id="advMaskCanvas" style="position:absolute;left:0;top:0;cursor:crosshair;touch-action:none"></canvas>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+      <button id="advMaskCancel" class="go ghost" type="button" style="width:auto;padding:8px 14px;margin-right:auto;color:#f87171;border-color:rgba(248,113,113,.4)">✕ Cancel &amp; restart</button>
       <button id="advMaskSkip" class="go ghost" type="button" style="width:auto;padding:8px 14px">skip (blank mask)</button>
       <button id="advMaskGo" class="go" type="button" style="width:auto;padding:8px 18px;background:linear-gradient(135deg,#6366f1,#a78bfa);border:none;color:#15102b">Continue →</button>
     </div>
   </div>
+</div>
+
+<!-- Advanced interactive: "waiting for popup" toast -->
+<div id="advWait" class="hide" style="position:fixed;right:18px;bottom:18px;z-index:55;background:#15131c;border:1px solid rgba(167,139,250,.4);border-radius:12px;padding:12px 16px;max-width:300px;box-shadow:0 8px 30px rgba(0,0,0,.5);display:flex;gap:10px;align-items:center">
+  <span class="spin"></span>
+  <span style="font-size:12px;color:#cdbcff;line-height:1.45">Interactive mode on — the picker will pop up here when your photos are ready (usually a few minutes in). Keep this tab open.</span>
 </div>
 
 <!-- reel video player (with sound) -->
@@ -1928,15 +1936,36 @@ function initAdvLoraDefaults(){ if(_advLoraInit)return; _advLoraInit=true;
 
 // ===== Advanced interactive popups (image picker + mask editor) =====
 let _interactTimer=null, _interactBusy=false;
-function startInteractionPolling(){ if(_interactTimer)return;
+function _showWait(){ const w=$('#advWait'); if(w) w.classList.remove('hide'); }
+function _hideWait(){ const w=$('#advWait'); if(w) w.classList.add('hide'); }
+function startInteractionPolling(){ _interactBusy=false; if(_interactTimer)return; _showWait();
   _interactTimer=setInterval(async()=>{ if(_interactBusy)return;
-    try{ const d=await(await fetch('/api/interaction')).json();
-      if(d&&d.active){ _interactBusy=true; if(d.maskedit) showMaskModal(d); else showPickerModal(d); }
-    }catch(e){} }, 1200);
+    let d; try{ d=await(await fetch('/api/interaction')).json(); }catch(e){ return; }
+    if(d&&d.active){
+      // set busy only AFTER a successful show, so a render error can't wedge us forever
+      try{ if(d.maskedit) showMaskModal(d); else showPickerModal(d); _interactBusy=true; _hideWait(); }
+      catch(e){ console.error('interactive popup failed to show:',e); }
+    } else { _showWait(); }   // still generating — keep the "waiting" toast up
+  }, 1200);
 }
 function stopInteractionPolling(){ if(_interactTimer){clearInterval(_interactTimer);_interactTimer=null;} _interactBusy=false;
-  $('#advPicker').classList.add('hide'); $('#advMask').classList.add('hide'); }
+  _hideWait(); $('#advPicker').classList.add('hide'); $('#advMask').classList.add('hide'); }
 async function _sendInteract(p){ try{ await fetch('/api/interact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}); }catch(e){} }
+// Cancel the open popup and stop the job, so the user can start a fresh generation.
+async function _cancelInteract(){
+  const uniq = !$('#advPicker').classList.contains('hide') ? $('#advPicker')._unique : $('#advMask')._unique;
+  $('#advPicker').classList.add('hide'); $('#advMask').classList.add('hide'); _hideWait();
+  try{ await _sendInteract({unique:uniq, special:"-3"}); }catch(e){}   // -3 = cancel this interaction
+  try{ await fetch('/api/interrupt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:S.target})}); }catch(e){}
+  stopInteractionPolling();
+  ['#go','#goTop'].forEach(s=>{const el=$(s); if(el){el.innerHTML='Develop'; el.disabled=false;}});
+  $('#stopGen').classList.add('hide');
+  $('#empty').innerHTML='<div class="g">cancelled</div><p class="hint">Ready — adjust and Develop again.</p>';
+  $('#empty').classList.remove('hide');
+  try{ refreshGo(); }catch(e){}
+}
+$('#advPickerCancel') && ($('#advPickerCancel').onclick=_cancelInteract);
+$('#advMaskCancel') && ($('#advMaskCancel').onclick=_cancelInteract);
 // --- image picker ---
 let _pickSel=new Set();
 function showPickerModal(d){ _pickSel=new Set();
