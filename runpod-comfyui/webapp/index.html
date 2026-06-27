@@ -882,8 +882,8 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
             <option value="16:9 (Landscape)">16:9 Landscape</option>
           </select>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;color:var(--mut);cursor:pointer">
-          <input type="checkbox" id="advInteractive"> Interactive — pick images + paint mask during generation
+        <label id="advInteractiveLbl" style="display:flex;align-items:center;gap:9px;margin-top:12px;font-size:13px;color:#cdbcff;cursor:pointer;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.4);border-radius:9px;padding:10px 12px">
+          <input type="checkbox" id="advInteractive" style="width:17px;height:17px;accent-color:#a78bfa;flex:0 0 auto"> <span><b style="color:#e7deff;font-weight:600">Interactive</b> — pick images + paint mask during generation</span>
         </label>
         <details style="margin-top:12px;border:1px solid rgba(167,139,250,.25);border-radius:8px;padding:0 11px;background:rgba(167,139,250,.04)">
           <summary style="cursor:pointer;font-size:12px;color:#cdbcff;padding:9px 0">⚙ Pipeline stages <span style="color:var(--faint);font-size:11px">(Main Menu — all on)</span></summary>
@@ -1966,6 +1966,15 @@ async function _cancelInteract(){
 }
 $('#advPickerCancel') && ($('#advPickerCancel').onclick=_cancelInteract);
 $('#advMaskCancel') && ($('#advMaskCancel').onclick=_cancelInteract);
+// Remember the Interactive toggle across reloads + brighten the label when armed,
+// so it's obvious whether the popups will fire for this run.
+(function(){ const cb=$('#advInteractive'), lbl=$('#advInteractiveLbl'); if(!cb) return;
+  const paint=()=>{ if(lbl) lbl.style.borderColor = cb.checked ? '#a78bfa' : 'rgba(167,139,250,.4)';
+    if(lbl) lbl.style.background = cb.checked ? 'rgba(167,139,250,.18)' : 'rgba(167,139,250,.08)'; };
+  try{ cb.checked = localStorage.getItem('advInteractive')==='1'; }catch(e){}
+  cb.addEventListener('change',()=>{ try{ localStorage.setItem('advInteractive', cb.checked?'1':'0'); }catch(e){} paint(); });
+  paint();
+})();
 // --- image picker ---
 let _pickSel=new Set();
 function showPickerModal(d){ _pickSel=new Set();
