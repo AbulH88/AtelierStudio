@@ -1954,10 +1954,12 @@ async function _sendInteract(p){ try{ await fetch('/api/interact',{method:'POST'
 // Cancel the open popup and stop the job, so the user can start a fresh generation.
 async function _cancelInteract(){
   const uniq = !$('#advPicker').classList.contains('hide') ? $('#advPicker')._unique : $('#advMask')._unique;
+  // Kill the poll timer FIRST (synchronously) so a 1.2s tick can't re-show the
+  // popup while the cancel/interrupt requests are still in flight.
+  stopInteractionPolling();
   $('#advPicker').classList.add('hide'); $('#advMask').classList.add('hide'); _hideWait();
   try{ await _sendInteract({unique:uniq, special:"-3"}); }catch(e){}   // -3 = cancel this interaction
   try{ await fetch('/api/interrupt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:S.target})}); }catch(e){}
-  stopInteractionPolling();
   ['#go','#goTop'].forEach(s=>{const el=$(s); if(el){el.innerHTML='Develop'; el.disabled=false;}});
   $('#stopGen').classList.add('hide');
   $('#empty').innerHTML='<div class="g">cancelled</div><p class="hint">Ready — adjust and Develop again.</p>';
