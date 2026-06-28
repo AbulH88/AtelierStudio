@@ -2500,9 +2500,14 @@ $('#go').onclick=async()=>{
           const src=d.video_url||('data:video/mp4;base64,'+((d.videos||[])[0]||''));
           $('#results').innerHTML=`<video controls autoplay loop playsinline style="width:100%;max-width:460px;border-radius:12px;background:#000" src="${src}"></video>`;
         } else {
-          $('#results').innerHTML=(d.images||[]).map((b,i)=>`<figure style="animation-delay:${i*.07}s;position:relative"><img src="data:image/png;base64,${b}"><button class="to-motion" data-i="${i}" title="Use as Motion reference photo" style="position:absolute;left:6px;bottom:6px;background:rgba(12,12,14,.74);border:1px solid var(--amber-dim);color:var(--amber);font-size:11px;padding:4px 9px;border-radius:8px;cursor:pointer">→ Motion ref</button></figure>`).join('');
+          // Prefer lightweight R2 URLs (lazy-loaded); fall back to base64 only if the server sent it.
+          const urls=(d.image_urls&&d.image_urls.length)?d.image_urls:(d.images||[]).map(b=>'data:image/png;base64,'+b);
+          $('#results').innerHTML=urls.map((u,i)=>`<figure style="animation-delay:${i*.07}s;position:relative"><img src="${u}" loading="lazy"><button class="to-motion" data-i="${i}" title="Use as Motion reference photo" style="position:absolute;left:6px;bottom:6px;background:rgba(12,12,14,.74);border:1px solid var(--amber-dim);color:var(--amber);font-size:11px;padding:4px 9px;border-radius:8px;cursor:pointer">→ Motion ref</button></figure>`).join('');
           $$('#results img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.src;$('#imgview').classList.add('on');});
-          $$('#results .to-motion').forEach(btn=>btn.onclick=(e)=>{e.stopPropagation(); useAsMotionRef(d.images[+btn.dataset.i]);});
+          $$('#results .to-motion').forEach(btn=>btn.onclick=(e)=>{e.stopPropagation();
+            const u=urls[+btn.dataset.i];
+            if(u.indexOf('data:')===0) useAsMotionRef(u.split(',')[1]); else galToMotionRef(u);   // URL -> fetch -> motion ref
+          });
         }
         $('#seedTag').textContent='seed '+d.seed;
         if(_wasCloud&&CLOUD.info){   // estimate-only spend: $/sec × measured seconds × variations

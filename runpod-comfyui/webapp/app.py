@@ -1443,9 +1443,18 @@ def _run_gen_job(job_id, target, inp, body):
                                     "video_url": url, "seed": out.get("seed")}
             return
         images = out.get("images", [])
-        _save_to_gallery(inp, images, out.get("seed"))   # persist (best-effort)
+        keys = _save_to_gallery(inp, images, out.get("seed"))   # -> R2, returns keys
+        # Hand the browser lightweight URLs (served from R2 via /api/media), not
+        # 30-40MB of inline base64 — keeps the result response tiny so the UI
+        # updates instantly and Develop unlocks without hauling blobs to the page.
+        result = {"status": "done", "seed": out.get("seed")}
+        if keys and len(keys) == len(images):
+            from urllib.parse import quote
+            result["image_urls"] = [f"/api/media?key={quote(k, safe='')}" for k in keys]
+        else:
+            result["images"] = images   # R2 save incomplete -> base64 fallback so the UI still works
         with GEN_JOBS_LOCK:
-            GEN_JOBS[job_id] = {"status": "done", "images": images, "seed": out.get("seed")}
+            GEN_JOBS[job_id] = result
     except Exception as e:
         with GEN_JOBS_LOCK:
             GEN_JOBS[job_id] = {"status": "error", "error": f"{type(e).__name__}: {e}"}
@@ -1507,15 +1516,21 @@ def _gallery_group(inp):
 
 
 def _save_to_gallery(inp, images, seed):
+    """Persist each generated image to R2. Returns the list of R2 keys written,
+    so the result can be served as lightweight URLs instead of base64 blobs."""
     if not images:
-        return
+        return []
     group = _gallery_group(inp)
     ts = int(time.time())
+    keys = []
     for i, b64 in enumerate(images):
+        key = f"gallery/{group}/{ts}_{seed}_{i}.png"
         try:
-            r2_store.upload_bytes(f"gallery/{group}/{ts}_{seed}_{i}.png", base64.b64decode(b64))
+            r2_store.upload_bytes(key, base64.b64decode(b64))
+            keys.append(key)
         except Exception:
             pass
+    return keys
 
 
 @app.get("/api/gallery/groups")
