@@ -2882,10 +2882,13 @@ $('#clearGalSearch').onclick = () => {
   renderGallery();
 };
 
+let _galSearchT = null;
 $('#galSearch').oninput = () => {
   _galSearch = $('#galSearch').value;
   $('#clearGalSearch').classList.toggle('hide', !_galSearch);
-  renderGallery();
+  // Debounce: renderGallery() rebuilds the whole grid, so don't fire it on every
+  // keystroke — wait until the user pauses (matches the library search pattern).
+  clearTimeout(_galSearchT); _galSearchT = setTimeout(renderGallery, 180);
 };
 
 
