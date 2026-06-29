@@ -1704,11 +1704,17 @@ $('#advSrcFile') && ($('#advSrcFile').onchange=async e=>{ const f=e.target.files
   const st=$('#advSrcStatus'); st.style.color='var(--mut)'; st.textContent='uploading source…';
   try{
     const fd=new FormData(); fd.append('files', f); fd.append('node_id','atelier');
-    const d=await(await fetch('/api/instaraw/batch_upload',{method:'POST',body:fd})).json();
+    const resp=await fetch('/api/instaraw/batch_upload',{method:'POST',body:fd});
+    const ct=resp.headers.get('content-type')||'';
+    if(!resp.ok || ct.indexOf('json')<0){   // surface the real error (HTML page, 413, 502, …)
+      const txt=(await resp.text()).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+      throw new Error('HTTP '+resp.status+(txt?(' — '+txt.slice(0,90)):''));
+    }
+    const d=await resp.json();
     const img=(d.images||[])[0];
     if(img){ S.advI2iImg=img; st.style.color='#34d399'; st.textContent='✓ img2img ON for this run — the output will follow this photo'; }
     else { S.advI2iImg=null; st.style.color='#f87171'; st.textContent='upload failed: '+(d.error||'no image returned'); }
-  }catch(err){ S.advI2iImg=null; st.style.color='#f87171'; st.textContent='upload error: '+err; }
+  }catch(err){ S.advI2iImg=null; st.style.color='#f87171'; st.textContent='upload error: '+(err.message||err); }
   refreshGo();
 });
 // click the source preview to remove it (back to txt2img)
