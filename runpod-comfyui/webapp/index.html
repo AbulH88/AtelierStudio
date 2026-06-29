@@ -1686,6 +1686,7 @@ $('#advRefFile').onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
 $('#advDropSrc') && ($('#advDropSrc').onclick=()=>$('#advSrcFile').click());
 $('#advSrcFile') && ($('#advSrcFile').onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
   $('#advSrcPreview').src=URL.createObjectURL(f); $('#advSrcPreview').classList.remove('hide');
+  try{ S.advI2iImgB64=await _fileToB64(f); }catch(_){ }   // keep b64 so Generate prompts can read this photo
   const st=$('#advSrcStatus'); st.style.color='var(--mut)'; st.textContent='uploading source…';
   try{
     const fd=new FormData(); fd.append('files', f); fd.append('node_id','atelier');
@@ -1697,7 +1698,7 @@ $('#advSrcFile') && ($('#advSrcFile').onchange=async e=>{ const f=e.target.files
   refreshGo();
 });
 // click the source preview to remove it (back to txt2img)
-$('#advSrcPreview') && ($('#advSrcPreview').onclick=()=>{ S.advI2iImg=null; $('#advSrcPreview').classList.add('hide');
+$('#advSrcPreview') && ($('#advSrcPreview').onclick=()=>{ S.advI2iImg=null; S.advI2iImgB64=null; $('#advSrcPreview').classList.add('hide');
   $('#advSrcPreview').src=''; if($('#advSrcFile'))$('#advSrcFile').value=''; $('#advSrcStatus').textContent=''; refreshGo(); });
 $('#advScene').oninput=()=>{ S.advPrompts=null; const b=$('#advPromptCards'); if(b)b.innerHTML=''; const st=$('#advGenStatus'); if(st){st.textContent='';st.style.color='var(--mut)';} refreshGo(); };
 const _abBtn='background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--mut);width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:12px;line-height:1';
@@ -1768,12 +1769,22 @@ $('#advGenDesc').onclick=async()=>{
 };
 $('#advGenPrompts').onclick=async()=>{
   const scene=$('#advScene').value.trim(), st=$('#advGenStatus');
-  if(scene.length<3){ st.textContent='type a scene first'; st.style.color='var(--rose)'; return; }
+  const imgB64=S.advI2iImgB64||S.advRefB64||'';
+  if(scene.length<3 && !imgB64 && !S.advCharDesc){ st.textContent='type a scene or add an image first'; st.style.color='var(--rose)'; return; }
   const btn=$('#advGenPrompts'), t=btn.innerHTML; btn.innerHTML='<span class="spin"></span>generating…'; btn.disabled=true;
   st.textContent='thinking…'; st.style.color='var(--mut)';
   try{
+    // No scene typed but a photo is provided -> read it first so the AI writes the prompt from the image
+    if(scene.length<3 && !S.advCharDesc && imgB64){
+      st.textContent='reading your image…';
+      try{ const dd=await safeJson(await fetch('/api/instaraw/generate_character_description',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({character_image:imgB64,model:$('#advModel').value,complexity:'balanced'})}));
+        if(dd.success&&dd.description){ S.advCharDesc=dd.description; const box=$('#advCharDesc'); if(box){box.textContent=dd.description; box.classList.remove('hide');} }
+      }catch(_){ }
+    }
     const exprs=[...(S.advExpr||[])];
-    const userText=scene + (exprs.length? (', expression: '+exprs.join(' / ')):'');
+    const base=scene.length>=3 ? scene : (S.advCharDesc||'a candid lifestyle photo');
+    const userText=base + (exprs.length? (', expression: '+exprs.join(' / ')):'');
     const inspo=Math.max(0,Math.min(10,+$('#advInspo').value||0));
     let randomInspo=[];
     if(inspo>0){ try{ const ri=await safeJson(await fetch('/api/instaraw/get_random_prompts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count:inspo,filters:{}})})); randomInspo=ri.prompts||[]; }catch(_){} }
