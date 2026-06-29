@@ -853,6 +853,11 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <div class="drop" id="advDropRef" style="padding:18px"><div class="ic">🖼</div><p><b>Drop a face photo</b> or click</p></div>
         <input type="file" id="advRefFile" accept="image/*" class="hide">
         <img id="advRefPreview" class="hide" style="width:100%;margin:10px 0 0;border-radius:10px;max-height:200px;object-fit:contain;background:#000">
+        <div class="lab" style="margin-top:14px">Source image <span style="color:var(--faint)">(optional · img2img — the look follows this photo)</span></div>
+        <div class="drop" id="advDropSrc" style="padding:18px"><div class="ic">🎨</div><p><b>Drop a source photo</b> or click</p></div>
+        <input type="file" id="advSrcFile" accept="image/*" class="hide">
+        <img id="advSrcPreview" class="hide" title="click to remove" style="width:100%;margin:10px 0 0;border-radius:10px;max-height:200px;object-fit:contain;background:#000;cursor:pointer">
+        <div id="advSrcStatus" class="hint" style="margin:6px 0 0"></div>
         <button id="advGenDesc" type="button" class="go ghost" style="width:auto;margin:10px 0 0;padding:7px 13px;font-size:12px;border-color:rgba(167,139,250,.4);color:#cdbcff">✦ Describe character from image</button>
         <div id="advCharDesc" class="hide" style="margin-top:8px;font-size:11.5px;color:#cdbcff;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25);border-radius:8px;padding:8px 10px;line-height:1.5"></div>
         <div class="lab" style="margin-top:14px">Scene / intent</div>
@@ -1677,6 +1682,23 @@ $('#advRefFile').onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
   try{ S.advRefB64=await _fileToB64(f); }catch(_){ }
   refreshGo();
 };
+// img2img source image -> uploads to ComfyUI's INSTARAW pool, drives loader 583.
+$('#advDropSrc') && ($('#advDropSrc').onclick=()=>$('#advSrcFile').click());
+$('#advSrcFile') && ($('#advSrcFile').onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
+  $('#advSrcPreview').src=URL.createObjectURL(f); $('#advSrcPreview').classList.remove('hide');
+  const st=$('#advSrcStatus'); st.style.color='var(--mut)'; st.textContent='uploading source…';
+  try{
+    const fd=new FormData(); fd.append('files', f); fd.append('node_id','atelier');
+    const d=await(await fetch('/api/instaraw/batch_upload',{method:'POST',body:fd})).json();
+    const img=(d.images||[])[0];
+    if(img){ S.advI2iImg=img; st.style.color='#34d399'; st.textContent='✓ img2img ON for this run — the output will follow this photo'; }
+    else { S.advI2iImg=null; st.style.color='#f87171'; st.textContent='upload failed: '+(d.error||'no image returned'); }
+  }catch(err){ S.advI2iImg=null; st.style.color='#f87171'; st.textContent='upload error: '+err; }
+  refreshGo();
+});
+// click the source preview to remove it (back to txt2img)
+$('#advSrcPreview') && ($('#advSrcPreview').onclick=()=>{ S.advI2iImg=null; $('#advSrcPreview').classList.add('hide');
+  $('#advSrcPreview').src=''; if($('#advSrcFile'))$('#advSrcFile').value=''; $('#advSrcStatus').textContent=''; refreshGo(); });
 $('#advScene').oninput=()=>{ S.advPrompts=null; const b=$('#advPromptCards'); if(b)b.innerHTML=''; const st=$('#advGenStatus'); if(st){st.textContent='';st.style.color='var(--mut)';} refreshGo(); };
 const _abBtn='background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--mut);width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:12px;line-height:1';
 const _abMini='background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--mut);border-radius:6px;cursor:pointer;font-size:10.5px;padding:4px 9px';
@@ -2473,7 +2495,18 @@ $('#go').onclick=async()=>{
   else if(S.mode==='adv'){   // INSTARAW advanced — AI prompts if generated, else the raw scene
     body.ref_b64=S.advRefB64||'';
     body.aspect=$('#advAspect').value;
-    body.img2img=false;
+    // img2img: if a source photo was uploaded, drive the loader (583) with it so the
+    // output follows that image — exactly the workflow's IMG2IMG mode.
+    if(S.advI2iImg){
+      body.img2img=true;
+      body.loader_batch_data=JSON.stringify({
+        images:[{id:S.advI2iImg.id, filename:S.advI2iImg.filename,
+                 original_name:S.advI2iImg.original_name||S.advI2iImg.filename,
+                 width:S.advI2iImg.width, height:S.advI2iImg.height, repeat_count:1}],
+        order:[S.advI2iImg.id], total_count:1});
+    } else {
+      body.img2img=false;
+    }
     if(S.advPrompts && S.advPrompts.length){
       body.prompt_batch_data=JSON.stringify(S.advPrompts.map(p=>({positive_prompt:p.positive||'',
         negative_prompt:p.negative||'', tags:p.tags||[], seed:(+p.seed||Math.floor(Math.random()*1e9)), repeat_count:Math.max(1,+p.repeat||1)})));
