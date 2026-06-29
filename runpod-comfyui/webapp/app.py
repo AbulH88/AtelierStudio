@@ -582,8 +582,10 @@ def config():
 
 @app.get("/api/loras")
 def api_loras():
-    """LoRA picker options: curated helpers + the whole wan/NSFW folder (its own group)."""
+    """LoRA picker options: curated helpers + whole-folder groups (each its own group).
+    'My LoRAs' = anything dropped into loras/wan/MyLoras/ — auto-populates, no config."""
     return jsonify({"groups": [
+        {"label": "My LoRAs", "items": _folder_loras("MyLoras", ".my_loras.json")},
         {"label": "Helpers", "items": HELPER_LORAS},
         {"label": "NSFW", "items": _folder_loras("NSFW", ".nsfw_loras.json")},
     ]})
