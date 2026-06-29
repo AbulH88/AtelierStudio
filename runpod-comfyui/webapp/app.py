@@ -54,6 +54,10 @@ API_KEY = os.environ.get("RUNPOD_API_KEY", "")
 RUNPOD_URL = f"https://api.runpod.ai/v2/{ENDPOINT_ID}/runsync"
 RUNPOD_HEALTH_URL = f"https://api.runpod.ai/v2/{ENDPOINT_ID}/health"
 LOCAL_COMFY = os.environ.get("LOCAL_COMFY_URL", "http://127.0.0.1:8189")  # matches Windows_Run_GPU.bat
+# Max images generated per ComfyUI run on Local. The 5090 can batch several at
+# once, so "Variations: N" runs as ONE batch (fast) instead of N looped runs.
+# Lower this if a big batch ever OOMs the GPU at high resolutions.
+LOCAL_MAX_BATCH = max(1, int(os.environ.get("LOCAL_MAX_BATCH", "8")))
 
 # Cloud (RunPod) cost + capacity hints. Cost is ESTIMATE-ONLY: the UI multiplies
 # price_per_sec by the measured generation seconds — we never call RunPod billing.
@@ -1396,7 +1400,8 @@ def _run_gen_job(job_id, target, inp, body):
             inp["prompt"] = describe_image(inp["image_b64"], p, p["model"])
 
         if target == "local":
-            out = comfy_common.generate(LOCAL_COMFY, WORKFLOW_DIR, inp, client_id=CLIENT_ID)
+            out = comfy_common.generate(LOCAL_COMFY, WORKFLOW_DIR, inp, client_id=CLIENT_ID,
+                                        max_batch=LOCAL_MAX_BATCH)
         else:
             if not (ENDPOINT_ID and API_KEY):
                 raise RuntimeError("Cloud not configured (set RunPod env vars).")
