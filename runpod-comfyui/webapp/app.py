@@ -1324,12 +1324,19 @@ def api_ir_random():
 
 @app.post("/api/instaraw/batch_upload")
 def api_ir_upload():
-    """Forward i2i source images to ComfyUI's INSTARAW image pool (multipart)."""
+    """Forward i2i source images to ComfyUI's INSTARAW image pool (multipart).
+    Prefer the home agent — the comfy hostname is behind Cloudflare Access, which
+    bounces multipart uploads to an HTML login page; the agent reaches ComfyUI on
+    localhost. Falls back to LOCAL_COMFY for local dev (no agent)."""
     files = [("files", (f.filename, f.stream, f.mimetype)) for f in request.files.getlist("files")]
+    if AGENT_URL:
+        url, hdrs = f"{AGENT_URL}/batch_upload", {"x-agent-secret": AGENT_SECRET}
+    else:
+        url, hdrs = f"{LOCAL_COMFY}/instaraw/batch_upload", comfy_common.CF_HEADERS
     try:
-        r = requests.post(f"{LOCAL_COMFY}/instaraw/batch_upload", files=files or None,
+        r = requests.post(url, files=files or None,
                           data={"node_id": request.form.get("node_id", "atelier")},
-                          headers=comfy_common.CF_HEADERS, timeout=120)
+                          headers=hdrs, timeout=120)
         return (r.content, r.status_code,
                 {"Content-Type": r.headers.get("Content-Type", "application/json")})
     except Exception as e:

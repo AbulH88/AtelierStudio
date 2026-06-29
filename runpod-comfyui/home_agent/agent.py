@@ -103,6 +103,10 @@ def _ws_loop():
                 elif t == "executing" and data.get("node") is None:
                     PROGRESS.update(running=False, value=0, max=0)
                 elif t == "instaraw-interactive-images" and isinstance(data, dict):
+                    if data.get("tick") is None:   # don't spam the 0.5s countdown ticks
+                        print(f"[agent] WS instaraw-interactive-images: keys={list(data.keys())} "
+                              f"uid={data.get('uid')!r} unique={data.get('unique')!r} "
+                              f"maskedit={data.get('maskedit')} urls={data.get('urls')!r}")
                     _capture_interactive(data)
                 elif t in ("execution_success", "execution_error", "execution_interrupted"):
                     PROGRESS.update(running=False, value=0, max=0)
@@ -149,6 +153,24 @@ def interact():
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/batch_upload")
+def batch_upload():
+    """Relay an i2i source-image multipart upload to local ComfyUI's INSTARAW pool.
+    The VPS can't reach comfy directly (Cloudflare Access bounces multipart uploads
+    to a login page), so it forwards here and we POST to ComfyUI on localhost."""
+    if not authed():
+        return jsonify({"error": "unauthorized"}), 401
+    import requests as _rq
+    files = [("files", (f.filename, f.stream, f.mimetype)) for f in request.files.getlist("files")]
+    try:
+        r = _rq.post(f"{COMFY_URL}/instaraw/batch_upload", files=files or None,
+                     data={"node_id": request.form.get("node_id", "atelier")}, timeout=120)
+        return (r.content, r.status_code,
+                {"Content-Type": r.headers.get("Content-Type", "application/json")})
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 502
 
 
 @app.get("/status")
