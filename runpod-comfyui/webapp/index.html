@@ -1803,15 +1803,23 @@ $('#advGenPrompts').onclick=async()=>{
       }catch(_){ }
     }
     const exprs=[...(S.advExpr||[])];
-    const base=scene.length>=3 ? scene : (S.advCharDesc||'a candid lifestyle photo');
-    const userText=base + (exprs.length? (', expression: '+exprs.join(' / ')):'');
-    const inspo=Math.max(0,Math.min(10,+$('#advInspo').value||0));
-    let randomInspo=[];
-    if(inspo>0){ try{ const ri=await safeJson(await fetch('/api/instaraw/get_random_prompts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count:inspo,filters:{}})})); randomInspo=ri.prompts||[]; }catch(_){} }
-    const d=await safeJson(await fetch('/api/instaraw/generate_creative_prompts',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({generation_count:S.variations||2,model:$('#advModel').value,is_sdxl:false,generation_mode:'txt2img',
-        user_text_input:userText,character_description:S.advCharDesc||'',affect_elements:[],
-        inspiration_count:inspo,random_inspiration_prompts:randomInspo})}));
+    const _common={generation_count:S.variations||2,model:$('#advModel').value,is_sdxl:false,
+      character_description:S.advCharDesc||'',use_character_likeness:!!S.advCharDesc};
+    let _payload;
+    if(S.advI2iImg){
+      // img2img: engine DESCRIBES the source photo so every variation FOLLOWS it (not new scenes).
+      // affect_elements = what to change; [] = keep everything as shown.
+      _payload={..._common, generation_mode:'img2img', images:[S.advI2iImgB64].filter(Boolean), affect_elements:[]};
+    } else {
+      const base=scene.length>=3 ? scene : (S.advCharDesc||'a candid lifestyle photo');
+      const userText=base + (exprs.length? (', expression: '+exprs.join(' / ')):'');
+      const inspo=Math.max(0,Math.min(10,+$('#advInspo').value||0));
+      let randomInspo=[];
+      if(inspo>0){ try{ const ri=await safeJson(await fetch('/api/instaraw/get_random_prompts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({count:inspo,filters:{}})})); randomInspo=ri.prompts||[]; }catch(_){} }
+      _payload={..._common, generation_mode:'txt2img', user_text_input:userText, affect_elements:[],
+        inspiration_count:inspo, random_inspiration_prompts:randomInspo};
+    }
+    const d=await safeJson(await fetch('/api/instaraw/generate_creative_prompts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(_payload)}));
     if(d.success && (d.prompts||[]).length){
       S.advPrompts=(d.prompts||[]).map(p=>({positive:p.positive||'',negative:p.negative||'',tags:p.tags||[],source:'AI',repeat:Math.max(1,+S.variations||1)})); renderAdvPrompts();
       st.textContent='✓ '+d.prompts.length+' prompt(s) ready'; st.style.color='#6ee7b7'; }
