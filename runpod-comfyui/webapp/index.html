@@ -870,11 +870,25 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           <span style="font-size:10.5px;color:var(--faint)">prompts pulled from the 8k library</span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
-          <select id="advModel" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:12px">
+          <input id="advModel" list="advModelList" value="x-ai/grok-4.3" spellcheck="false" placeholder="OpenRouter model id… (type any)" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 10px;font-size:12px;font-family:var(--mono);min-width:240px">
+          <datalist id="advModelList">
             <option value="x-ai/grok-4.3">Grok 4.3 · handles NSFW</option>
+            <option value="x-ai/grok-4">Grok 4 · handles NSFW</option>
+            <option value="x-ai/grok-3">Grok 3 · handles NSFW</option>
+            <option value="nousresearch/hermes-3-llama-3.1-405b">Hermes 3 405B · uncensored</option>
+            <option value="sao10k/l3.1-70b-euryale-v2.2">Euryale 70B · NSFW writer</option>
+            <option value="sao10k/l3.3-euryale-70b">Euryale L3.3 70B · NSFW writer</option>
+            <option value="cognitivecomputations/dolphin-mixtral-8x22b">Dolphin Mixtral · uncensored</option>
+            <option value="deepseek/deepseek-chat">DeepSeek V3 · cheap, flexible</option>
+            <option value="deepseek/deepseek-r1">DeepSeek R1 · reasoning</option>
+            <option value="google/gemini-2.5-pro">Gemini 2.5 Pro · SFW</option>
+            <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash · fast, SFW</option>
             <option value="openai/gpt-4o">GPT-4o · SFW</option>
-            <option value="anthropic/claude-3.7-sonnet">Claude 3.7 · SFW</option>
-          </select>
+            <option value="openai/gpt-4.1">GPT-4.1 · SFW</option>
+            <option value="anthropic/claude-3.7-sonnet">Claude 3.7 Sonnet · SFW</option>
+            <option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B</option>
+            <option value="mistralai/mistral-large">Mistral Large · SFW</option>
+          </datalist>
           <button id="advGenPrompts" type="button" class="go" style="width:auto;margin:0;padding:9px 16px;font-size:13px;background:linear-gradient(135deg,#6366f1,#8b5cf6 50%,#a78bfa);border:none;color:#15102b">✦ Generate prompts</button>
           <span id="advGenStatus" style="font-size:11px;color:var(--mut)"></span>
         </div>
