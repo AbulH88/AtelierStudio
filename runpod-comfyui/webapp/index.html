@@ -1059,12 +1059,12 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         </div>
       </div>
       <div class="field imgonly stdlora">
-        <div class="lab">LoRAs</div>
+        <div class="lab" style="display:flex;align-items:center">LoRAs<span id="t2iRefreshLoras" title="Re-scan the LoRA folder (e.g. after copying into My LoRAs)" style="margin-left:auto;font-size:11px;color:#a78bfa;cursor:pointer">↻ refresh</span></div>
         <div id="extraLoras"></div>
         <button class="go ghost" id="addLoraBtn" type="button" style="width:100%;margin-top:10px;font-size:13px;padding:9px">+ Add LoRA</button>
       </div>
       <div class="field advlora hide">
-        <div class="lab">⚡ LoRA groups <span class="num" style="font-size:10px;color:var(--faint)">high + low noise</span></div>
+        <div class="lab" style="display:flex;align-items:center;gap:8px">⚡ LoRA groups <span class="num" style="font-size:10px;color:var(--faint)">high + low noise</span><span id="advRefreshLoras" title="Re-scan the LoRA folder (e.g. after copying into My LoRAs)" style="margin-left:auto;font-size:11px;color:#a78bfa;cursor:pointer">↻ refresh</span></div>
         <div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.28);border-radius:10px;padding:10px 11px;margin-bottom:10px">
           <div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#a78bfa;margin-bottom:7px">Group A · high-noise</div>
           <div id="advLorasHigh"></div>
@@ -1925,6 +1925,26 @@ function addLoraInto(container, path='', strength=0.6){
 }
 $('#advAddHigh').onclick=()=>addLoraInto($('#advLorasHigh'));
 $('#advAddLow').onclick=()=>addLoraInto($('#advLorasLow'));
+
+// Re-fetch the LoRA list and refresh every dropdown in place (preserving each
+// current selection), without reloading the page. Use after copying a file into
+// the My LoRAs folder. /api/loras reads ComfyUI live, which re-scans the folder.
+async function refreshLoras(el){
+  const prev = el ? el.textContent : null;
+  if(el){ el.textContent='↻ …'; el.style.pointerEvents='none'; }
+  try{
+    const d = await(await fetch('/api/loras?t='+Date.now())).json();   // cache-bust
+    LORA_OPTIONS_HTML = '<option value="">— select a LoRA —</option>' +
+      (d.groups||[]).filter(g => g.items && g.items.length).map(g =>
+        `<optgroup label="${g.label}">` +
+        g.items.map(it => `<option value="${it.path}">${it.label}</option>`).join('') +
+        `</optgroup>`).join('');
+    document.querySelectorAll('select.lora-pick').forEach(sel=>{ const v=sel.value; sel.innerHTML=LORA_OPTIONS_HTML; sel.value=v; });
+  }catch(e){ console.error('refresh loras failed', e); }
+  if(el){ el.textContent=prev||'↻ refresh'; el.style.pointerEvents=''; }
+}
+$('#t2iRefreshLoras') && ($('#t2iRefreshLoras').onclick=()=>refreshLoras($('#t2iRefreshLoras')));
+$('#advRefreshLoras') && ($('#advRefreshLoras').onclick=()=>refreshLoras($('#advRefreshLoras')));
 // pre-populate the groups with the workflow's baked helper LoRAs (low-noise = Lenovo @0.6;
 // high-noise had none). Matches node 287 slot3 of the INSTARAW workflow.
 let _advLoraInit=false;
