@@ -426,26 +426,24 @@ def _auto_characters_fs(parent="wan/MyLoras"):
 
 
 def build_characters():
-    # Prefer the live ComfyUI LoRA list (the VPS has no H: drive to scan); cache it
-    # so the dropdown still fills if ComfyUI is briefly down.
+    # Characters come ONLY from wan/MyLoras/ subfolders — drop a folder in = a character.
+    # (The hardcoded CHAR_DEFS list is no longer shown; it's kept only for gallery grouping.)
+    # An empty result is valid (no folders yet) — don't fall back to the old curated list.
     try:
-        loras = _comfy_loras()
-        res = _group_characters(loras) + _auto_characters(loras)   # curated + auto-discovered
-        if res:
-            try:
-                with open(CATALOG_CACHE, "w", encoding="utf-8") as f:
-                    _json.dump(res, f)
-            except Exception:
-                pass
-            return res
+        chars = _auto_characters(_comfy_loras())   # live ComfyUI list; [] is a valid result
+        try:
+            with open(CATALOG_CACHE, "w", encoding="utf-8") as f:
+                _json.dump(chars, f)
+        except Exception:
+            pass
+        return chars
     except Exception:
         pass
-    # fallback: local filesystem scan (home dev)
-    fs = [{"key": d["key"], "label": d["label"], "variants": v}
-          for d in CHAR_DEFS for v in [_list_variants(d["folder"])] if v]
-    fs += _auto_characters_fs()   # auto-discovered MyLoras characters
-    if fs:
-        return fs
+    # fallback: local filesystem scan (home dev, where H: is reachable)
+    try:
+        return _auto_characters_fs()
+    except Exception:
+        pass
     # last resort: previously cached catalog
     if os.path.exists(CATALOG_CACHE):
         try:
@@ -1587,6 +1585,12 @@ def generate_result():
 
 def _gallery_group(inp):
     p = (inp.get("character_lora_path") or "").replace("\\", "/").lower()
+    # MyLoras auto-characters: group by the character subfolder name
+    pref = "wan/myloras/"
+    if pref in p:
+        rest = p.split(pref, 1)[1]
+        if "/" in rest:
+            return _auto_char_key(rest.split("/", 1)[0])
     for d in CHAR_DEFS:
         if p.startswith(d["folder"].rstrip("/").lower() + "/"):
             return d["key"]
