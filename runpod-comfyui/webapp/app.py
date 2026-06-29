@@ -385,11 +385,52 @@ def _group_characters(loras):
     return res
 
 
+def _auto_char_key(name):
+    return "myl_" + re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def _auto_characters(loras, parent="wan/MyLoras"):
+    """Auto-discover characters from immediate subfolders of <parent>: each subfolder
+    is a character (label = folder name); the .safetensors inside are its checkpoints.
+    Lets the user add a character by dropping its folder into MyLoras — no code edits."""
+    prefix = (parent.rstrip("/") + "/").lower()
+    chars = {}   # subfolder name -> [{label, path}]
+    for raw in loras:
+        p = raw.replace("\\", "/")
+        i = p.lower().find(prefix)
+        if i < 0:
+            continue
+        rest = p[i + len(prefix):]
+        if "/" not in rest:        # a loose file directly in MyLoras (no character folder)
+            continue
+        sub, inner = rest.split("/", 1)
+        chars.setdefault(sub, []).append({"label": os.path.splitext(inner)[0], "path": p})
+    res = []
+    for sub in sorted(chars, key=str.lower):
+        variants = sorted(chars[sub], key=lambda v: (bool(_STEP.search(v["label"])), v["label"]))
+        res.append({"key": _auto_char_key(sub), "label": sub, "variants": variants})
+    return res
+
+
+def _auto_characters_fs(parent="wan/MyLoras"):
+    """Filesystem version of _auto_characters (home dev, where H: is reachable)."""
+    base = os.path.join(LORAS_DIR, *parent.split("/"))
+    res = []
+    if os.path.isdir(base):
+        for d in sorted(os.listdir(base), key=str.lower):
+            if os.path.isdir(os.path.join(base, d)):
+                v = _list_variants(os.path.join(*parent.split("/"), d))
+                if v:
+                    res.append({"key": _auto_char_key(d), "label": d, "variants": v})
+    return res
+
+
 def build_characters():
     # Prefer the live ComfyUI LoRA list (the VPS has no H: drive to scan); cache it
     # so the dropdown still fills if ComfyUI is briefly down.
     try:
-        res = _group_characters(_comfy_loras())
+        loras = _comfy_loras()
+        res = _group_characters(loras) + _auto_characters(loras)   # curated + auto-discovered
         if res:
             try:
                 with open(CATALOG_CACHE, "w", encoding="utf-8") as f:
@@ -402,6 +443,7 @@ def build_characters():
     # fallback: local filesystem scan (home dev)
     fs = [{"key": d["key"], "label": d["label"], "variants": v}
           for d in CHAR_DEFS for v in [_list_variants(d["folder"])] if v]
+    fs += _auto_characters_fs()   # auto-discovered MyLoras characters
     if fs:
         return fs
     # last resort: previously cached catalog
@@ -459,6 +501,29 @@ def _folder_loras(subfolder, cache_name):
         except Exception:
             items = []
     return [{"path": p, "label": os.path.splitext(p.split("/")[-1])[0]} for p in items]
+
+
+def _folder_groups(subfolder, cache_name, label_prefix):
+    """Like _folder_loras, but split into one picker group per immediate subfolder
+    so the UI mirrors the folder layout. Files sitting directly in the folder go in
+    a root group; each subfolder becomes "<label_prefix> · <subfolder>"."""
+    flat = _folder_loras(subfolder, cache_name)   # [{path,label}] (live/fs/cache)
+    prefix = f"wan/{subfolder}/".lower()
+    root_items, groups = [], {}
+    for it in flat:
+        low = it["path"].lower()
+        i = low.find(prefix)
+        rest = it["path"][i + len(prefix):] if i >= 0 else it["path"].split("/")[-1]
+        if "/" in rest:                       # lives in a subfolder -> its own group
+            groups.setdefault(rest.split("/", 1)[0], []).append(it)
+        else:                                 # sits directly in the folder -> root group
+            root_items.append(it)
+    out = []
+    if root_items:
+        out.append({"label": label_prefix, "items": root_items})
+    for sub in sorted(groups, key=str.lower):
+        out.append({"label": f"{label_prefix} · {sub}", "items": groups[sub]})
+    return out
 
 
 # --- Cloud LoRA manifest ------------------------------------------------------
@@ -584,8 +649,7 @@ def config():
 def api_loras():
     """LoRA picker options: curated helpers + whole-folder groups (each its own group).
     'My LoRAs' = anything dropped into loras/wan/MyLoras/ — auto-populates, no config."""
-    return jsonify({"groups": [
-        {"label": "My LoRAs", "items": _folder_loras("MyLoras", ".my_loras.json")},
+    return jsonify({"groups": _folder_groups("MyLoras", ".my_loras.json", "My LoRAs") + [
         {"label": "Helpers", "items": HELPER_LORAS},
         {"label": "NSFW", "items": _folder_loras("NSFW", ".nsfw_loras.json")},
     ]})
