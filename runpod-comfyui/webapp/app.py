@@ -655,6 +655,13 @@ def api_loras():
     ]})
 
 
+@app.get("/api/characters")
+def api_characters():
+    """Just the character list (curated + auto-discovered from MyLoras), so the UI
+    can refresh the Character dropdown after a folder is added — no page reload."""
+    return jsonify({"characters": build_characters()})
+
+
 @app.get("/api/health")
 def health():
     """Report which compute targets are available so the UI can auto-pick."""

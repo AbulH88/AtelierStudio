@@ -937,7 +937,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <div class="bd">
       <button class="go" id="goTop" style="width:100%;margin:0 0 16px" disabled>Develop</button>
       <div class="field">
-        <div class="lab">Character</div>
+        <div class="lab" style="display:flex;align-items:center">Character<span id="charRefresh" title="Re-scan for new character folders dropped into My LoRAs" style="margin-left:auto;font-size:11px;color:#a78bfa;cursor:pointer">↻ refresh</span></div>
         <div class="sel"><select id="character"></select></div>
       </div>
       <div class="field">
@@ -1346,6 +1346,23 @@ function fillVariants(){
   $('#variant').innerHTML=ch.variants.map(v=>`<option value="${v.path}">${v.label}</option>`).join('');
   $('#vCount').textContent=ch.variants.length>1?ch.variants.length+' ckpts':'';
 }
+// Re-fetch the character list (picks up folders just dropped into My LoRAs) and
+// refresh the Character + Checkpoint dropdowns, keeping the current pick if it survives.
+async function refreshCharacters(el){
+  const prev=el?el.textContent:null; if(el){ el.textContent='↻ …'; el.style.pointerEvents='none'; }
+  const cur=$('#variant')?$('#variant').value:'';
+  try{
+    const d=await(await fetch('/api/characters?t='+Date.now())).json();
+    if(d.characters) S.chars=d.characters;
+    applyCharList();
+    if(cur){ const list=_charList();
+      for(let i=0;i<list.length;i++){ if((list[i].variants||[]).some(v=>v.path===cur)){
+        $('#character').value=i; fillVariants(); $('#variant').value=cur; break; } } }
+  }catch(e){ console.error('refresh characters failed', e); }
+  if(el){ el.textContent=prev||'↻ refresh'; el.style.pointerEvents=''; }
+  try{ refreshGo(); }catch(e){}
+}
+$('#charRefresh') && ($('#charRefresh').onclick=()=>refreshCharacters($('#charRefresh')));
 
 async function loadHealth(){
   let h={local:false,cloud:false};
