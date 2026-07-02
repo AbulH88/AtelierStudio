@@ -2365,6 +2365,29 @@ function initReelSortChips() {
   });
 }
 
+// Only start fetching a reel's video once its card scrolls near the viewport —
+// the R2 proxy chain ignores Range requests, so every <video> load pulls the
+// ENTIRE file. Rendering hundreds of reels at once used to fire hundreds of
+// full-file downloads simultaneously, which is what made the tab so slow.
+let _reelObserver = null;
+function lazyLoadReelVideos(){
+  if(!_reelObserver){
+    _reelObserver = new IntersectionObserver((entries)=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){
+          const v = entry.target;
+          if(!v.src) v.src = v.dataset.src;
+          _reelObserver.unobserve(v);
+        }
+      });
+    }, {root:null, rootMargin:'400px 0px', threshold:0.01});
+  }
+  // Observing right after innerHTML replaces the grid (same task as insertion) can
+  // miss the observer's initial intersection check before layout has settled — defer
+  // one frame so the freshly-inserted cards have a real layout to measure against.
+  requestAnimationFrame(()=>$$('#reelGrid video').forEach(v=>_reelObserver.observe(v)));
+}
+
 function renderReelGrid(){
   const q = ($('#reelSearch').value || '').trim().toLowerCase();
   const sort = _reelSortMode;
@@ -2389,13 +2412,14 @@ function renderReelGrid(){
     return;
   }
   $('#reelGrid').innerHTML = list.map(r => `<div class="reel-card">
-    <video src="${r.url}" muted preload="metadata" data-url="${r.url}" data-name="${r.name}" style="cursor:pointer"
-      onmouseover="this.play()" onmouseout="this.pause();this.currentTime=0"></video>
+    <video data-src="${r.url}" muted preload="none" data-url="${r.url}" data-name="${r.name}" style="cursor:pointer"
+      onmouseover="if(!this.src){this.src=this.dataset.src;} this.play()" onmouseout="this.pause();this.currentTime=0"></video>
     <div class="meta"><div class="nm" title="${r.name}">${r.name}</div><div class="sz">${r.size_mb} MB</div></div>
     <div class="acts"><button class="use" data-key="${r.key}">→ Frame</button>
       <button class="usemotion" data-url="${r.url}" data-name="${r.name}">→ Motion</button></div>
     <div class="acts" style="padding-top:0"><button class="save" data-key="${r.key}">↓ Save</button>
       <button class="del" data-key="${r.key}">✕ Delete</button></div></div>`).join('');
+  lazyLoadReelVideos();
   $$('#reelGrid video').forEach(v=>v.onclick=()=>openReelPlayer(v.dataset.url, v.dataset.name));
   $$('#reelGrid .use').forEach(b=>b.onclick=()=>useReel(b.dataset.key));
   $$('#reelGrid .usemotion').forEach(b=>b.onclick=()=>useReelMotion(b.dataset.url, b.dataset.name));
