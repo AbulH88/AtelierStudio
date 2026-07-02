@@ -105,9 +105,12 @@ def delete_folder(folder):
         delete(o["key"])
 
 
-def stream(key):
+def stream(key, range_header=None):
     """Return a streaming requests.Response for the object (app proxies it)."""
-    return requests.get(f"{PROXY_URL}/{_k(key)}", headers=H, stream=True, timeout=900)
+    headers = dict(H)
+    if range_header:
+        headers["Range"] = range_header
+    return requests.get(f"{PROXY_URL}/{_k(key)}", headers=headers, stream=True, timeout=900)
 
 
 def download_to(key, local_path):

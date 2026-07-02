@@ -994,16 +994,19 @@ def reels_media():
     key = request.args.get("key", "")
     if not key:
         return jsonify({"error": "no key"}), 400
-    up = r2_store.stream(key)
-    if up.status_code != 200:
+    up = r2_store.stream(key, request.headers.get("Range"))
+    if up.status_code not in (200, 206):
         return ("not found", up.status_code)
     ext = key.lower().rsplit(".", 1)[-1]
     ct = ("video/mp4" if ext in ("mp4", "mov", "webm")
           else "image/png" if ext == "png" else "image/jpeg")
-    headers = {"Content-Type": ct}
+    headers = {"Content-Type": ct, "Accept-Ranges": "bytes"}
+    for h in ("Content-Range", "Content-Length"):
+        if h in up.headers:
+            headers[h] = up.headers[h]
     if request.args.get("download"):
         headers["Content-Disposition"] = f'attachment; filename="{key.split("/")[-1]}"'
-    return Response(up.iter_content(65536), headers=headers)
+    return Response(up.iter_content(65536), status=up.status_code, headers=headers)
 
 
 @app.get("/api/reels/save-url")
