@@ -24,9 +24,9 @@ BASE = [
     ("Comfy-Org/Wan_2.1_ComfyUI_repackaged",
      "split_files/text_encoders/umt5_xxl_fp16.safetensors",
      "text_encoders/Wan/umt5_xxl_fp16.safetensors"),
-    ("Comfy-Org/Wan_2.1_ComfyUI_repackaged",
-     "split_files/vae/wan_2.1_vae.safetensors",
-     "vae/wan_2.1_vae.safetensors"),
+    ("Kijai/WanVideo_comfy",
+     "Wan2_1_VAE_fp32.safetensors",
+     "vae/Wan/Wan2_1_VAE_fp32.safetensors"),
 ]
 
 results = []

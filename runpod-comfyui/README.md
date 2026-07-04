@@ -42,7 +42,7 @@ Pipeline:
 |---|---|---|
 | diffusion_models | WAN/Wan2.2/Text/low_noise_model/wan2.2_t2v_low_noise_14B_fp16.safetensors | 27 GB |
 | text_encoders/clip | Wan/umt5_xxl_fp16.safetensors | 11 GB |
-| vae | wan_2.1_vae.safetensors | 1 GB |
+| vae | Wan/Wan2_1_VAE_fp32.safetensors | 1 GB |
 | loras | wan/Wan2.2-Lightning/Wan2.1-Distill-Loras/wan2.1_t2v_14b_lora_rank64_lightx2v_4step.safetensors | 1 GB |
 | loras | wan/WanRealisomLora/Lenovo.safetensors | 1 GB |
 | loras | wan/Own/LoranceNew/LoranceNew.safetensors (CHARACTER IP) | 2 GB |
