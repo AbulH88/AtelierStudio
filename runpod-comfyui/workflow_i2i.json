@@ -29,7 +29,7 @@
   },
   "10": {
     "class_type": "UNETLoader",
-    "inputs": { "unet_name": "WAN/Wan2.2/Text/low_noise_model/wan2.2_t2v_low_noise_14B_fp16.safetensors", "weight_dtype": "default" },
+    "inputs": { "unet_name": "WAN/Wan2.2/Text/low_noise_model/Wan-2.2-T2V-Low-Noise-BF16.safetensors", "weight_dtype": "default" },
     "_meta": { "title": "Wan 2.2 low-noise UNet" }
   },
   "14": {
