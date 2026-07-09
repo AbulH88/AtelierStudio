@@ -706,6 +706,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <button id="mTxt" data-mode="t2i"><span class="k">t</span>Text → Character</button>
     <button id="mMotion" data-mode="video"><span class="k">m</span>Motion → Video</button>
     <button id="mAdv" data-mode="adv"><span class="k">a</span>⚡ Advanced</button>
+    <button id="mKrea2" data-mode="krea2"><span class="k">k</span>Krea2 I2I</button>
   </div>
 </div>
 
@@ -995,6 +996,46 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
       <div class="field" id="stepsField">
         <div class="lab">Steps · detail <input type="number" class="numin" id="stVal" min="1" max="60" step="1" value="8"></div>
         <input type="range" id="steps" min="4" max="24" step="1" value="8">
+      </div>
+      <div class="field hide" id="krea2ResizeField">
+        <div class="lab">Resize target · px <input type="number" class="numin" id="krea2ResizeVal" min="512" max="4096" step="8" value="1920"></div>
+      </div>
+      <div class="field hide" id="krea2RefineField">
+        <div class="lab">Skin-detail refine pass</div>
+        <div class="seedrow" style="margin-top:4px">
+          <span class="hint" style="font-size:12px;color:var(--mut)">Extra denoise 0.15 pass for peach-fuzz skin texture</span>
+          <div class="sw" id="krea2RefineSw" title="refine"></div>
+        </div>
+      </div>
+      <!-- Sampler Override (all modes) -->
+      <div style="margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);
+        font-family:var(--serif);font-style:italic;font-size:14px;color:var(--amber)">⚙ Override Sampler</div>
+      <div class="field">
+        <div class="lab">Override cfg / sampler / scheduler</div>
+        <div class="seedrow" style="margin-top:4px">
+          <span class="hint" style="font-size:12px;color:var(--mut)">Applies to every sampler stage in this mode, including detail/refine passes</span>
+          <div class="sw" id="samplerOverrideSw" title="override"></div>
+        </div>
+      </div>
+      <div class="field hide" id="overrideCfgField">
+        <div class="lab">cfg <input type="number" class="numin" id="ovCfgVal" min="0" max="15" step="0.1" value="1"></div>
+        <input type="range" id="ovCfg" min="0" max="15" step="0.1" value="1">
+      </div>
+      <div class="field hide" id="overrideSamplerField">
+        <div class="lab">sampler_name</div>
+        <input list="samplerNameList" id="ovSamplerName" value="res_2s" style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+        <datalist id="samplerNameList">
+          <option value="res_2s"><option value="res_2m"><option value="res_6s">
+          <option value="er_sde"><option value="exponential/res_2s"><option value="dpm++_sde">
+        </datalist>
+      </div>
+      <div class="field hide" id="overrideSchedulerField">
+        <div class="lab">scheduler</div>
+        <input list="schedulerList" id="ovScheduler" value="simple" style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+        <datalist id="schedulerList">
+          <option value="simple"><option value="beta57"><option value="bong_tangent">
+          <option value="normal"><option value="karras">
+        </datalist>
       </div>
       <!-- OpenRouter Vision Settings -->
       <div class="advhide" style="margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);
@@ -1349,6 +1390,8 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const S={mode:"i2i",session:null,frame:null,aspect:null,variations:2,rand:true,target:"local",avail:{local:false,cloud:false},chars:[],frames:[],lbIndex:0};
 
 function _charList(){
+  // Krea2 characters live under a completely different LoRA root -> its own list.
+  if(S.mode==='krea2') return S.krea2Chars||[];
   // Cloud mode -> characters from the volume manifest (every char on the volume,
   // with the volume's real paths). Local -> the live ComfyUI list. Fall back to
   // whichever is non-empty so the picker is never empty.
@@ -1648,6 +1691,7 @@ function onTargetChange(){
   $('#mVid').classList.toggle('hide', cloudOnly);
   $('#mTxt').classList.toggle('hide', cloudOnly);
   $('#mAdv').classList.toggle('hide', cloudOnly);   // advanced = local only
+  $('#mKrea2').classList.toggle('hide', cloudOnly);   // krea2 = local only
   if(cloudOnly && S.mode!=='video') setMode('video');
   if(typeof applyCharList==='function') applyCharList();   // cloud vs local character list
   renderCloudCard();
@@ -1657,11 +1701,20 @@ function onTargetChange(){
 function setRange(el){el.style.setProperty('--p',((el.value-el.min)/(el.max-el.min)*100)+'%');}
 // each slider is paired with an editable number box (type exact values, even
 // beyond the slider's range — the typed box is the source of truth on generate)
-const PAIRS=[['#cstrength','#csVal',2],['#denoise','#dnVal',2],['#steps','#stVal',0]];
+const PAIRS=[['#cstrength','#csVal',2],['#denoise','#dnVal',2],['#steps','#stVal',0],['#ovCfg','#ovCfgVal',1]];
 PAIRS.forEach(([r,n,dec])=>{const R=$(r),N=$(n);
   R.oninput=()=>{N.value=dec?(+R.value).toFixed(dec):R.value;setRange(R);};
   N.oninput=()=>{const v=+N.value;if(!isNaN(v)){R.value=v;setRange(R);}};
   setRange(R);});
+
+$('#samplerOverrideSw').onclick=()=>{
+  const on=!$('#samplerOverrideSw').classList.contains('on');
+  $('#samplerOverrideSw').classList.toggle('on',on);
+  ['#overrideCfgField','#overrideSamplerField','#overrideSchedulerField'].forEach(s=>$(s).classList.toggle('hide',!on));
+};
+$('#krea2RefineSw').onclick=()=>{
+  $('#krea2RefineSw').classList.toggle('on');
+};
 
 // mode switch
 function setMode(m){
@@ -1669,26 +1722,31 @@ function setMode(m){
   $('#mVid').classList.toggle('on',m==='i2i');$('#mTxt').classList.toggle('on',m==='t2i');
   $('#mMotion').classList.toggle('on',m==='video');
   $('#mAdv').classList.toggle('on',m==='adv');
-  $('#paneVideo').classList.toggle('hide',m!=='i2i');
+  $('#mKrea2').classList.toggle('on',m==='krea2');
+  $('#paneVideo').classList.toggle('hide',m!=='i2i'&&m!=='krea2');   // krea2 reuses the frame-picker pane
   $('#paneText').classList.toggle('hide',m!=='t2i');
   $('#paneMotion').classList.toggle('hide',m!=='video');
   $('#paneAdv').classList.toggle('hide',m!=='adv');
   // Steps + Denoise only apply to I2I; T2I uses its fixed schedule; video uses its own
   $('#denoiseField').classList.toggle('hide',m!=='i2i');
   $('#stepsField').classList.toggle('hide',m!=='i2i');
-  // Lightning + the helper-LoRA / lightning controls are image-only
+  $('#krea2ResizeField').classList.toggle('hide',m!=='krea2');
+  $('#krea2RefineField').classList.toggle('hide',m!=='krea2');
+  // Lightning + the helper-LoRA / lightning controls are image-only, and krea2
+  // has no Lightning node at all (single character LoRA only)
   $$('.imgonly').forEach(el=>el.classList.toggle('hide', m==='video'));
-  $$('.stdlora').forEach(el=>el.classList.toggle('hide', m==='adv'));   // generic lightning/LoRAs hidden in adv
+  $$('.stdlora').forEach(el=>el.classList.toggle('hide', m==='adv'||m==='krea2'));
   $$('.advlora').forEach(el=>el.classList.toggle('hide', m!=='adv'));   // two LoRA groups shown only in adv
   // adv has its own aspect + describe in the studio -> hide the rail's (keep Trigger Word)
   $$('.advhide').forEach(el=>el.classList.toggle('hide', m==='adv'));
   ['visionModelField','stylePresetField','bodyTypeField','shotTypeField','detailField','explicitField','clothingNoteField','customInstrField'].forEach(id=>{ const el=$('#'+id); if(el)el.classList.toggle('hide', m==='adv'); });
   applyLightningDefault(m);
+  applyCharList();
   refreshGo();
   if(typeof renderCloudCard==='function') renderCloudCard();
 }
 $('#mVid').onclick=()=>setMode('i2i');$('#mTxt').onclick=()=>setMode('t2i');$('#mMotion').onclick=()=>setMode('video');
-$('#mAdv').onclick=()=>setMode('adv');
+$('#mAdv').onclick=()=>setMode('adv');$('#mKrea2').onclick=()=>setMode('krea2');
 // --- Advanced (INSTARAW) panel wiring (increment A: scene -> prompt_batch_data) ---
 $('#advDropRef').onclick=()=>$('#advRefFile').click();
 $('#advRefFile').onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
@@ -1910,7 +1968,7 @@ async function galToMotionRef(url){
 
 async function loadConfig(){
   const c=await(await fetch('/api/config')).json();
-  S.chars=c.characters; S.cloudChars=c.cloud_characters||[];
+  S.chars=c.characters; S.cloudChars=c.cloud_characters||[]; S.krea2Chars=c.krea2_characters||[];
   $('#character').onchange=fillVariants; applyCharList();
   $('#aspects').innerHTML=c.aspects.map((a,i)=>`<button data-key="${a.key}" data-w="${a.width}" data-h="${a.height}" class="${i===0?'on':''}">
      <span>${a.label.split(' · ')[0]}</span><span class="r">${a.width}×${a.height}</span></button>`).join('')
@@ -1934,6 +1992,7 @@ async function loadConfig(){
 
 // set Lightning pick + strength to the safe default for the given mode
 function applyLightningDefault(mode){
+  if(mode==='krea2') return;   // krea2 has no Lightning node — single character LoRA only
   if(mode==='adv'){   // group B (low-noise) uses the t2i v2-distill default @0.6
     const d=(S.lightning && S.lightning.defaults && S.lightning.defaults['t2i'])||null;
     if(d){ const p=$('#advLightningPick'); if(p)p.value=d.path; const s=$('#advLightningStr'); if(s)s.value=d.strength; }
@@ -2204,7 +2263,8 @@ function refreshGo(){
   let ok;
   if(S.mode==='video') ok = !!(S.motionVid && S.motionRef);   // need driving video + ref photo
   else if(S.mode==='adv') ok = !!($('#variant').value && ($('#advScene').value.trim().length>3 || (S.advPrompts&&S.advPrompts.length)));
-  else ok = S.mode==='i2i' ? !!S.frame : $('#prompt').value.trim().length>3;
+  else if(S.mode==='i2i' || S.mode==='krea2') ok = !!S.frame;
+  else ok = $('#prompt').value.trim().length>3;
   if(ok && cloudMissing().length) ok=false;   // grey out: a selected LoRA isn't on the cloud volume
   $('#go').disabled=!ok; $('#goTop').disabled=!ok;
 }
@@ -2540,11 +2600,22 @@ $('#go').onclick=async()=>{
     lightning:{path:$('#lightningPick').value,strength:+$('#lightningStr').value},
     trigger:$('#triggerWord').value.trim(),
     ...describeOpts()};
+  if($('#samplerOverrideSw').classList.contains('on')){
+    body.sampler_override={cfg:+$('#ovCfgVal').value, sampler_name:$('#ovSamplerName').value.trim(),
+                           scheduler:$('#ovScheduler').value.trim()};
+  }
   if(S.mode==='i2i'){
     body.session=S.session;
     body.frame=S.frame;
     body.denoise=+$('#dnVal').value;
     body.prompt=$('#i2iPrompt').value.trim();
+  }
+  else if(S.mode==='krea2'){
+    body.session=S.session;
+    body.frame=S.frame;
+    body.prompt=$('#i2iPrompt').value.trim();
+    body.resize_size=+$('#krea2ResizeVal').value||1920;
+    body.refine=$('#krea2RefineSw').classList.contains('on');
   }
   else if(S.mode==='video'){
     try{
