@@ -65,6 +65,15 @@ ADV_STAGES = {"face": "127", "eyes": "501", "hands": "141", "pussy": "147",
               "nipples": "140", "feet": "142", "lips": "171", "color": "543",
               "glcm": "537", "grain": "548", "perturb": "533", "compress": "551"}
 
+# Krea2 I2I (workflow_krea2.json) — true img2img (VAEEncode of the resized source
+# image, denoise 0.6), single character LoraLoaderModelOnly (no Lightning chain,
+# unlike WAN i2i/t2i), plus an optional skin-detail refine pass (denoise 0.15,
+# fixed prompt at node 339).
+KREA2 = {"load_image": "316", "positive": "314", "resize_size": "324",
+         "char": "313", "base_ksampler": "302", "save": "304",
+         "refine_encode": "334", "refine_ksampler": "335", "refine_decode": "336",
+         "refine_prompt": "339"}
+
 
 def _bypass_node(graph, nid, in_key="image"):
     """Bypass an image->image node: rewire every consumer of its output to its image
@@ -289,6 +298,27 @@ def _build_t2i(graph, inp, seed):
     _apply_extra_loras(graph, nm["lora_after"], nm["char"], inp.get("extra_loras", []))
     _set_lora(graph, nm["char"], inp.get("character_lora_path"),
               inp.get("character_strength", 1.0))
+    return graph
+
+
+def _build_krea2(graph, inp, seed, frame_name):
+    """Krea2 img2img: VAEEncode(resized source image) -> KSampler(denoise 0.6)
+    base pass, optionally followed by a fixed skin-detail refine pass. No
+    Lightning/helper-LoRA chain — just the single character LoRA node."""
+    nm = KREA2
+    graph[nm["load_image"]]["inputs"]["image"] = frame_name
+    graph[nm["resize_size"]]["inputs"]["Number"] = str(int(inp.get("resize_size", 1920)))
+    graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
+    graph[nm["base_ksampler"]]["inputs"]["seed"] = seed
+    _set_lora(graph, nm["char"], inp.get("character_lora_path"),
+              inp.get("character_strength", 1.0))
+    if inp.get("refine"):
+        graph[nm["refine_ksampler"]]["inputs"]["seed"] = seed
+        graph[nm["save"]]["inputs"]["images"] = [nm["refine_decode"], 0]
+    else:
+        for nid in (nm["refine_encode"], nm["refine_ksampler"],
+                    nm["refine_decode"], nm["refine_prompt"]):
+            graph.pop(nid, None)
     return graph
 
 
