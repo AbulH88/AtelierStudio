@@ -1,0 +1,124 @@
+{
+  "302": {
+    "inputs": {
+      "seed": 875143778411088,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "er_sde",
+      "scheduler": "simple",
+      "denoise": 0.6,
+      "model": ["313", 0],
+      "positive": ["314", 0],
+      "negative": ["305", 0],
+      "latent_image": ["317", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": {"title": "KSampler"}
+  },
+  "303": {
+    "inputs": {"samples": ["302", 0], "vae": ["312", 0]},
+    "class_type": "VAEDecode",
+    "_meta": {"title": "VAE Decode"}
+  },
+  "304": {
+    "inputs": {"filename_prefix": "ComfyUI", "images": ["303", 0]},
+    "class_type": "SaveImage",
+    "_meta": {"title": "Save Image"}
+  },
+  "305": {
+    "inputs": {"conditioning": ["314", 0]},
+    "class_type": "ConditioningZeroOut",
+    "_meta": {"title": "Negative (Zero Out)"}
+  },
+  "310": {
+    "inputs": {"unet_name": "Kera2\\krea2_turbo_bf16.safetensors", "weight_dtype": "default"},
+    "class_type": "UNETLoader",
+    "_meta": {"title": "UNET Loader - Krea2 Turbo FP8"}
+  },
+  "311": {
+    "inputs": {"clip_name": "Krea-2\\Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors", "type": "krea2", "device": "default"},
+    "class_type": "CLIPLoader",
+    "_meta": {"title": "CLIP Loader - Krea2"}
+  },
+  "312": {
+    "inputs": {"vae_name": "Wan\\Wan2_1_VAE_fp32.safetensors"},
+    "class_type": "VAELoader",
+    "_meta": {"title": "VAE Loader"}
+  },
+  "313": {
+    "inputs": {"lora_name": "Keara2\\CristinaCosplay\\CosplayGirl_000000600.safetensors", "strength_model": 1, "model": ["310", 0]},
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {"title": "Load LoRA"}
+  },
+  "314": {
+    "inputs": {"text": "", "clip": ["311", 0]},
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "Positive Prompt"}
+  },
+  "316": {
+    "inputs": {"image": "Woman_in_black_velvet_dress_202606280259.jpeg"},
+    "class_type": "LoadImage",
+    "_meta": {"title": "Load Image"}
+  },
+  "317": {
+    "inputs": {"pixels": ["323", 0], "vae": ["312", 0]},
+    "class_type": "VAEEncode",
+    "_meta": {"title": "VAE Encode"}
+  },
+  "322": {
+    "inputs": {
+      "width": ["324", 0],
+      "height": ["324", 0],
+      "upscale_method": "nearest-exact",
+      "keep_proportion": "resize",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 2,
+      "device": "cpu",
+      "image": ["316", 0]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {"title": "Resize Image v2"}
+  },
+  "323": {
+    "inputs": {"noise_aug_strength": 0.01, "seed": 292682449859114, "image": ["322", 0]},
+    "class_type": "ImageNoiseAugmentation",
+    "_meta": {"title": "Image Noise Augmentation"}
+  },
+  "324": {
+    "inputs": {"Number": "1920"},
+    "class_type": "Int",
+    "_meta": {"title": "Int"}
+  },
+  "334": {
+    "inputs": {"pixels": ["303", 0], "vae": ["312", 0]},
+    "class_type": "VAEEncode",
+    "_meta": {"title": "VAE Encode"}
+  },
+  "335": {
+    "inputs": {
+      "seed": 949413061011777,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "res_6s",
+      "scheduler": "beta57",
+      "denoise": 0.15,
+      "model": ["313", 0],
+      "positive": ["339", 0],
+      "negative": ["305", 0],
+      "latent_image": ["334", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": {"title": "KSampler"}
+  },
+  "336": {
+    "inputs": {"samples": ["335", 0], "vae": ["312", 0]},
+    "class_type": "VAEDecode",
+    "_meta": {"title": "VAE Decode"}
+  },
+  "339": {
+    "inputs": {"text": "Natural skin textures with visible peach fuzz, natural shadows", "clip": ["311", 0]},
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "Positive Prompt"}
+  }
+}
