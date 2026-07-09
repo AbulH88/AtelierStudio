@@ -5,6 +5,50 @@ end-to-end** (local-only). A full render proven this session: ~470s, eye-detaile
 authenticity + real iPhone-12 EXIF, 2 images to Gallery. Memory: `instaraw-advanced-mode`,
 `runpod-cloud-build-state`. Plan: `instaraw-advanced-plan.md`. (Cloud Motion still LIVE — see below.)
 
+## ✅ KREA2 I2I MODE + CROSS-MODE SAMPLER OVERRIDE (this session — built + unit-tested, NOT yet live-verified on VPS)
+6th local-only generation mode wrapping the user's Krea2 workflow (true img2img: VAEEncode of a
+resized+noise-augmented source image, denoise 0.6, optional skin-detail refine pass), plus an opt-in
+cfg/sampler_name/scheduler override usable across every mode (T2I/I2I/Video/Advanced/Krea2) without
+touching any mode's tuned defaults unless a user explicitly turns it on. Built via
+`superpowers:subagent-driven-development` in a worktree (`feature/krea2-i2i-mode`), all 5 tasks
+task-reviewed clean, 16/16 backend tests passing. Design: `docs/superpowers/specs/
+2026-07-09-krea2-mode-and-sampler-overrides-design.md`. Plan: `docs/superpowers/plans/
+2026-07-09-krea2-mode-and-sampler-overrides.md`.
+- **`workflow_krea2.json`** (repo root of `runpod-comfyui`) — cleaned Krea2 graph, leaked OpenRouter
+  key + graph-embedded auto-caption dropped (app's existing "Describe with AI" reused instead), debug
+  nodes (rgthree comparers/preview) stripped. Confirmed on-disk LoRA root is **`Keara2`** (verified
+  against the home PC's `models/loras/Keara2/{CristinaCosplay,GothNiche}`) — NOT `Kera2`, which is a
+  different root used only for the base UNET/CLIP checkpoint folders.
+- **`comfy_common.py`** — `KREA2` node map, `_build_krea2()` (image/prompt/seed/LoRA/resize wiring,
+  refine-pass toggle that drops or keeps nodes 334/335/336/339), `_apply_sampler_override(graph, inp)`
+  (broadcasts cfg/sampler_name/scheduler to every node whose `class_type` contains `"Sampler"`, only
+  touching keys the node already has — a true no-op when `inp` has no `sampler_override` key), wired
+  into all 5 `_build_*` functions, `generate()` `mode=="krea2"` branch.
+- **`webapp/app.py`** — `KREA2_LORA_ROOT="Keara2"` + `build_krea2_characters()` (own character picker,
+  separate from WAN's `wan/MyLoras` root), `/api/config` gains `krea2_characters`, `_build_input()`
+  gains a `krea2` branch (reuses i2i's frame/session upload plumbing + `resize_size`/`refine`) and a
+  universal `sampler_override` passthrough applied once for every mode, `/api/generate` gates `krea2`
+  to `target=="local"` (mirrors `adv`'s gate), empty-prompt auto-describe extended to cover `krea2`.
+- **`webapp/index.html`** — 5th mode button (`Krea2 I2I`, hidden on Cloud like Advanced), reuses the
+  existing `#paneVideo` frame-picker pane, Options-rail fields (Resize target · px, Skin-detail refine
+  toggle), shared "⚙ Override Sampler" block (cfg slider + editable sampler_name/scheduler datalists)
+  shown for every mode. Krea2 has no Lightning node — `applyLightningDefault()` skips it, `.stdlora`
+  controls hidden same as `adv`. Live-verified in-browser this session (dev server, all 5 mode buttons,
+  Cloud correctly hides Krea2, fields toggle correctly, zero console errors across mode switches).
+
+### Krea2 mode — still open before shipping
+- **Not yet live-VPS-verified**: character LoRA render correctness, actual resize semantics of
+  `ImageResizeKJv2` with equal W/H (pad vs stretch vs crop — confirm against a real render), whether
+  the refine toggle visibly changes skin texture, whether the sampler override actually changes output
+  when toggled on. Needs a real ComfyUI install with the Krea2 checkpoint/CLIP/LoRA files present.
+- **Deploy**: not yet pushed to VPS. Add `workflow_krea2.json` to the "Manual deploy" tar list below,
+  deploy `comfy_common.py`/`workflow_krea2.json`/`webapp/app.py`/`webapp/index.html`, restart `atelier`.
+- **⚠️ Another OpenRouter key was pasted into this session** (`sk-or-v1-2ecfce...`, was graph-embedded
+  in the source Krea2 JSON, node 330 — that node was dropped from `workflow_krea2.json` entirely, and
+  a test in `tests/test_workflow_krea2_file.py` guards against `sk-or-v1`/`api_key` ever reappearing in
+  the file). The key itself still needs rotating in the OpenRouter dashboard + VPS `.env` update — same
+  outstanding class of issue as the HF/RunPod/OpenRouter keys already flagged below.
+
 ## ✅ INSTARAW ADVANCED MODE (this session — local only, on the home 5090)
 New app mode wrapping the user's `INSTARAW WAN 2.2 V2.0` workflow (t2i + image-guided "i2i" via the
 `576` toggle; "i2i" = image-guided PROMPTING, NOT latent img2img — verified, generation is always
