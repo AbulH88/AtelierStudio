@@ -263,6 +263,28 @@ def _apply_extra_loras(graph, after_id, char_id, loras):
     graph[char_id]["inputs"]["model"] = prev
 
 
+def _apply_sampler_override(graph, inp):
+    """Opt-in broadcast of cfg/sampler_name/scheduler to every sampler node in the
+    graph. Only keys present in inp["sampler_override"] AND already defined on a
+    given node's inputs are touched (e.g. WanVideoSampler has no sampler_name, so
+    that key is silently skipped for it). No-op when the UI toggle is off (no
+    "sampler_override" key), so every mode's tuned defaults stay untouched unless
+    a user explicitly opts in. [user requirement: broadcasts to EVERY sampler
+    node in a mode's graph, including refine/detailer stages, not just the
+    primary one.]"""
+    override = inp.get("sampler_override")
+    if not override:
+        return graph
+    for node in graph.values():
+        if "Sampler" not in node.get("class_type", ""):
+            continue
+        node_inputs = node.get("inputs", {})
+        for key in ("cfg", "sampler_name", "scheduler"):
+            if key in override and key in node_inputs:
+                node_inputs[key] = override[key]
+    return graph
+
+
 # --- graph builders -----------------------------------------------------------
 def _build_i2i(graph, inp, seed, frame_name):
     nm = I2I
@@ -280,6 +302,7 @@ def _build_i2i(graph, inp, seed, frame_name):
     _apply_extra_loras(graph, nm["lora_after"], nm["char"], inp.get("extra_loras", []))
     _set_lora(graph, nm["char"], inp.get("character_lora_path"),
               inp.get("character_strength", 1.0))
+    _apply_sampler_override(graph, inp)
     return graph
 
 
@@ -298,6 +321,7 @@ def _build_t2i(graph, inp, seed):
     _apply_extra_loras(graph, nm["lora_after"], nm["char"], inp.get("extra_loras", []))
     _set_lora(graph, nm["char"], inp.get("character_lora_path"),
               inp.get("character_strength", 1.0))
+    _apply_sampler_override(graph, inp)
     return graph
 
 
@@ -319,6 +343,7 @@ def _build_krea2(graph, inp, seed, frame_name):
         for nid in (nm["refine_encode"], nm["refine_ksampler"],
                     nm["refine_decode"], nm["refine_prompt"]):
             graph.pop(nid, None)
+    _apply_sampler_override(graph, inp)
     return graph
 
 
@@ -355,6 +380,7 @@ def _build_video(graph, inp, seed, video_name, ref_name):
         graph[nm["char"]]["inputs"]["lora"] = inp["character_lora_path"]
         graph[nm["char"]]["inputs"]["strength"] = float(inp.get("character_strength", 1.0))
     graph[nm["sampler"]]["inputs"]["seed"] = seed
+    _apply_sampler_override(graph, inp)
     return graph
 
 
@@ -439,6 +465,7 @@ def _build_adv(graph, inp, seed, ref_name=None):
     for name, on in (inp.get("stages") or {}).items():
         if not on and name in ADV_STAGES:
             _bypass_node(graph, ADV_STAGES[name])
+    _apply_sampler_override(graph, inp)
     return graph
 
 
@@ -479,7 +506,7 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
         return {"images": images, "seed": seed}
 
     frame_name = None
-    if mode == "i2i":
+    if mode in ("i2i", "krea2"):
         frame_name = upload_image(base, base64.b64decode(inp["image_b64"]))
 
     images, done = [], 0
@@ -489,8 +516,12 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
             graph = json.load(f)
         sub = dict(inp, variations=chunk)
         cseed = seed + done   # distinct seed per chunk so variations differ
-        graph = (_build_i2i(graph, sub, cseed, frame_name) if mode == "i2i"
-                 else _build_t2i(graph, sub, cseed))
+        if mode == "i2i":
+            graph = _build_i2i(graph, sub, cseed, frame_name)
+        elif mode == "krea2":
+            graph = _build_krea2(graph, sub, cseed, frame_name)
+        else:
+            graph = _build_t2i(graph, sub, cseed)
         images += run(base, graph, client_id=client_id)
         done += chunk
 

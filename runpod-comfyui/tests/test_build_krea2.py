@@ -48,3 +48,13 @@ def test_build_krea2_refine_on_keeps_refine_subgraph_and_saves_refined():
         assert nid in out
     assert out["304"]["inputs"]["images"] == ["336", 0]
     assert out["335"]["inputs"]["seed"] == 7
+
+
+def test_build_krea2_applies_sampler_override_to_both_stages():
+    graph = _load_graph()
+    inp = {"prompt": "x", "refine": True,
+           "sampler_override": {"cfg": 4, "sampler_name": "euler", "scheduler": "karras"}}
+    out = cc._build_krea2(graph, inp, seed=1, frame_name="f.png")
+    assert out["302"]["inputs"]["cfg"] == 4
+    assert out["302"]["inputs"]["sampler_name"] == "euler"
+    assert out["335"]["inputs"]["scheduler"] == "karras"
