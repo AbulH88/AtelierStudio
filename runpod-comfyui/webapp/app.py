@@ -336,6 +336,11 @@ CHAR_DEFS = [
     {"key": "siren",       "label": "Siren",         "folder": "wan/Own/siren2.2_LowOnly"},
 ]
 
+# Krea2 characters live under a separate LoRA root (confirmed on the home PC:
+# H:/ConfiuiModels/models/loras/Keara2/{CristinaCosplay,GothNiche}/...), not
+# under wan/ like the WAN character LoRAs.
+KREA2_LORA_ROOT = "Keara2"
+
 _STEP = re.compile(r"step\d+|-\d{6}$", re.I)   # checkpoint-iteration markers
 
 
@@ -450,6 +455,20 @@ def build_characters():
             return _json.load(open(CATALOG_CACHE, encoding="utf-8"))
         except Exception:
             pass
+    return []
+
+
+def build_krea2_characters():
+    """Character picker for Krea2 mode: same auto-discovery convention as
+    build_characters(), scoped to the Krea2 LoRA root instead of wan/MyLoras."""
+    try:
+        return _auto_characters(_comfy_loras(), parent=KREA2_LORA_ROOT)
+    except Exception:
+        pass
+    try:
+        return _auto_characters_fs(parent=KREA2_LORA_ROOT)
+    except Exception:
+        pass
     return []
 
 
@@ -638,7 +657,8 @@ def index():
 @app.get("/api/config")
 def config():
     return jsonify({"characters": build_characters(),
-                    "cloud_characters": build_cloud_characters(), "aspects": ASPECTS,
+                    "cloud_characters": build_cloud_characters(),
+                    "krea2_characters": build_krea2_characters(), "aspects": ASPECTS,
                     "lightning": {"options": _folder_loras("WanLightning", ".lightning_loras.json"),
                                   "defaults": LIGHTNING_DEFAULTS}})
 
@@ -1071,12 +1091,25 @@ def _build_input(body):
         "prompt": body.get("prompt", "").strip(),
         "trigger": body.get("trigger", "ing2lorance"),
     }
+    override = body.get("sampler_override")
+    if isinstance(override, dict) and override:
+        inp["sampler_override"] = {k: override[k] for k in ("cfg", "sampler_name", "scheduler")
+                                   if k in override and override[k] not in (None, "")}
+        if inp["sampler_override"].get("cfg") is not None:
+            inp["sampler_override"]["cfg"] = float(inp["sampler_override"]["cfg"])
     if inp["mode"] == "i2i":
         session, frame_name = body["session"], body["frame"]
         fpath = os.path.join(FRAMES_DIR, session, frame_name)
         with open(fpath, "rb") as f:
             inp["image_b64"] = base64.b64encode(f.read()).decode()
         inp["denoise"] = float(body.get("denoise", 0.65))
+    elif inp["mode"] == "krea2":
+        session, frame_name = body["session"], body["frame"]
+        fpath = os.path.join(FRAMES_DIR, session, frame_name)
+        with open(fpath, "rb") as f:
+            inp["image_b64"] = base64.b64encode(f.read()).decode()
+        inp["resize_size"] = int(body.get("resize_size", 1920))
+        inp["refine"] = bool(body.get("refine", False))
     elif inp["mode"] == "video":   # Wan Animate: driving video + ref photo
         inp["video_b64"] = body.get("video_b64", "")
         inp["video_filename"] = body.get("video_filename", "driving.mp4")
@@ -1475,8 +1508,8 @@ def _mux_audio(video_bytes, audio_src_b64):
 
 def _run_gen_job(job_id, target, inp, body):
     try:
-        # i2i with an empty prompt → auto-describe the frame first (OpenRouter)
-        if inp["mode"] == "i2i" and not inp.get("prompt"):
+        # i2i/krea2 with an empty prompt → auto-describe the frame first (OpenRouter)
+        if inp["mode"] in ("i2i", "krea2") and not inp.get("prompt"):
             p = _describe_params(body, False)
             inp["prompt"] = describe_image(inp["image_b64"], p, p["model"])
 
@@ -1553,6 +1586,12 @@ def generate():
 
     mode = body.get("mode", "i2i")
     if mode == "i2i":
+        fpath = os.path.join(FRAMES_DIR, body.get("session", ""), body.get("frame", ""))
+        if not os.path.exists(fpath):
+            return jsonify({"error": "Frame not found."}), 404
+    elif mode == "krea2":
+        if target != "local":
+            return jsonify({"error": "Krea2 mode runs on Local only."}), 400
         fpath = os.path.join(FRAMES_DIR, body.get("session", ""), body.get("frame", ""))
         if not os.path.exists(fpath):
             return jsonify({"error": "Frame not found."}), 404
