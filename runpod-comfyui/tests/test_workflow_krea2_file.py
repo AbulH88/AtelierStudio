@@ -24,9 +24,9 @@ def test_video_switch_and_debug_nodes_removed():
 
 def test_remaining_nodes_present():
     graph = _load()
-    expected = {"302", "303", "304", "305", "310", "311", "312", "313",
+    expected = {"302", "303", "305", "310", "311", "312", "313",
                 "314", "316", "317", "322", "323", "324", "334", "335",
-                "336", "339"}
+                "336", "339", "345", "346"}
     assert set(graph.keys()) == expected
 
 
@@ -42,6 +42,8 @@ def test_positive_prompt_has_no_dangling_link():
     assert isinstance(graph["314"]["inputs"]["text"], str)
 
 
-def test_save_image_defaults_to_base_output():
+def test_base_and_refine_save_nodes_read_the_right_stage():
     graph = _load()
-    assert graph["304"]["inputs"]["images"] == ["303", 0]
+    # 346 = base save (always present), 345 = refine save (dropped when refine is off)
+    assert graph["346"]["inputs"]["images"] == ["303", 0]
+    assert graph["345"]["inputs"]["images"] == ["336", 0]

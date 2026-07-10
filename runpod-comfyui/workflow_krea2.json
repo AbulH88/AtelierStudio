@@ -6,7 +6,7 @@
       "cfg": 1,
       "sampler_name": "er_sde",
       "scheduler": "simple",
-      "denoise": 0.6,
+      "denoise": 0.71,
       "model": ["313", 0],
       "positive": ["314", 0],
       "negative": ["305", 0],
@@ -19,11 +19,6 @@
     "inputs": {"samples": ["302", 0], "vae": ["312", 0]},
     "class_type": "VAEDecode",
     "_meta": {"title": "VAE Decode"}
-  },
-  "304": {
-    "inputs": {"filename_prefix": "ComfyUI", "images": ["303", 0]},
-    "class_type": "SaveImage",
-    "_meta": {"title": "Save Image"}
   },
   "305": {
     "inputs": {"conditioning": ["314", 0]},
@@ -46,7 +41,7 @@
     "_meta": {"title": "VAE Loader"}
   },
   "313": {
-    "inputs": {"lora_name": "Keara2\\CristinaCosplay\\CosplayGirl_000000600.safetensors", "strength_model": 1, "model": ["310", 0]},
+    "inputs": {"lora_name": "Keara2\\CristinaCosplay\\CosplayGirl_000000600.safetensors", "strength_model": 1.2, "model": ["310", 0]},
     "class_type": "LoraLoaderModelOnly",
     "_meta": {"title": "Load LoRA"}
   },
@@ -102,7 +97,7 @@
       "cfg": 1,
       "sampler_name": "res_6s",
       "scheduler": "beta57",
-      "denoise": 0.15,
+      "denoise": 0.1,
       "model": ["313", 0],
       "positive": ["339", 0],
       "negative": ["305", 0],
@@ -120,5 +115,15 @@
     "inputs": {"text": "Natural skin textures with visible peach fuzz, natural shadows", "clip": ["311", 0]},
     "class_type": "CLIPTextEncode",
     "_meta": {"title": "Positive Prompt"}
+  },
+  "345": {
+    "inputs": {"filename_prefix": "ComfyUI", "output_folder": "output", "caption_file_extension": ".txt", "images": ["336", 0]},
+    "class_type": "SaveImageKJ",
+    "_meta": {"title": "Save Image KJ"}
+  },
+  "346": {
+    "inputs": {"filename_prefix": "ComfyUI", "output_folder": "output", "caption_file_extension": ".txt", "images": ["303", 0]},
+    "class_type": "SaveImageKJ",
+    "_meta": {"title": "Save Image KJ"}
   }
 }

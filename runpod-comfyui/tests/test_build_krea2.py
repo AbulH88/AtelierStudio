@@ -33,20 +33,21 @@ def test_build_krea2_resize_defaults_to_1920():
     assert out["324"]["inputs"]["Number"] == "1920"
 
 
-def test_build_krea2_refine_off_drops_refine_subgraph_and_saves_base():
+def test_build_krea2_refine_off_drops_refine_subgraph_and_saves_base_only():
     graph = _load_graph()
     out = cc._build_krea2(graph, {"prompt": "x"}, seed=1, frame_name="f.png")
-    for nid in ("334", "335", "336", "339"):
+    for nid in ("334", "335", "336", "339", "345"):
         assert nid not in out
-    assert out["304"]["inputs"]["images"] == ["303", 0]
+    assert out["346"]["inputs"]["images"] == ["303", 0]
 
 
-def test_build_krea2_refine_on_keeps_refine_subgraph_and_saves_refined():
+def test_build_krea2_refine_on_keeps_refine_subgraph_and_saves_both():
     graph = _load_graph()
     out = cc._build_krea2(graph, {"prompt": "x", "refine": True}, seed=7, frame_name="f.png")
-    for nid in ("334", "335", "336", "339"):
+    for nid in ("334", "335", "336", "339", "345", "346"):
         assert nid in out
-    assert out["304"]["inputs"]["images"] == ["336", 0]
+    assert out["345"]["inputs"]["images"] == ["336", 0]
+    assert out["346"]["inputs"]["images"] == ["303", 0]
     assert out["335"]["inputs"]["seed"] == 7
 
 

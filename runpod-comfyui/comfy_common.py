@@ -70,9 +70,9 @@ ADV_STAGES = {"face": "127", "eyes": "501", "hands": "141", "pussy": "147",
 # unlike WAN i2i/t2i), plus an optional skin-detail refine pass (denoise 0.15,
 # fixed prompt at node 339).
 KREA2 = {"load_image": "316", "positive": "314", "resize_size": "324",
-         "char": "313", "base_ksampler": "302", "save": "304",
+         "char": "313", "base_ksampler": "302", "base_save": "346",
          "refine_encode": "334", "refine_ksampler": "335", "refine_decode": "336",
-         "refine_prompt": "339"}
+         "refine_prompt": "339", "refine_save": "345"}
 
 
 def _bypass_node(graph, nid, in_key="image"):
@@ -326,9 +326,11 @@ def _build_t2i(graph, inp, seed):
 
 
 def _build_krea2(graph, inp, seed, frame_name):
-    """Krea2 img2img: VAEEncode(resized source image) -> KSampler(denoise 0.6)
-    base pass, optionally followed by a fixed skin-detail refine pass. No
-    Lightning/helper-LoRA chain — just the single character LoRA node."""
+    """Krea2 img2img: VAEEncode(resized source image) -> KSampler base pass
+    (always saved via base_save/346), optionally followed by a fixed
+    skin-detail refine pass (saved separately via refine_save/345, so a
+    refine run returns BOTH images). No Lightning/helper-LoRA chain — just
+    the single character LoRA node."""
     nm = KREA2
     graph[nm["load_image"]]["inputs"]["image"] = frame_name
     graph[nm["resize_size"]]["inputs"]["Number"] = str(int(inp.get("resize_size", 1920)))
@@ -338,10 +340,11 @@ def _build_krea2(graph, inp, seed, frame_name):
               inp.get("character_strength", 1.0))
     if inp.get("refine"):
         graph[nm["refine_ksampler"]]["inputs"]["seed"] = seed
-        graph[nm["save"]]["inputs"]["images"] = [nm["refine_decode"], 0]
+        # base_save (346) and refine_save (345) both stay in the graph, so run()
+        # returns both the pre-refine and refined image for this generation.
     else:
         for nid in (nm["refine_encode"], nm["refine_ksampler"],
-                    nm["refine_decode"], nm["refine_prompt"]):
+                    nm["refine_decode"], nm["refine_prompt"], nm["refine_save"]):
             graph.pop(nid, None)
     _apply_sampler_override(graph, inp)
     return graph
