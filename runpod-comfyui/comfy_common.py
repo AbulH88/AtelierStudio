@@ -336,10 +336,12 @@ def _build_krea2(graph, inp, seed, frame_name):
     graph[nm["resize_size"]]["inputs"]["Number"] = str(int(inp.get("resize_size", 1920)))
     graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
     graph[nm["base_ksampler"]]["inputs"]["seed"] = seed
+    graph[nm["base_ksampler"]]["inputs"]["denoise"] = float(inp.get("denoise", 0.71))
     _set_lora(graph, nm["char"], inp.get("character_lora_path"),
               inp.get("character_strength", 1.0))
     if inp.get("refine"):
         graph[nm["refine_ksampler"]]["inputs"]["seed"] = seed
+        graph[nm["refine_ksampler"]]["inputs"]["denoise"] = float(inp.get("refine_denoise", 0.1))
         # base_save (346) and refine_save (345) both stay in the graph, so run()
         # returns both the pre-refine and refined image for this generation.
     else:

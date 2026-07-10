@@ -33,6 +33,21 @@ def test_build_krea2_resize_defaults_to_1920():
     assert out["324"]["inputs"]["Number"] == "1920"
 
 
+def test_build_krea2_denoise_defaults_match_baked_workflow_values():
+    graph = _load_graph()
+    out = cc._build_krea2(graph, {"prompt": "x", "refine": True}, seed=1, frame_name="f.png")
+    assert out["302"]["inputs"]["denoise"] == 0.71
+    assert out["335"]["inputs"]["denoise"] == 0.1
+
+
+def test_build_krea2_denoise_overrides_are_applied():
+    graph = _load_graph()
+    inp = {"prompt": "x", "refine": True, "denoise": 0.5, "refine_denoise": 0.2}
+    out = cc._build_krea2(graph, inp, seed=1, frame_name="f.png")
+    assert out["302"]["inputs"]["denoise"] == 0.5
+    assert out["335"]["inputs"]["denoise"] == 0.2
+
+
 def test_build_krea2_refine_off_drops_refine_subgraph_and_saves_base_only():
     graph = _load_graph()
     out = cc._build_krea2(graph, {"prompt": "x"}, seed=1, frame_name="f.png")

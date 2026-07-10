@@ -1000,12 +1000,20 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
       <div class="field hide" id="krea2ResizeField">
         <div class="lab">Resize target · px <input type="number" class="numin" id="krea2ResizeVal" min="512" max="4096" step="8" value="1920"></div>
       </div>
+      <div class="field hide" id="krea2Denoise1Field">
+        <div class="lab">Denoise · base <input type="number" class="numin" id="krea2Dn1Val" min="0" max="1" step="0.01" value="0.71"></div>
+        <input type="range" id="krea2Dn1" min="0" max="1" step="0.01" value="0.71">
+      </div>
       <div class="field hide" id="krea2RefineField">
         <div class="lab">Skin-detail refine pass</div>
         <div class="seedrow" style="margin-top:4px">
-          <span class="hint" style="font-size:12px;color:var(--mut)">Extra denoise 0.15 pass for peach-fuzz skin texture</span>
+          <span class="hint" style="font-size:12px;color:var(--mut)">Extra denoise pass for peach-fuzz skin texture</span>
           <div class="sw" id="krea2RefineSw" title="refine"></div>
         </div>
+      </div>
+      <div class="field hide" id="krea2Denoise2Field">
+        <div class="lab">Denoise · refine <input type="number" class="numin" id="krea2Dn2Val" min="0" max="1" step="0.01" value="0.1"></div>
+        <input type="range" id="krea2Dn2" min="0" max="1" step="0.01" value="0.1">
       </div>
       <!-- Sampler Override (all modes) -->
       <div style="margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);
@@ -1023,19 +1031,25 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
       </div>
       <div class="field hide" id="overrideSamplerField">
         <div class="lab">sampler_name</div>
-        <input list="samplerNameList" id="ovSamplerName" value="res_2s" style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
-        <datalist id="samplerNameList">
-          <option value="res_2s"><option value="res_2m"><option value="res_6s">
-          <option value="er_sde"><option value="exponential/res_2s"><option value="dpm++_sde">
-        </datalist>
+        <select id="ovSamplerName" style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+          <option value="res_2s">res_2s</option>
+          <option value="res_2m">res_2m</option>
+          <option value="res_6s">res_6s</option>
+          <option value="er_sde">er_sde</option>
+          <option value="exponential/res_2s">exponential/res_2s</option>
+          <option value="dpm++_sde">dpm++_sde</option>
+          <option value="euler">euler</option>
+        </select>
       </div>
       <div class="field hide" id="overrideSchedulerField">
         <div class="lab">scheduler</div>
-        <input list="schedulerList" id="ovScheduler" value="simple" style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
-        <datalist id="schedulerList">
-          <option value="simple"><option value="beta57"><option value="bong_tangent">
-          <option value="normal"><option value="karras">
-        </datalist>
+        <select id="ovScheduler" style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+          <option value="simple">simple</option>
+          <option value="beta57">beta57</option>
+          <option value="bong_tangent">bong_tangent</option>
+          <option value="normal">normal</option>
+          <option value="karras">karras</option>
+        </select>
       </div>
       <!-- OpenRouter Vision Settings -->
       <div class="advhide" style="margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);
@@ -1701,7 +1715,8 @@ function onTargetChange(){
 function setRange(el){el.style.setProperty('--p',((el.value-el.min)/(el.max-el.min)*100)+'%');}
 // each slider is paired with an editable number box (type exact values, even
 // beyond the slider's range — the typed box is the source of truth on generate)
-const PAIRS=[['#cstrength','#csVal',2],['#denoise','#dnVal',2],['#steps','#stVal',0],['#ovCfg','#ovCfgVal',1]];
+const PAIRS=[['#cstrength','#csVal',2],['#denoise','#dnVal',2],['#steps','#stVal',0],['#ovCfg','#ovCfgVal',1],
+  ['#krea2Dn1','#krea2Dn1Val',2],['#krea2Dn2','#krea2Dn2Val',2]];
 PAIRS.forEach(([r,n,dec])=>{const R=$(r),N=$(n);
   R.oninput=()=>{N.value=dec?(+R.value).toFixed(dec):R.value;setRange(R);};
   N.oninput=()=>{const v=+N.value;if(!isNaN(v)){R.value=v;setRange(R);}};
@@ -1713,7 +1728,9 @@ $('#samplerOverrideSw').onclick=()=>{
   ['#overrideCfgField','#overrideSamplerField','#overrideSchedulerField'].forEach(s=>$(s).classList.toggle('hide',!on));
 };
 $('#krea2RefineSw').onclick=()=>{
-  $('#krea2RefineSw').classList.toggle('on');
+  const on=!$('#krea2RefineSw').classList.contains('on');
+  $('#krea2RefineSw').classList.toggle('on',on);
+  $('#krea2Denoise2Field').classList.toggle('hide',!on);
 };
 
 // mode switch
@@ -1731,7 +1748,9 @@ function setMode(m){
   $('#denoiseField').classList.toggle('hide',m!=='i2i');
   $('#stepsField').classList.toggle('hide',m!=='i2i');
   $('#krea2ResizeField').classList.toggle('hide',m!=='krea2');
+  $('#krea2Denoise1Field').classList.toggle('hide',m!=='krea2');
   $('#krea2RefineField').classList.toggle('hide',m!=='krea2');
+  $('#krea2Denoise2Field').classList.toggle('hide',m!=='krea2'||!$('#krea2RefineSw').classList.contains('on'));
   // Lightning + the helper-LoRA / lightning controls are image-only, and krea2
   // has no Lightning node at all (single character LoRA only)
   $$('.imgonly').forEach(el=>el.classList.toggle('hide', m==='video'));
@@ -2616,6 +2635,8 @@ $('#go').onclick=async()=>{
     body.prompt=$('#i2iPrompt').value.trim();
     body.resize_size=+$('#krea2ResizeVal').value||1920;
     body.refine=$('#krea2RefineSw').classList.contains('on');
+    body.denoise=+$('#krea2Dn1Val').value||0.71;
+    body.refine_denoise=+$('#krea2Dn2Val').value||0.1;
   }
   else if(S.mode==='video'){
     try{

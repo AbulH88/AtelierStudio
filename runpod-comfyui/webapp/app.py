@@ -1110,6 +1110,8 @@ def _build_input(body):
             inp["image_b64"] = base64.b64encode(f.read()).decode()
         inp["resize_size"] = int(body.get("resize_size", 1920))
         inp["refine"] = bool(body.get("refine", False))
+        inp["denoise"] = float(body.get("denoise", 0.71))
+        inp["refine_denoise"] = float(body.get("refine_denoise", 0.1))
     elif inp["mode"] == "video":   # Wan Animate: driving video + ref photo
         inp["video_b64"] = body.get("video_b64", "")
         inp["video_filename"] = body.get("video_filename", "driving.mp4")
