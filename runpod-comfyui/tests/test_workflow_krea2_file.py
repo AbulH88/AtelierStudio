@@ -47,3 +47,13 @@ def test_base_and_refine_save_nodes_read_the_right_stage():
     # 346 = base save (always present), 345 = refine save (dropped when refine is off)
     assert graph["346"]["inputs"]["images"] == ["303", 0]
     assert graph["345"]["inputs"]["images"] == ["336", 0]
+
+
+def test_save_nodes_are_plain_save_image():
+    # A custom SaveImageKJ ran fine in ComfyUI's console but didn't surface its
+    # output in /history the way run() expects (0 images returned despite a
+    # clean execution log) — pin both save nodes to the vanilla SaveImage node
+    # type, which is the one proven to populate history["outputs"][nid]["images"].
+    graph = _load()
+    assert graph["345"]["class_type"] == "SaveImage"
+    assert graph["346"]["class_type"] == "SaveImage"

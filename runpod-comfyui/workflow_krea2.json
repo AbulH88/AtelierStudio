@@ -117,13 +117,13 @@
     "_meta": {"title": "Positive Prompt"}
   },
   "345": {
-    "inputs": {"filename_prefix": "ComfyUI", "output_folder": "output", "caption_file_extension": ".txt", "images": ["336", 0]},
-    "class_type": "SaveImageKJ",
-    "_meta": {"title": "Save Image KJ"}
+    "inputs": {"filename_prefix": "ComfyUI", "images": ["336", 0]},
+    "class_type": "SaveImage",
+    "_meta": {"title": "Save Image (refined)"}
   },
   "346": {
-    "inputs": {"filename_prefix": "ComfyUI", "output_folder": "output", "caption_file_extension": ".txt", "images": ["303", 0]},
-    "class_type": "SaveImageKJ",
-    "_meta": {"title": "Save Image KJ"}
+    "inputs": {"filename_prefix": "ComfyUI", "images": ["303", 0]},
+    "class_type": "SaveImage",
+    "_meta": {"title": "Save Image (base)"}
   }
 }
