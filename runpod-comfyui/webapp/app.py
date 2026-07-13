@@ -639,7 +639,7 @@ VISION_MODELS = [
     {"id": "qwen/qwen3-vl-32b-instruct",            "name": "Qwen3-VL 32B (both · cheaper)"},
     {"id": "x-ai/grok-4.3",                         "name": "Grok 4.3 (both · least filtered)"},
     {"id": "openai/gpt-4o",                         "name": "GPT-4o (refuses figure/body descriptions — scene-only)"},
-    {"id": "anthropic/claude-3.5-sonnet",           "name": "Claude 3.5 Sonnet (refuses figure/body descriptions — scene-only)"},
+    {"id": "anthropic/claude-sonnet-5",              "name": "Claude Sonnet 5 (refuses figure/body descriptions — scene-only)"},
     {"id": "mistralai/mistral-small-3.2-24b-instruct", "name": "Mistral Small 3.2 (both · cheap)"},
     {"id": "z-ai/glm-4.6v",                         "name": "GLM-4.6V (both)"},
     {"id": "google/gemini-2.5-flash",               "name": "Gemini 2.5 Flash (SFW only · fast)"},
