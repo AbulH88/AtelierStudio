@@ -628,14 +628,18 @@ LIGHTNING_DEFAULTS = {
 # Curated OpenRouter vision models for the "Describe with AI" dropdown. Kept short
 # on purpose (the full /models list is 300+). Edit this list to add/remove options;
 # the first entry is the default. DeepSeek has no vision model on OpenRouter, so
-# Qwen3-VL covers the uncensored/strong slot. OpenAI/Anthropic models are SFW-only
-# (they refuse to describe NSFW content) but read fine-grained detail well.
+# Qwen3-VL covers the uncensored/strong slot. OpenAI/Anthropic models refuse even
+# non-explicit figure/body-type descriptions of real people (confirmed: refuses
+# "curvy hourglass figure" language on a fully clothed, non-nude photo, Explicit
+# toggle off) — not just NSFW. Effectively unusable for this app's core describe
+# workflow (body type is central to it); kept only for clothing/scene-only use
+# with Body Type left blank.
 VISION_MODELS = [
     {"id": "qwen/qwen3-vl-235b-a22b-instruct",      "name": "Qwen3-VL 235B (SFW + NSFW · default)"},
     {"id": "qwen/qwen3-vl-32b-instruct",            "name": "Qwen3-VL 32B (both · cheaper)"},
     {"id": "x-ai/grok-4.3",                         "name": "Grok 4.3 (both · least filtered)"},
-    {"id": "openai/gpt-4o",                         "name": "GPT-4o (SFW only · very accurate)"},
-    {"id": "anthropic/claude-3.5-sonnet",           "name": "Claude 3.5 Sonnet (SFW only · sharp detail)"},
+    {"id": "openai/gpt-4o",                         "name": "GPT-4o (refuses figure/body descriptions — scene-only)"},
+    {"id": "anthropic/claude-3.5-sonnet",           "name": "Claude 3.5 Sonnet (refuses figure/body descriptions — scene-only)"},
     {"id": "mistralai/mistral-small-3.2-24b-instruct", "name": "Mistral Small 3.2 (both · cheap)"},
     {"id": "z-ai/glm-4.6v",                         "name": "GLM-4.6V (both)"},
     {"id": "google/gemini-2.5-flash",               "name": "Gemini 2.5 Flash (SFW only · fast)"},
