@@ -689,7 +689,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   </nav>
   <div class="compute" id="compute">
     <button data-t="local" class="on"><span class="cl"></span>Local</button>
-    <button data-t="cloud"><span class="cl"></span>Cloud</button>
+    <button data-t="cloud" class="hide"><span class="cl"></span>Cloud</button>
   </div>
   <button id="startComfy" class="startbtn hide">▶ Start ComfyUI</button>
   <button id="stopComfy" class="stopbtn hide">■ Stop ComfyUI</button>
@@ -1450,8 +1450,8 @@ async function loadHealth(){
     // always clickable — clicking Cloud while unconfigured reveals the setup card
     b.onclick=()=>{S.target=t;document.querySelectorAll('#compute button').forEach(x=>x.classList.toggle('on',x===b));_lastTarget=t;updateStatus();onTargetChange();};
   });
-  // prefer local when ComfyUI is on, else cloud
-  if(_lastTarget===null) S.target = h.local ? 'local' : (h.cloud ? 'cloud' : 'local');
+  // Cloud disabled for now (UI button hidden) — always default to local.
+  if(_lastTarget===null) S.target = 'local';
   document.querySelectorAll('#compute button').forEach(b=>b.classList.toggle('on',b.dataset.t===S.target));
   $('#startComfy').classList.toggle('hide', h.local);   // hide once ComfyUI is up
   $('#stopComfy').classList.toggle('hide', !h.local);
