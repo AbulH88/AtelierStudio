@@ -5,6 +5,46 @@ end-to-end** (local-only). A full render proven this session: ~470s, eye-detaile
 authenticity + real iPhone-12 EXIF, 2 images to Gallery. Memory: `instaraw-advanced-mode`,
 `runpod-cloud-build-state`. Plan: `instaraw-advanced-plan.md`. (Cloud Motion still LIVE — see below.)
 
+## ✅ KREA2 IMAGE TO IMAGE NEW — depth-ControlNet mode (this session — built + unit-tested, NOT yet live-verified)
+7th local-only generation mode (`mode="krea2new"`), built via `superpowers:subagent-driven-development`
+in a worktree (`worktree-krea2new-depth-mode`), all 6 tasks task-reviewed clean, 31/31 backend tests
+passing. Design: `docs/superpowers/specs/2026-07-19-krea2new-depth-mode-design.md`. Plan:
+`docs/superpowers/plans/2026-07-19-krea2new-depth-mode.md`.
+- Distinct pipeline from the existing Krea2 mode: **not** img2img. The source photo runs through
+  DepthAnythingV2 to get a depth map, which conditions a **full generation** (denoise 1, KSampler
+  from an empty latent) via a Krea2 control-LoRA (`Keara2\mix\depth-control-lora.safetensors`,
+  fixed strength 1) stacked on top of the character LoRA — pose/composition transfer, not
+  pixel-level editing.
+- **`workflow_krea2new.json`** (repo root of `runpod-comfyui`) — cleaned from the user's
+  `Krea-2-Turbo_Depth-Controlnet.json` export: leaked OpenRouter key (node 39,
+  `sk-or-v1-2ecfce...80749` — same key already flagged below, still needs rotating) + graph-embedded
+  auto-caption (node 40) dropped, app's existing "Describe with AI" reused instead; the
+  `FluxResolutionNode` preset dropdown (node 30) dropped in favor of wiring `EmptyLatentImage`
+  directly from the app's aspect picker (same as T2I); a debug `PreviewImage` of the depth map
+  (node 36) dropped (would otherwise leak into every generation's returned image list).
+- **`comfy_common.py`** — `KREA2NEW` node map, `_build_krea2new()` (frame image, width/height,
+  prompt+trigger, seed, character LoRA, sampler override — no Lightning chain, no refine pass),
+  wired into `generate()`'s dispatch and upload-once check.
+- **`webapp/app.py`** — `krea2new` branch in `_build_input` (session/frame → image_b64 only, reuses
+  the generic width/height already parsed for every mode), `/api/generate` local-only gate +
+  frame-exists check, empty-prompt auto-describe extended to cover `krea2new`.
+- **`webapp/index.html`** — 7th mode button, reuses the shared frame-picker pane (`#paneVideo`),
+  the T2I aspect-ratio picker, and the Krea2 character picker (`Keara2` root) — no new UI controls.
+  Also relabeled all 6 mode buttons per user request this session: Wan Image to Image (i2i), Wan
+  Text To Image (t2i), Wan Animate Motion Control (video), Instaraw Advance (adv), Krea2 Image to
+  Image (krea2), Krea2 Image to Image new (krea2new). Display text only — mode keys/`data-mode`
+  attrs unchanged.
+
+### Krea2 Image to Image new — still open before shipping
+- **Not yet live-verified**: needs a real ComfyUI install with the Krea2 checkpoint/CLIP/character
+  LoRA/depth-control-LoRA files present to confirm the depth-control chain and character LoRA
+  render correctly, and to check `Krea2ControlImageEncode`'s `resize=match_latent_size` behavior
+  when the chosen aspect ratio differs a lot from the source photo's native aspect.
+- **Deploy**: merged to `main` and pushed this session — confirm the GitHub Actions `deploy.yml`
+  run went green (check the API/Actions tab) and test a real render on the VPS.
+- The leaked OpenRouter key from the source JSON is stripped from the shipped file but the key
+  itself still needs rotating — same outstanding item as below.
+
 ## ✅ KREA2 I2I MODE + CROSS-MODE SAMPLER OVERRIDE (this session — built + unit-tested, NOT yet live-verified on VPS)
 6th local-only generation mode wrapping the user's Krea2 workflow (true img2img: VAEEncode of a
 resized+noise-augmented source image, denoise 0.6, optional skin-detail refine pass), plus an opt-in
