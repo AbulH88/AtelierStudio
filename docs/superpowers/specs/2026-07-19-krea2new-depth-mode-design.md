@@ -67,9 +67,10 @@ Starting from the source graph, before it becomes
   mode, no refine pass (unlike Krea2, this workflow ships without one — YAGNI,
   can add later if wanted).
 - `4` VAELoader, `15` UNETLoader, `18` CLIPLoader — fixed model paths from the
-  source graph, backslash-normalized via the existing
-  `_normalize_model_paths()` guard (same treatment as Video mode's
-  Windows-exported paths).
+  source graph, left as backslash paths as-is (this mode is local-only,
+  same convention as `_build_krea2`, which also skips `_normalize_model_paths`
+  — that guard exists for Video mode's cloud/Linux worker, where backslash
+  paths actually break; the local Windows ComfyUI install handles them fine).
 
 **Node-id map** (`comfy_common.py`, mirrors `I2I`/`T2I`/`KREA2` style):
 ```python
@@ -79,7 +80,6 @@ KREA2NEW = {"load_image": "32", "positive": "6", "latent": "10",
 
 **`_build_krea2new(graph, inp, seed, frame_name)`**, mirroring `_build_krea2`
 and `_build_t2i`:
-- `_normalize_model_paths(graph)` (backslash guard, same as `_build_video`).
 - Set `32.image = frame_name`.
 - Set `10.width = inp.get("width", 1080)`, `10.height = inp.get("height", 1920)`.
 - Set `6.text = _prompt_with_trigger(inp)`.
