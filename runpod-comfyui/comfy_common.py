@@ -74,6 +74,13 @@ KREA2 = {"load_image": "316", "positive": "314", "resize_size": "324",
          "refine_encode": "334", "refine_ksampler": "335", "refine_decode": "336",
          "refine_prompt": "339", "refine_save": "345"}
 
+# Krea I2I New (workflow_krea2new.json) — depth-ControlNet guided generation:
+# DepthAnythingV2 map of the source photo drives a Krea2ControlLoRA + Apply
+# chain that conditions a full (denoise 1) KSampler pass from an empty latent.
+# NOT img2img (unlike KREA2 above) — no VAEEncode of the source pixels.
+KREA2NEW = {"load_image": "32", "positive": "6", "latent": "10",
+            "base_ksampler": "2", "char": "38"}
+
 
 def _bypass_node(graph, nid, in_key="image"):
     """Bypass an image->image node: rewire every consumer of its output to its image
@@ -348,6 +355,24 @@ def _build_krea2(graph, inp, seed, frame_name):
         for nid in (nm["refine_encode"], nm["refine_ksampler"],
                     nm["refine_decode"], nm["refine_prompt"], nm["refine_save"]):
             graph.pop(nid, None)
+    _apply_sampler_override(graph, inp)
+    return graph
+
+
+def _build_krea2new(graph, inp, seed, frame_name):
+    """Krea I2I New: depth-ControlNet guided generation. The source photo drives
+    a DepthAnythingV2 map -> Krea2ControlLoRA/Apply chain that conditions a
+    full-denoise KSampler pass from an empty latent sized by the app's aspect
+    picker (same width/height convention as _build_t2i). Single character
+    LoRA, no Lightning/helper-LoRA chain, no refine pass."""
+    nm = KREA2NEW
+    graph[nm["load_image"]]["inputs"]["image"] = frame_name
+    graph[nm["latent"]]["inputs"]["width"] = int(inp.get("width", 1080))
+    graph[nm["latent"]]["inputs"]["height"] = int(inp.get("height", 1920))
+    graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
+    graph[nm["base_ksampler"]]["inputs"]["seed"] = seed
+    _set_lora(graph, nm["char"], inp.get("character_lora_path"),
+              inp.get("character_strength", 1.0))
     _apply_sampler_override(graph, inp)
     return graph
 
