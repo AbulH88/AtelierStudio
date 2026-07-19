@@ -1,0 +1,99 @@
+{
+  "2": {
+    "inputs": {
+      "seed": 474731759263502,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "er_sde",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": ["35", 0],
+      "positive": ["6", 0],
+      "negative": ["8", 0],
+      "latent_image": ["10", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": {"title": "KSampler"}
+  },
+  "3": {
+    "inputs": {"samples": ["2", 0], "vae": ["4", 0]},
+    "class_type": "VAEDecode",
+    "_meta": {"title": "VAE Decode"}
+  },
+  "4": {
+    "inputs": {"vae_name": "Krea2\\Krea2-HD-vae.safetensors"},
+    "class_type": "VAELoader",
+    "_meta": {"title": "VAE Loader"}
+  },
+  "6": {
+    "inputs": {"text": "", "clip": ["18", 0]},
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "Positive Prompt"}
+  },
+  "8": {
+    "inputs": {"conditioning": ["6", 0]},
+    "class_type": "ConditioningZeroOut",
+    "_meta": {"title": "Negative (Zero Out)"}
+  },
+  "10": {
+    "inputs": {"width": 1080, "height": 1920, "batch_size": 1},
+    "class_type": "EmptyLatentImage",
+    "_meta": {"title": "Empty Latent Image"}
+  },
+  "15": {
+    "inputs": {"unet_name": "Kera2\\krea2_turbo_bf16.safetensors", "weight_dtype": "default"},
+    "class_type": "UNETLoader",
+    "_meta": {"title": "Load Diffusion Model"}
+  },
+  "18": {
+    "inputs": {"clip_name": "Krea-2\\Huihui-Qwen3-VL-4B-Instruct-abliterated.safetensors", "type": "krea2", "device": "default"},
+    "class_type": "CLIPLoader",
+    "_meta": {"title": "Load CLIP"}
+  },
+  "31": {
+    "inputs": {"ckpt_name": "depth_anything_v2_vitl.pth", "resolution": 512, "image": ["32", 0]},
+    "class_type": "DepthAnythingV2Preprocessor",
+    "_meta": {"title": "Depth Anything V2 - Relative"}
+  },
+  "32": {
+    "inputs": {"image": "ComfyUI_00116_.png"},
+    "class_type": "LoadImage",
+    "_meta": {"title": "Load Image"}
+  },
+  "33": {
+    "inputs": {"lora_name": "Keara2\\mix\\depth-control-lora.safetensors", "strength": 1, "model": ["38", 0]},
+    "class_type": "Krea2ControlLoRALoader",
+    "_meta": {"title": "Krea2 Control LoRA Loader"}
+  },
+  "34": {
+    "inputs": {
+      "resize": "match_latent_size",
+      "upscale_method": "lanczos",
+      "crop": "center",
+      "channel_mode": "rgb",
+      "normalize": "none",
+      "invert": false,
+      "batch_mode": "independent_images",
+      "control_image": ["31", 0],
+      "vae": ["4", 0],
+      "latent": ["10", 0]
+    },
+    "class_type": "Krea2ControlImageEncode",
+    "_meta": {"title": "Krea2 Control Image Encode"}
+  },
+  "35": {
+    "inputs": {"model": ["33", 0], "control_latent": ["34", 0]},
+    "class_type": "Krea2ControlApply",
+    "_meta": {"title": "Krea2 Control Apply"}
+  },
+  "37": {
+    "inputs": {"filename_prefix": "ComfyUI", "images": ["3", 0]},
+    "class_type": "SaveImage",
+    "_meta": {"title": "Save Image"}
+  },
+  "38": {
+    "inputs": {"lora_name": "Keara2\\krea2_cristiana\\Cristina-2600.safetensors", "strength_model": 1, "model": ["15", 0]},
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {"title": "Load LoRA"}
+  }
+}
