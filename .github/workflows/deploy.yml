@@ -53,6 +53,7 @@ jobs:
           cd runpod-comfyui
           tar czf - \
             comfy_common.py workflow_i2i.json workflow_t2i.json workflow_video.json workflow_adv.json \
+            workflow_krea2.json workflow_krea2new.json \
             webapp/app.py webapp/r2_store.py webapp/index.html webapp/login.html \
           | ssh -i ~/.ssh/deploy_key -p "$PORT" \
               -o StrictHostKeyChecking=accept-new \
