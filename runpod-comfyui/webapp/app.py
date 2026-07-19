@@ -1119,6 +1119,11 @@ def _build_input(body):
         inp["refine"] = bool(body.get("refine", False))
         inp["denoise"] = float(body.get("denoise", 0.71))
         inp["refine_denoise"] = float(body.get("refine_denoise", 0.1))
+    elif inp["mode"] == "krea2new":
+        session, frame_name = body["session"], body["frame"]
+        fpath = os.path.join(FRAMES_DIR, session, frame_name)
+        with open(fpath, "rb") as f:
+            inp["image_b64"] = base64.b64encode(f.read()).decode()
     elif inp["mode"] == "video":   # Wan Animate: driving video + ref photo
         inp["video_b64"] = body.get("video_b64", "")
         inp["video_filename"] = body.get("video_filename", "driving.mp4")
@@ -1518,7 +1523,7 @@ def _mux_audio(video_bytes, audio_src_b64):
 def _run_gen_job(job_id, target, inp, body):
     try:
         # i2i/krea2 with an empty prompt → auto-describe the frame first (OpenRouter)
-        if inp["mode"] in ("i2i", "krea2") and not inp.get("prompt"):
+        if inp["mode"] in ("i2i", "krea2", "krea2new") and not inp.get("prompt"):
             p = _describe_params(body, False)
             inp["prompt"] = describe_image(inp["image_b64"], p, p["model"])
 
@@ -1601,6 +1606,12 @@ def generate():
     elif mode == "krea2":
         if target != "local":
             return jsonify({"error": "Krea2 mode runs on Local only."}), 400
+        fpath = os.path.join(FRAMES_DIR, body.get("session", ""), body.get("frame", ""))
+        if not os.path.exists(fpath):
+            return jsonify({"error": "Frame not found."}), 404
+    elif mode == "krea2new":
+        if target != "local":
+            return jsonify({"error": "Krea I2I New mode runs on Local only."}), 400
         fpath = os.path.join(FRAMES_DIR, body.get("session", ""), body.get("frame", ""))
         if not os.path.exists(fpath):
             return jsonify({"error": "Frame not found."}), 404
