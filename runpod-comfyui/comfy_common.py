@@ -536,7 +536,7 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
         return {"images": images, "seed": seed}
 
     frame_name = None
-    if mode in ("i2i", "krea2"):
+    if mode in ("i2i", "krea2", "krea2new"):
         frame_name = upload_image(base, base64.b64decode(inp["image_b64"]))
 
     images, done = [], 0
@@ -550,6 +550,8 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
             graph = _build_i2i(graph, sub, cseed, frame_name)
         elif mode == "krea2":
             graph = _build_krea2(graph, sub, cseed, frame_name)
+        elif mode == "krea2new":
+            graph = _build_krea2new(graph, sub, cseed, frame_name)
         else:
             graph = _build_t2i(graph, sub, cseed)
         images += run(base, graph, client_id=client_id)
