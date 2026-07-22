@@ -3032,32 +3032,42 @@ function renderGallery() {
     list.sort((a, b) => b.name.localeCompare(a.name));
   }
   
-  $('#galCount').textContent = list.length + (list.length === 1 ? ' image' : ' images') + (q ? ` of ${_galImages.length}` : '');
-  
+  $('#galCount').textContent = list.length + (list.length === 1 ? ' item' : ' items') + (q ? ` of ${_galImages.length}` : '');
+
   if (!list.length) {
-    $('#galGrid').innerHTML = '<div class="reels-empty" style="grid-column:1/-1"><div class="re-icon">🖼</div><p>No matching images found.</p></div>';
+    $('#galGrid').innerHTML = '<div class="reels-empty" style="grid-column:1/-1"><div class="re-icon">🖼</div><p>No matching items found.</p></div>';
     updateBulkBar();
     return;
   }
-  
+
+  const _isVid = name => /\.(mp4|mov|webm)$/i.test(name);
   $('#galGrid').innerHTML = list.map((im, idx) => {
     const isSel = _galSelected.has(im.key);
     const selClass = isSel ? ' selected' : '';
     const checked = isSel ? 'checked' : '';
+    const isVid = _isVid(im.name);
+    const media = isVid
+      ? `<video src="${im.url}" data-url="${im.url}" data-name="${im.name}" muted preload="metadata" style="cursor:pointer" onmouseover="this.play()" onmouseout="this.pause();this.currentTime=0"></video>`
+      : `<img src="${im.url}" loading="lazy" data-url="${im.url}">`;
+    // "Use as Motion reference photo" only makes sense for images
+    const motionBtn = isVid ? '' : `<button class="gmotion" data-url="${im.url}" title="Use as Motion reference photo">→ Motion ref</button>`;
     return `<div class="gal-card${selClass}" data-key="${im.key}" data-index="${idx}">
       <div class="gcheck"><input type="checkbox" ${checked} data-key="${im.key}"></div>
-      <img src="${im.url}" loading="lazy" data-url="${im.url}">
+      ${media}
       <button class="gdel" data-key="${im.key}" title="Delete">✕</button>
-      <button class="gmotion" data-url="${im.url}" title="Use as Motion reference photo">→ Motion ref</button>
+      ${motionBtn}
     </div>`;
   }).join('');
   $$('#galGrid .gmotion').forEach(b => b.onclick = e => { e.stopPropagation(); galToMotionRef(b.dataset.url); });
-  
+
   $$('#galGrid img').forEach(im => {
     im.onclick = (e) => {
       $('#imgviewImg').src = im.dataset.url;
       $('#imgview').classList.add('on');
     };
+  });
+  $$('#galGrid video').forEach(v => {
+    v.onclick = (e) => { e.stopPropagation(); openReelPlayer(v.dataset.url, v.dataset.name); };
   });
   
   $$('#galGrid .gdel').forEach(b => {

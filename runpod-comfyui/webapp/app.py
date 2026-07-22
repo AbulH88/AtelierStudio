@@ -1645,15 +1645,20 @@ def _run_gen_job(job_id, target, inp, body):
             raise RuntimeError((out or {}).get("error", "No output from worker."))
         if inp["mode"] == "video":                       # Wan Animate -> mp4(s)
             # May be 1 (raw only) or 2 (raw + RTX-upscaled) videos. Carry the driving
-            # audio onto each, persist each to R2, hand the UI lightweight urls.
+            # audio onto each, persist each to R2 under gallery/ (same prefix images
+            # use) so motion results show up in the Gallery tab too — /api/gallery/list
+            # is a plain prefix scan, and /api/media already content-types .mp4
+            # correctly, so no other backend changes are needed for this to appear.
             vids = out.get("videos", []) or []
             urls, muxed = [], []
             try:
                 ts = int(time.time())
+                group = _gallery_group(inp)
+                seed = out.get("seed", 0)
                 for i, b64 in enumerate(vids):
                     raw = _mux_audio(base64.b64decode(b64), inp.get("video_b64"))
                     muxed.append(base64.b64encode(raw).decode())
-                    key = f"video_outputs/motion_{ts}_{i}.mp4"
+                    key = f"gallery/{group}/{ts}_{seed}_{i}.mp4"
                     r2_store.upload_bytes(key, raw)
                     urls.append(f"/api/media?key={key}")
             except Exception:
