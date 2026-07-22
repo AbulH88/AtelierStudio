@@ -5,6 +5,56 @@ end-to-end** (local-only). A full render proven this session: ~470s, eye-detaile
 authenticity + real iPhone-12 EXIF, 2 images to Gallery. Memory: `instaraw-advanced-mode`,
 `runpod-cloud-build-state`. Plan: `instaraw-advanced-plan.md`. (Cloud Motion still LIVE — see below.)
 
+## ✅ KREA2 IMAGE TO IMAGE HIGH QUALITY — 2-stage ClownsharKSampler mode (this session — built + unit-tested, NOT yet live-verified)
+8th local-only generation mode (`mode="krea2hq"`), built from the user's
+`Krea2 I2I HighQuality.json` export. Distinct from both existing Krea2 modes: true img2img like
+`krea2` (VAEEncode of the resized+noise-augmented source image), but always runs a fixed **two-stage**
+`ClownsharKSampler_Beta` pipeline — base pass (denoise 0.8) feeding straight into a quality-refine pass
+(denoise 0.27) — with no optional-refine toggle (unlike `krea2`, where the refine pass is opt-in). 19/19
+new backend tests passing (`test_workflow_krea2hq_file.py`, `test_build_krea2hq.py`,
+`test_generate_krea2hq_dispatch.py`), 45/45 total.
+- **`workflow_krea2hq.json`** (repo root of `runpod-comfyui`) — cleaned from the source export:
+  leaked OpenRouter key + hardcoded character-specific caption instruction (node 19,
+  `sk-or-v1-2ecfce...80749` — **same key already flagged below, still needs rotating**) dropped, app's
+  existing "Describe with AI" reused instead; the in-graph video source + interactive frame picker
+  (`VHS_LoadVideo` node 25, `Image Filter` node 16) dropped in favor of the app's own frame
+  extraction/picker (same plumbing as `i2i`/`krea2`/`krea2new` — a plain `LoadImage` node now sits at
+  id `16`); the `EmptyLatentImageResPreset` in-graph resolution-preset dropdown (node 7) dropped in
+  favor of the app computing width/height itself (new `RES_PRESETS` list in `webapp/app.py`, 16 named
+  presets — Landscape/Portrait/Full Body/Square × 1K–4K — matching the source node's own preset table);
+  an unused orphan `Int` node (23) dropped; the debug `PreviewImage` (node 12) converted to a real
+  `SaveImage` (this mode's sole output node).
+- **`comfy_common.py`** — `KREA2HQ` node map, `_set_power_lora_slot()` helper (the character LoRA lives
+  in slot 1 of an rgthree "Power Lora Loader" node — a *third* LoRA-node convention alongside the
+  existing `_set_lora`/`LoraLoaderModelOnly` and `_set_stack_slot`/"Lora Loader Stack" helpers: this one
+  uses a nested `{"on","lora","strength"}` dict per slot), `_build_krea2hq()` (frame image, resize
+  width/height, prompt+trigger, shared sampler seed, character LoRA slot, sampler override — the two
+  fixed realism-helper LoRAs in slots 2/3 are left untouched, technique LoRAs not identity LoRAs, same
+  treatment as `krea2new`'s control-LoRA), wired into `generate()`'s dispatch and upload-once check.
+- **`webapp/app.py`** — `krea2hq` branch in `_build_input` (session/frame → image_b64, reuses the
+  generic width/height already parsed for every mode), `/api/generate` local-only gate + frame-exists
+  check, empty-prompt auto-describe extended to cover `krea2hq`, new `RES_PRESETS` list exposed via
+  `/api/config` as `res_presets`.
+- **`webapp/index.html`** — 8th mode button (`Krea2 Image to Image High Quality`, local-only, hidden on
+  Cloud), reuses the shared frame-picker pane (`#paneVideo`) and the Krea2 character picker (`Keara2`
+  root). New **resolution-preset `<select>`** (grouped `<optgroup>`s by Landscape/Portrait/Full
+  Body/Square) replaces the generic aspect-ratio picker for this mode only — selecting a preset sets
+  `S.aspect` the same way the aspect-picker buttons do, so the existing `body.width`/`body.height`
+  wiring in the generate handler needed no changes.
+- **`.github/workflows/deploy.yml`** — added `workflow_krea2hq.json` to the deploy tar manifest
+  up front this time (the `krea2`/`krea2new` rollout hit a `FileNotFoundError` on the VPS because this
+  hardcoded whitelist wasn't updated — see the `deploy(fix)` commit referenced above).
+
+### Krea2 Image to Image High Quality — still open before shipping
+- **Not yet live-verified**: needs a real ComfyUI install with the Krea2 checkpoint/CLIP/character
+  LoRA/realism-helper-LoRA files present to confirm the two-stage sampler chain and the rgthree Power
+  Lora Loader wiring render correctly.
+- **Deploy**: not yet pushed to VPS — confirm the GitHub Actions `deploy.yml` run goes green and test a
+  real render.
+- The leaked OpenRouter key from the source JSON is stripped from the shipped file but the key itself
+  still needs rotating — same outstanding item as below (this is the third time this exact key has
+  turned up graph-embedded in a Krea2-family export).
+
 ## ✅ KREA2 IMAGE TO IMAGE NEW — depth-ControlNet mode (this session — built + unit-tested, NOT yet live-verified)
 7th local-only generation mode (`mode="krea2new"`), built via `superpowers:subagent-driven-development`
 in a worktree (`worktree-krea2new-depth-mode`), all 6 tasks task-reviewed clean, 31/31 backend tests

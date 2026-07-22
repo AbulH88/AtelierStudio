@@ -708,6 +708,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <button id="mAdv" data-mode="adv"><span class="k">a</span>⚡ Instaraw Advance</button>
     <button id="mKrea2" data-mode="krea2"><span class="k">k</span>Krea2 Image to Image</button>
     <button id="mKreaNew" data-mode="krea2new"><span class="k">n</span>Krea2 Image to Image new</button>
+    <button id="mKreaHQ" data-mode="krea2hq"><span class="k">h</span>Krea2 Image to Image High Quality</button>
   </div>
 </div>
 
@@ -976,9 +977,13 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           <button data-v="3">3</button><button data-v="4">4</button>
         </div>
       </div>
-      <div class="field imgonly advhide">
+      <div class="field imgonly advhide" id="aspectField">
         <div class="lab">Aspect ratio</div>
         <div class="aspects" id="aspects"></div>
+      </div>
+      <div class="field hide" id="resPresetField">
+        <div class="lab">Resolution preset</div>
+        <div class="sel"><select id="resPreset"></select></div>
       </div>
       <div class="field hide" id="customResField">
         <div class="lab">Custom size · px</div>
@@ -1406,7 +1411,7 @@ const S={mode:"i2i",session:null,frame:null,aspect:null,variations:2,rand:true,t
 
 function _charList(){
   // Krea2 characters live under a completely different LoRA root -> its own list.
-  if(S.mode==='krea2'||S.mode==='krea2new') return S.krea2Chars||[];
+  if(S.mode==='krea2'||S.mode==='krea2new'||S.mode==='krea2hq') return S.krea2Chars||[];
   // Cloud mode -> characters from the volume manifest (every char on the volume,
   // with the volume's real paths). Local -> the live ComfyUI list. Fall back to
   // whichever is non-empty so the picker is never empty.
@@ -1708,6 +1713,7 @@ function onTargetChange(){
   $('#mAdv').classList.toggle('hide', cloudOnly);   // advanced = local only
   $('#mKrea2').classList.toggle('hide', cloudOnly);   // krea2 = local only
   $('#mKreaNew').classList.toggle('hide', cloudOnly);   // krea2new = local only
+  $('#mKreaHQ').classList.toggle('hide', cloudOnly);   // krea2hq = local only
   if(cloudOnly && S.mode!=='video') setMode('video');
   if(typeof applyCharList==='function') applyCharList();   // cloud vs local character list
   renderCloudCard();
@@ -1743,7 +1749,8 @@ function setMode(m){
   $('#mAdv').classList.toggle('on',m==='adv');
   $('#mKrea2').classList.toggle('on',m==='krea2');
   $('#mKreaNew').classList.toggle('on',m==='krea2new');
-  $('#paneVideo').classList.toggle('hide',m!=='i2i'&&m!=='krea2'&&m!=='krea2new');   // krea2/krea2new reuse the frame-picker pane
+  $('#mKreaHQ').classList.toggle('on',m==='krea2hq');
+  $('#paneVideo').classList.toggle('hide',m!=='i2i'&&m!=='krea2'&&m!=='krea2new'&&m!=='krea2hq');   // krea2/krea2new/krea2hq reuse the frame-picker pane
   $('#paneText').classList.toggle('hide',m!=='t2i');
   $('#paneMotion').classList.toggle('hide',m!=='video');
   $('#paneAdv').classList.toggle('hide',m!=='adv');
@@ -1754,10 +1761,23 @@ function setMode(m){
   $('#krea2Denoise1Field').classList.toggle('hide',m!=='krea2');
   $('#krea2RefineField').classList.toggle('hide',m!=='krea2');
   $('#krea2Denoise2Field').classList.toggle('hide',m!=='krea2'||!$('#krea2RefineSw').classList.contains('on'));
-  // Lightning + the helper-LoRA / lightning controls are image-only, and krea2
-  // has no Lightning node at all (single character LoRA only)
+  // Krea2 HQ uses its own resolution-preset dropdown instead of the generic
+  // aspect-ratio picker (different, wider set of named presets)
+  $('#aspectField').classList.toggle('hide', m==='krea2hq');
+  $('#resPresetField').classList.toggle('hide', m!=='krea2hq');
+  if(m==='krea2hq'){
+    const o=$('#resPreset').selectedOptions[0];
+    if(o) S.aspect={key:o.dataset.key,width:+o.dataset.w,height:+o.dataset.h};
+  }else{
+    const b=$('#aspects .on');
+    if(b) S.aspect = b.dataset.key==='custom'
+      ? {key:'custom',width:+$('#cw').value,height:+$('#ch').value}
+      : {key:b.dataset.key,width:+b.dataset.w,height:+b.dataset.h};
+  }
+  // Lightning + the helper-LoRA / lightning controls are image-only, and krea2/
+  // krea2new/krea2hq have no Lightning node at all (single character LoRA only)
   $$('.imgonly').forEach(el=>el.classList.toggle('hide', m==='video'));
-  $$('.stdlora').forEach(el=>el.classList.toggle('hide', m==='adv'||m==='krea2'||m==='krea2new'));
+  $$('.stdlora').forEach(el=>el.classList.toggle('hide', m==='adv'||m==='krea2'||m==='krea2new'||m==='krea2hq'));
   $$('.advlora').forEach(el=>el.classList.toggle('hide', m!=='adv'));   // two LoRA groups shown only in adv
   // adv has its own aspect + describe in the studio -> hide the rail's (keep Trigger Word)
   $$('.advhide').forEach(el=>el.classList.toggle('hide', m==='adv'));
@@ -1770,6 +1790,7 @@ function setMode(m){
 $('#mVid').onclick=()=>setMode('i2i');$('#mTxt').onclick=()=>setMode('t2i');$('#mMotion').onclick=()=>setMode('video');
 $('#mAdv').onclick=()=>setMode('adv');$('#mKrea2').onclick=()=>setMode('krea2');
 $('#mKreaNew').onclick=()=>setMode('krea2new');
+$('#mKreaHQ').onclick=()=>setMode('krea2hq');
 // --- Advanced (INSTARAW) panel wiring (increment A: scene -> prompt_batch_data) ---
 $('#advDropRef').onclick=()=>$('#advRefFile').click();
 $('#advRefFile').onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
@@ -2005,6 +2026,16 @@ async function loadConfig(){
       S.aspect={key:b.dataset.key,width:+b.dataset.w,height:+b.dataset.h};}});
   $('#cw').oninput=$('#ch').oninput=()=>{if(S.aspect.key==='custom')
     S.aspect={key:'custom',width:+$('#cw').value,height:+$('#ch').value};};
+  // Krea2 HQ resolution presets — grouped <select>, mirrors the source workflow's
+  // in-graph dropdown (now computed app-side, see RES_PRESETS in app.py)
+  const resGroups={};
+  (c.res_presets||[]).forEach(p=>{ (resGroups[p.group]=resGroups[p.group]||[]).push(p); });
+  $('#resPreset').innerHTML=Object.entries(resGroups).map(([g,items])=>
+    `<optgroup label="${g}">${items.map(p=>
+      `<option value="${p.key}" data-key="${p.key}" data-w="${p.width}" data-h="${p.height}">${p.label} (${p.width}×${p.height})</option>`
+    ).join('')}</optgroup>`).join('');
+  $('#resPreset').onchange=()=>{ const o=$('#resPreset').selectedOptions[0];
+    if(o) S.aspect={key:o.dataset.key,width:+o.dataset.w,height:+o.dataset.h}; };
   // Lightning lightx2v — editable dropdown + strength, defaults per mode
   S.lightning = c.lightning || {options:[], defaults:{}};
   $('#lightningPick').innerHTML = (S.lightning.options||[])
@@ -2286,7 +2317,7 @@ function refreshGo(){
   let ok;
   if(S.mode==='video') ok = !!(S.motionVid && S.motionRef);   // need driving video + ref photo
   else if(S.mode==='adv') ok = !!($('#variant').value && ($('#advScene').value.trim().length>3 || (S.advPrompts&&S.advPrompts.length)));
-  else if(S.mode==='i2i' || S.mode==='krea2' || S.mode==='krea2new') ok = !!S.frame;
+  else if(S.mode==='i2i' || S.mode==='krea2' || S.mode==='krea2new' || S.mode==='krea2hq') ok = !!S.frame;
   else ok = $('#prompt').value.trim().length>3;
   if(ok && cloudMissing().length) ok=false;   // grey out: a selected LoRA isn't on the cloud volume
   $('#go').disabled=!ok; $('#goTop').disabled=!ok;
@@ -2643,6 +2674,11 @@ $('#go').onclick=async()=>{
     body.refine_denoise=+$('#krea2Dn2Val').value||0.1;
   }
   else if(S.mode==='krea2new'){
+    body.session=S.session;
+    body.frame=S.frame;
+    body.prompt=$('#i2iPrompt').value.trim();
+  }
+  else if(S.mode==='krea2hq'){
     body.session=S.session;
     body.frame=S.frame;
     body.prompt=$('#i2iPrompt').value.trim();

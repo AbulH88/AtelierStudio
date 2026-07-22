@@ -652,6 +652,29 @@ ASPECTS = [
     {"key": "landscape", "label": "Landscape · 16:9","width": 1920, "height": 1080},
 ]
 
+# Resolution presets for Krea2 High Quality (mirrors the source ComfyUI workflow's
+# in-graph "Empty Latent Image (Res Presets)" dropdown — that node was dropped from
+# workflow_krea2hq.json in favor of the app computing width/height itself, same
+# pattern as ASPECTS above). Grouped by category for the UI's <optgroup>s.
+RES_PRESETS = [
+    {"group": "Landscape", "key": "landscape_1k", "label": "Landscape 1K", "width": 1024, "height": 576},
+    {"group": "Landscape", "key": "landscape_2k", "label": "Landscape 2K", "width": 1920, "height": 1088},
+    {"group": "Landscape", "key": "landscape_3k", "label": "Landscape 3K", "width": 2560, "height": 1440},
+    {"group": "Landscape", "key": "landscape_4k", "label": "Landscape 4K", "width": 3840, "height": 2160},
+    {"group": "Portrait",  "key": "portrait_1k",  "label": "Portrait 1K",  "width": 768,  "height": 1024},
+    {"group": "Portrait",  "key": "portrait_2k",  "label": "Portrait 2K",  "width": 1440, "height": 1920},
+    {"group": "Portrait",  "key": "portrait_3k",  "label": "Portrait 3K",  "width": 1920, "height": 2560},
+    {"group": "Portrait",  "key": "portrait_4k",  "label": "Portrait 4K",  "width": 2880, "height": 3840},
+    {"group": "Full Body", "key": "fullbody_1k",  "label": "Full Body 1K", "width": 576,  "height": 1024},
+    {"group": "Full Body", "key": "fullbody_2k",  "label": "Full Body 2K", "width": 1088, "height": 1920},
+    {"group": "Full Body", "key": "fullbody_3k",  "label": "Full Body 3K", "width": 1440, "height": 2560},
+    {"group": "Full Body", "key": "fullbody_4k",  "label": "Full Body 4K", "width": 2160, "height": 3840},
+    {"group": "Square",    "key": "square_1k",    "label": "Square 1K",    "width": 1024, "height": 1024},
+    {"group": "Square",    "key": "square_2k",    "label": "Square 2K",    "width": 2048, "height": 2048},
+    {"group": "Square",    "key": "square_3k",    "label": "Square 3K",    "width": 3072, "height": 3072},
+    {"group": "Square",    "key": "square_4k",    "label": "Square 4K",    "width": 4096, "height": 4096},
+]
+
 
 @app.get("/")
 def index():
@@ -666,6 +689,7 @@ def config():
     return jsonify({"characters": build_characters(),
                     "cloud_characters": build_cloud_characters(),
                     "krea2_characters": build_krea2_characters(), "aspects": ASPECTS,
+                    "res_presets": RES_PRESETS,
                     "lightning": {"options": _folder_loras("WanLightning", ".lightning_loras.json"),
                                   "defaults": LIGHTNING_DEFAULTS}})
 
@@ -1124,6 +1148,11 @@ def _build_input(body):
         fpath = os.path.join(FRAMES_DIR, session, frame_name)
         with open(fpath, "rb") as f:
             inp["image_b64"] = base64.b64encode(f.read()).decode()
+    elif inp["mode"] == "krea2hq":
+        session, frame_name = body["session"], body["frame"]
+        fpath = os.path.join(FRAMES_DIR, session, frame_name)
+        with open(fpath, "rb") as f:
+            inp["image_b64"] = base64.b64encode(f.read()).decode()
     elif inp["mode"] == "video":   # Wan Animate: driving video + ref photo
         inp["video_b64"] = body.get("video_b64", "")
         inp["video_filename"] = body.get("video_filename", "driving.mp4")
@@ -1523,7 +1552,7 @@ def _mux_audio(video_bytes, audio_src_b64):
 def _run_gen_job(job_id, target, inp, body):
     try:
         # i2i/krea2 with an empty prompt → auto-describe the frame first (OpenRouter)
-        if inp["mode"] in ("i2i", "krea2", "krea2new") and not inp.get("prompt"):
+        if inp["mode"] in ("i2i", "krea2", "krea2new", "krea2hq") and not inp.get("prompt"):
             p = _describe_params(body, False)
             inp["prompt"] = describe_image(inp["image_b64"], p, p["model"])
 
@@ -1612,6 +1641,12 @@ def generate():
     elif mode == "krea2new":
         if target != "local":
             return jsonify({"error": "Krea I2I New mode runs on Local only."}), 400
+        fpath = os.path.join(FRAMES_DIR, body.get("session", ""), body.get("frame", ""))
+        if not os.path.exists(fpath):
+            return jsonify({"error": "Frame not found."}), 404
+    elif mode == "krea2hq":
+        if target != "local":
+            return jsonify({"error": "Krea2 High Quality mode runs on Local only."}), 400
         fpath = os.path.join(FRAMES_DIR, body.get("session", ""), body.get("frame", ""))
         if not os.path.exists(fpath):
             return jsonify({"error": "Frame not found."}), 404

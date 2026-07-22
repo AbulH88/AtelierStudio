@@ -81,6 +81,15 @@ KREA2 = {"load_image": "316", "positive": "314", "resize_size": "324",
 KREA2NEW = {"load_image": "32", "positive": "6", "latent": "10",
             "base_ksampler": "2", "char": "38"}
 
+# Krea2 I2I High Quality (workflow_krea2hq.json) — img2img like KREA2, but always
+# runs a fixed two-stage ClownsharKSampler_Beta pipeline (base pass denoise 0.8 ->
+# quality-refine pass denoise 0.27, both always on, no optional-refine toggle like
+# KREA2). Character LoRA sits in slot 1 of an rgthree "Power Lora Loader" node
+# alongside two fixed realism-helper LoRAs (technique LoRAs, not user-selectable —
+# same treatment as KREA2NEW's control-LoRA).
+KREA2HQ = {"load_image": "16", "positive": "5", "resize": "13",
+           "noise_aug": "14", "seed_gen": "2", "char": "11"}
+
 
 def _bypass_node(graph, nid, in_key="image"):
     """Bypass an image->image node: rewire every consumer of its output to its image
@@ -240,6 +249,22 @@ def _set_lora(graph, nid, path, strength):
         n["strength_model"] = 0.0
 
 
+def _set_power_lora_slot(graph, nid, slot, path, strength):
+    """Set one slot of an rgthree 'Power Lora Loader' node — a nested
+    {"on","lora","strength"} dict per slot key (lora_1, lora_2, ...), unlike the
+    flat lora_name/strength_model of LoraLoaderModelOnly or the lora_0N/strength_0N
+    pairs of the 'Lora Loader Stack' node. Empty path -> slot toggled off."""
+    key = f"lora_{slot}"
+    n = dict(graph[nid]["inputs"].get(key) or {})
+    if path:
+        n["on"] = True
+        n["lora"] = path
+        n["strength"] = float(strength)
+    else:
+        n["on"] = False
+    graph[nid]["inputs"][key] = n
+
+
 def _apply_lightning(graph, node_id, lt):
     """Override the (otherwise locked) Lightning lightx2v node from the UI — a
     {"path","strength"} dict. If nothing is sent, the workflow JSON default
@@ -373,6 +398,27 @@ def _build_krea2new(graph, inp, seed, frame_name):
     graph[nm["base_ksampler"]]["inputs"]["seed"] = seed
     _set_lora(graph, nm["char"], inp.get("character_lora_path"),
               inp.get("character_strength", 1.0))
+    _apply_sampler_override(graph, inp)
+    return graph
+
+
+def _build_krea2hq(graph, inp, seed, frame_name):
+    """Krea2 I2I High Quality: resize+noise-augment the source image, VAEEncode it,
+    then always run BOTH ClownsharKSampler_Beta stages (base denoise 0.8 -> quality
+    refine denoise 0.27) — unlike KREA2's optional refine pass, this mode has no
+    toggle, the second stage is the point of "High Quality". Single SaveImage of
+    the refined result. Resolution comes from the app's resolution-preset picker
+    (plain width/height ints, same convention as _build_t2i/_build_krea2new) —
+    the source workflow's in-graph resolution-preset dropdown node was dropped."""
+    nm = KREA2HQ
+    graph[nm["load_image"]]["inputs"]["image"] = frame_name
+    graph[nm["resize"]]["inputs"]["width"] = int(inp.get("width", 1080))
+    graph[nm["resize"]]["inputs"]["height"] = int(inp.get("height", 1920))
+    graph[nm["noise_aug"]]["inputs"]["seed"] = seed
+    graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
+    graph[nm["seed_gen"]]["inputs"]["seed"] = seed
+    _set_power_lora_slot(graph, nm["char"], 1, inp.get("character_lora_path"),
+                         inp.get("character_strength", 1.0))
     _apply_sampler_override(graph, inp)
     return graph
 
@@ -536,7 +582,7 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
         return {"images": images, "seed": seed}
 
     frame_name = None
-    if mode in ("i2i", "krea2", "krea2new"):
+    if mode in ("i2i", "krea2", "krea2new", "krea2hq"):
         frame_name = upload_image(base, base64.b64decode(inp["image_b64"]))
 
     images, done = [], 0
@@ -552,6 +598,8 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
             graph = _build_krea2(graph, sub, cseed, frame_name)
         elif mode == "krea2new":
             graph = _build_krea2new(graph, sub, cseed, frame_name)
+        elif mode == "krea2hq":
+            graph = _build_krea2hq(graph, sub, cseed, frame_name)
         else:
             graph = _build_t2i(graph, sub, cseed)
         images += run(base, graph, client_id=client_id)
