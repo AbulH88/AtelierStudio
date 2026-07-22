@@ -1025,6 +1025,11 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <div class="lab">Denoise · base <input type="number" class="numin" id="krea2hqDnVal" min="0" max="1" step="0.01" value="0.8"></div>
         <input type="range" id="krea2hqDn" min="0" max="1" step="0.01" value="0.8">
       </div>
+      <div class="field hide" id="krea2hqLoraField">
+        <div class="lab" style="display:flex;align-items:center">Helper LoRAs <span class="num" style="font-size:10px;color:var(--faint)">toggle on/off</span><span id="krea2hqRefreshLoras" title="Re-scan Krea2 helper LoRAs" style="margin-left:auto;font-size:11px;color:#a78bfa;cursor:pointer">↻ refresh</span></div>
+        <div id="krea2hqHelpers"></div>
+        <button class="go ghost" id="krea2hqAddLora" type="button" style="width:100%;margin-top:10px;font-size:13px;padding:9px">+ Add helper LoRA</button>
+      </div>
       <!-- Sampler Override (all modes) -->
       <div style="margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);
         font-family:var(--serif);font-style:italic;font-size:14px;color:var(--amber)">⚙ Override Sampler</div>
@@ -1768,6 +1773,7 @@ function setMode(m){
   // Krea2 HQ exposes only the BASE (1st) sampler's denoise; the refine (2nd)
   // sampler stays static (fixed at the workflow default).
   $('#krea2hqDenoiseField').classList.toggle('hide',m!=='krea2hq');
+  $('#krea2hqLoraField').classList.toggle('hide',m!=='krea2hq');
   // Lightning + the helper-LoRA / lightning controls are image-only, and krea2/
   // krea2new/krea2hq have no Lightning node at all (single character LoRA only)
   $$('.imgonly').forEach(el=>el.classList.toggle('hide', m==='video'));
@@ -2044,6 +2050,12 @@ async function loadConfig(){
     ).join('')}</optgroup>`).join('');
   $('#resPreset').onchange=()=>{ const o=$('#resPreset').selectedOptions[0];
     if(o) S.aspect={key:o.dataset.key,width:+o.dataset.w,height:+o.dataset.h}; };
+  // Krea2 HQ helper LoRAs — dropdown options + the on-by-default rows (both baked-in
+  // realism helpers, toggle-able off / retunable / extendable from the UI)
+  KREA2_HELPER_OPTIONS_HTML='<option value="">— select a LoRA —</option>'+
+    (c.krea2_helpers||[]).map(it=>`<option value="${it.path}">${it.label}</option>`).join('');
+  $('#krea2hqHelpers').innerHTML='';
+  (c.krea2hq_default_helpers||[]).forEach(h=>addKrea2Helper(h.path,h.strength,true));
   // Lightning lightx2v — editable dropdown + strength, defaults per mode
   S.lightning = c.lightning || {options:[], defaults:{}};
   $('#lightningPick').innerHTML = (S.lightning.options||[])
@@ -2069,6 +2081,7 @@ function applyLightningDefault(mode){
 // ===== Helper LoRAs (short curated list; selection remembered between visits) =====
 let LORA_OPTIONS_HTML = '<option value="">— select a LoRA —</option>';
 const HELPERS_KEY = 'atelier_helper_loras';
+let KREA2_HELPER_OPTIONS_HTML = '<option value="">— select a LoRA —</option>';
 
 function saveHelperLoras(){
   const slots = $$('#extraLoras .tog').map(r=>({
@@ -2125,6 +2138,24 @@ function addLoraInto(container, path='', strength=0.6){
 $('#advAddHigh').onclick=()=>addLoraInto($('#advLorasHigh'));
 $('#advAddLow').onclick=()=>addLoraInto($('#advLorasLow'));
 
+// Krea2 HQ helper LoRAs — each row is on/off switch + Krea2 LoRA dropdown + strength.
+// Options come from /api/config (krea2_helpers), separate from the wan/ LoRA list.
+function addKrea2Helper(path='', strength=0.6, on=true){
+  const row=document.createElement('div'); row.className='tog krea2hq-helper';
+  row.style.cssText='align-items:center;gap:9px;padding:8px 0';
+  row.innerHTML=`<div class="sw${on?' on':''}" data-role="hsw" title="on/off"></div>
+    <div class="sel" style="flex:1;min-width:0"><select class="lora-pick" style="padding:7px 26px 7px 10px;font-size:12px;border-radius:8px;width:100%">${KREA2_HELPER_OPTIONS_HTML}</select></div>
+    <input type="number" class="lora-str" value="${strength}" step="0.05" min="0" max="2" style="width:50px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:5px 4px;font-family:var(--mono);font-size:12px;text-align:center">
+    <button class="lora-rm" type="button" title="remove" style="flex:none;background:rgba(217,139,122,.1);border:1px solid rgba(217,139,122,.3);color:var(--rose);width:28px;height:28px;border-radius:8px;cursor:pointer">✕</button>`;
+  $('#krea2hqHelpers').appendChild(row);
+  if(path) row.querySelector('.lora-pick').value=path;
+  const sw=row.querySelector('[data-role=hsw]');
+  sw.onclick=()=>sw.classList.toggle('on');
+  row.querySelector('.lora-rm').onclick=()=>row.remove();
+}
+$('#krea2hqAddLora').onclick=()=>addKrea2Helper('',0.6,true);
+$('#krea2hqRefreshLoras') && ($('#krea2hqRefreshLoras').onclick=()=>refreshKrea2Helpers($('#krea2hqRefreshLoras')));
+
 // Re-fetch the LoRA list and refresh every dropdown in place (preserving each
 // current selection), without reloading the page. Use after copying a file into
 // the My LoRAs folder. /api/loras reads ComfyUI live, which re-scans the folder.
@@ -2138,12 +2169,27 @@ async function refreshLoras(el){
         `<optgroup label="${g.label}">` +
         g.items.map(it => `<option value="${it.path}">${it.label}</option>`).join('') +
         `</optgroup>`).join('');
-    document.querySelectorAll('select.lora-pick').forEach(sel=>{ const v=sel.value; sel.innerHTML=LORA_OPTIONS_HTML; sel.value=v; });
+    // krea2hq helper rows use a different option set (krea2_helpers), skip them here
+    document.querySelectorAll('#extraLoras select.lora-pick, #advLorasHigh select.lora-pick, #advLorasLow select.lora-pick').forEach(sel=>{ const v=sel.value; sel.innerHTML=LORA_OPTIONS_HTML; sel.value=v; });
   }catch(e){ console.error('refresh loras failed', e); }
   if(el){ el.textContent=prev||'↻ refresh'; el.style.pointerEvents=''; }
 }
 $('#t2iRefreshLoras') && ($('#t2iRefreshLoras').onclick=()=>refreshLoras($('#t2iRefreshLoras')));
 $('#advRefreshLoras') && ($('#advRefreshLoras').onclick=()=>refreshLoras($('#advRefreshLoras')));
+
+// Krea2 HQ helper LoRAs get their own refresh (options come from /api/config, not
+// /api/loras), preserving each row's current selection + on/off state.
+async function refreshKrea2Helpers(el){
+  const prev=el?el.textContent:null;
+  if(el){ el.textContent='↻ …'; el.style.pointerEvents='none'; }
+  try{
+    const c=await(await fetch('/api/config?t='+Date.now())).json();
+    KREA2_HELPER_OPTIONS_HTML='<option value="">— select a LoRA —</option>'+
+      (c.krea2_helpers||[]).map(it=>`<option value="${it.path}">${it.label}</option>`).join('');
+    document.querySelectorAll('#krea2hqHelpers select.lora-pick').forEach(sel=>{ const v=sel.value; sel.innerHTML=KREA2_HELPER_OPTIONS_HTML; sel.value=v; });
+  }catch(e){ console.error('refresh krea2 helpers failed', e); }
+  if(el){ el.textContent=prev||'↻ refresh'; el.style.pointerEvents=''; }
+}
 // pre-populate the groups with the workflow's baked helper LoRAs (low-noise = Lenovo @0.6;
 // high-noise had none). Matches node 287 slot3 of the INSTARAW workflow.
 let _advLoraInit=false;
@@ -2691,6 +2737,11 @@ $('#go').onclick=async()=>{
     body.frame=S.frame;
     body.prompt=$('#i2iPrompt').value.trim();
     body.denoise=+$('#krea2hqDnVal').value||0.8;   // base (1st) sampler only; refine stays static
+    // only rows toggled ON with a selected LoRA; empty array = both helpers off
+    body.helper_loras=$$('#krea2hqHelpers .tog')
+      .filter(r=>r.querySelector('[data-role=hsw]').classList.contains('on'))
+      .map(r=>({path:r.querySelector('.lora-pick').value,strength:+r.querySelector('.lora-str').value}))
+      .filter(l=>l.path);
   }
   else if(S.mode==='video'){
     try{

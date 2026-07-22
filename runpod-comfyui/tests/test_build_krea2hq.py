@@ -67,8 +67,42 @@ def test_build_krea2hq_no_character_turns_off_slot():
     assert out["11"]["inputs"]["lora_1"]["on"] is False
 
 
-def test_build_krea2hq_leaves_helper_lora_slots_untouched():
+def test_build_krea2hq_leaves_helper_lora_slots_untouched_when_no_list_sent():
+    # No "helper_loras" key -> the workflow file's baked-in helpers stay on.
     graph = _load_graph()
     out = cc._build_krea2hq(graph, {"prompt": "x"}, seed=1, frame_name="f.png")
     assert out["11"]["inputs"]["lora_2"]["on"] is True
     assert out["11"]["inputs"]["lora_3"]["on"] is True
+
+
+def test_build_krea2hq_applies_explicit_helper_list():
+    graph = _load_graph()
+    inp = {"prompt": "x", "helper_loras": [
+        {"path": "Keara2/mix/RealisomHelper/RealisticSnapshotKrea2.safetensors", "strength": 0.5}]}
+    out = cc._build_krea2hq(graph, inp, seed=1, frame_name="f.png")
+    assert out["11"]["inputs"]["lora_2"]["on"] is True
+    assert out["11"]["inputs"]["lora_2"]["lora"] == inp["helper_loras"][0]["path"]
+    assert out["11"]["inputs"]["lora_2"]["strength"] == 0.5
+    # slot 3 existed in the file but wasn't refilled -> turned off
+    assert out["11"]["inputs"]["lora_3"]["on"] is False
+    # character (slot 1) is still wired independently
+    assert out["11"]["inputs"]["lora_1"]["on"] is False   # no character_lora_path given
+
+
+def test_build_krea2hq_empty_helper_list_turns_all_helpers_off():
+    graph = _load_graph()
+    out = cc._build_krea2hq(graph, {"prompt": "x", "helper_loras": []}, seed=1, frame_name="f.png")
+    assert out["11"]["inputs"]["lora_2"]["on"] is False
+    assert out["11"]["inputs"]["lora_3"]["on"] is False
+
+
+def test_build_krea2hq_helpers_coexist_with_character():
+    graph = _load_graph()
+    inp = {"prompt": "x", "character_lora_path": "Keara2/krea2_cristiana/Cristina-2600.safetensors",
+           "character_strength": 1.0,
+           "helper_loras": [{"path": "Keara2/mix/RealisomHelper/realism_engine_krea2_v3.1.safetensors",
+                             "strength": 0.6}]}
+    out = cc._build_krea2hq(graph, inp, seed=1, frame_name="f.png")
+    assert out["11"]["inputs"]["lora_1"]["lora"] == inp["character_lora_path"]
+    assert out["11"]["inputs"]["lora_1"]["on"] is True
+    assert out["11"]["inputs"]["lora_2"]["lora"] == inp["helper_loras"][0]["path"]

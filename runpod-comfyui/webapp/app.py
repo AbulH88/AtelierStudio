@@ -472,6 +472,53 @@ def build_krea2_characters():
     return []
 
 
+# The realism/technique "helper" LoRAs baked into the krea2hq Power Lora Loader
+# (slots 2/3 of node 11). These are the on-by-default set; the UI can toggle them
+# off, retune strength, or add more from build_krea2_helper_loras(). Paths are the
+# forward-slash form ComfyUI accepts on the local Windows install.
+KREA2HQ_DEFAULT_HELPERS = [
+    {"path": "Keara2/mix/RealisomHelper/RealisticSnapshotKrea2.safetensors", "strength": 0.6},
+    {"path": "Keara2/mix/RealisomHelper/realism_engine_krea2_v3.1.safetensors", "strength": 0.6},
+]
+
+
+def build_krea2_helper_loras():
+    """Krea2 helper (non-identity) LoRAs available to the krea2hq picker — every
+    .safetensors under the Keara2 'mix' area (live ComfyUI list, filesystem fallback
+    at home, cached last resort). The fixed defaults are always included so the
+    picker is never empty even when the scan can't reach the models."""
+    items = []
+    try:
+        items = [l.replace("\\", "/") for l in _comfy_loras()
+                 if l.replace("\\", "/").lower().startswith("keara2/")
+                 and "/mix/" in l.replace("\\", "/").lower()]
+    except Exception:
+        items = []
+    if not items:
+        base = os.path.join(LORAS_DIR, "Keara2", "mix")
+        if os.path.isdir(base):
+            for root, _, files in os.walk(base):
+                for fn in files:
+                    if fn.lower().endswith(".safetensors"):
+                        full = os.path.join(root, fn)
+                        items.append(os.path.relpath(full, LORAS_DIR).replace("\\", "/"))
+    cache = os.path.join(HERE, ".krea2_helpers.json")
+    if items:
+        try:
+            _json.dump(sorted(set(items)), open(cache, "w", encoding="utf-8"))
+        except Exception:
+            pass
+    elif os.path.exists(cache):
+        try:
+            items = _json.load(open(cache, encoding="utf-8"))
+        except Exception:
+            items = []
+    for d in KREA2HQ_DEFAULT_HELPERS:      # always selectable, even if the scan missed them
+        items.append(d["path"])
+    items = sorted(set(items))
+    return [{"path": p, "label": os.path.splitext(p.split("/")[-1])[0]} for p in items]
+
+
 # Curated helper LoRAs for the "Add LoRA" picker. The full wan/ folder is 125+
 # LoRAs (a mess to scroll) and most won't exist on the RunPod volume — so the
 # picker only offers this short, hand-picked set of LOW-noise realism/style
@@ -690,6 +737,8 @@ def config():
                     "cloud_characters": build_cloud_characters(),
                     "krea2_characters": build_krea2_characters(), "aspects": ASPECTS,
                     "res_presets": RES_PRESETS,
+                    "krea2_helpers": build_krea2_helper_loras(),
+                    "krea2hq_default_helpers": KREA2HQ_DEFAULT_HELPERS,
                     "lightning": {"options": _folder_loras("WanLightning", ".lightning_loras.json"),
                                   "defaults": LIGHTNING_DEFAULTS}})
 
@@ -1154,6 +1203,9 @@ def _build_input(body):
         with open(fpath, "rb") as f:
             inp["image_b64"] = base64.b64encode(f.read()).decode()
         inp["denoise"] = float(body.get("denoise", 0.8))   # base sampler only; refine is static
+        if "helper_loras" in body:   # only override the baked-in helper slots when the UI sent a list
+            inp["helper_loras"] = [{"path": l.get("path", ""), "strength": float(l.get("strength", 0.6))}
+                                   for l in body.get("helper_loras", []) if l.get("path")]
     elif inp["mode"] == "video":   # Wan Animate: driving video + ref photo
         inp["video_b64"] = body.get("video_b64", "")
         inp["video_filename"] = body.get("video_filename", "driving.mp4")

@@ -268,6 +268,29 @@ def _set_power_lora_slot(graph, nid, slot, path, strength):
     graph[nid]["inputs"][key] = n
 
 
+def _apply_power_loras(graph, nid, char_path, char_strength, helpers):
+    """Fill an rgthree 'Power Lora Loader' node: slot 1 = the character LoRA, slots
+    2..N = user-chosen helper LoRAs (each {"path","strength"}, empty paths skipped).
+    Any helper slots that already existed in the workflow file but aren't refilled
+    are toggled off — so unchecking a baked-in helper in the UI actually disables it."""
+    inputs = graph[nid]["inputs"]
+    existing = [int(k.split("_", 1)[1]) for k in inputs
+                if k.startswith("lora_") and k.split("_", 1)[1].isdigit()]
+    _set_power_lora_slot(graph, nid, 1, char_path, char_strength)
+    used = {1}
+    slot = 2
+    for h in helpers or []:
+        p = (h.get("path") or "").strip()
+        if not p:
+            continue
+        _set_power_lora_slot(graph, nid, slot, p, h.get("strength", 0.6))
+        used.add(slot)
+        slot += 1
+    for idx in existing:
+        if idx not in used:
+            _set_power_lora_slot(graph, nid, idx, None, 0)
+
+
 def _apply_lightning(graph, node_id, lt):
     """Override the (otherwise locked) Lightning lightx2v node from the UI — a
     {"path","strength"} dict. If nothing is sent, the workflow JSON default
@@ -423,8 +446,15 @@ def _build_krea2hq(graph, inp, seed, frame_name):
     graph[nm["seed_gen"]]["inputs"]["seed"] = seed
     # Only the base (1st) pass denoise is user-facing; the refine pass stays static.
     graph[nm["base_ksampler"]]["inputs"]["denoise"] = float(inp.get("denoise", 0.8))
-    _set_power_lora_slot(graph, nm["char"], 1, inp.get("character_lora_path"),
-                         inp.get("character_strength", 1.0))
+    # Character LoRA + helper LoRAs share one Power Lora Loader. When the UI sends an
+    # explicit helper list, apply it (toggling off any unchecked baked-in helpers);
+    # otherwise leave the workflow file's helper slots as-is and only set slot 1.
+    if "helper_loras" in inp:
+        _apply_power_loras(graph, nm["char"], inp.get("character_lora_path"),
+                           inp.get("character_strength", 1.0), inp["helper_loras"])
+    else:
+        _set_power_lora_slot(graph, nm["char"], 1, inp.get("character_lora_path"),
+                             inp.get("character_strength", 1.0))
     _apply_sampler_override(graph, inp)
     return graph
 
