@@ -1153,6 +1153,7 @@ def _build_input(body):
         fpath = os.path.join(FRAMES_DIR, session, frame_name)
         with open(fpath, "rb") as f:
             inp["image_b64"] = base64.b64encode(f.read()).decode()
+        inp["denoise"] = float(body.get("denoise", 0.8))   # base sampler only; refine is static
     elif inp["mode"] == "video":   # Wan Animate: driving video + ref photo
         inp["video_b64"] = body.get("video_b64", "")
         inp["video_filename"] = body.get("video_filename", "driving.mp4")

@@ -1021,6 +1021,10 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <div class="lab">Denoise · refine <input type="number" class="numin" id="krea2Dn2Val" min="0" max="1" step="0.01" value="0.1"></div>
         <input type="range" id="krea2Dn2" min="0" max="1" step="0.01" value="0.1">
       </div>
+      <div class="field hide" id="krea2hqDenoiseField">
+        <div class="lab">Denoise · base <input type="number" class="numin" id="krea2hqDnVal" min="0" max="1" step="0.01" value="0.8"></div>
+        <input type="range" id="krea2hqDn" min="0" max="1" step="0.01" value="0.8">
+      </div>
       <!-- Sampler Override (all modes) -->
       <div style="margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);
         font-family:var(--serif);font-style:italic;font-size:14px;color:var(--amber)">⚙ Override Sampler</div>
@@ -1724,7 +1728,7 @@ function setRange(el){el.style.setProperty('--p',((el.value-el.min)/(el.max-el.m
 // each slider is paired with an editable number box (type exact values, even
 // beyond the slider's range — the typed box is the source of truth on generate)
 const PAIRS=[['#cstrength','#csVal',2],['#denoise','#dnVal',2],['#steps','#stVal',0],['#ovCfg','#ovCfgVal',1],
-  ['#krea2Dn1','#krea2Dn1Val',2],['#krea2Dn2','#krea2Dn2Val',2]];
+  ['#krea2Dn1','#krea2Dn1Val',2],['#krea2Dn2','#krea2Dn2Val',2],['#krea2hqDn','#krea2hqDnVal',2]];
 PAIRS.forEach(([r,n,dec])=>{const R=$(r),N=$(n);
   R.oninput=()=>{N.value=dec?(+R.value).toFixed(dec):R.value;setRange(R);};
   N.oninput=()=>{const v=+N.value;if(!isNaN(v)){R.value=v;setRange(R);}};
@@ -1761,8 +1765,20 @@ function setMode(m){
   $('#krea2Denoise1Field').classList.toggle('hide',m!=='krea2');
   $('#krea2RefineField').classList.toggle('hide',m!=='krea2');
   $('#krea2Denoise2Field').classList.toggle('hide',m!=='krea2'||!$('#krea2RefineSw').classList.contains('on'));
-  // Krea2 HQ uses its own resolution-preset dropdown instead of the generic
-  // aspect-ratio picker (different, wider set of named presets)
+  // Krea2 HQ exposes only the BASE (1st) sampler's denoise; the refine (2nd)
+  // sampler stays static (fixed at the workflow default).
+  $('#krea2hqDenoiseField').classList.toggle('hide',m!=='krea2hq');
+  // Lightning + the helper-LoRA / lightning controls are image-only, and krea2/
+  // krea2new/krea2hq have no Lightning node at all (single character LoRA only)
+  $$('.imgonly').forEach(el=>el.classList.toggle('hide', m==='video'));
+  $$('.stdlora').forEach(el=>el.classList.toggle('hide', m==='adv'||m==='krea2'||m==='krea2new'||m==='krea2hq'));
+  $$('.advlora').forEach(el=>el.classList.toggle('hide', m!=='adv'));   // two LoRA groups shown only in adv
+  // adv has its own aspect + describe in the studio -> hide the rail's (keep Trigger Word)
+  $$('.advhide').forEach(el=>el.classList.toggle('hide', m==='adv'));
+  ['visionModelField','stylePresetField','bodyTypeField','shotTypeField','detailField','explicitField','clothingNoteField','customInstrField'].forEach(id=>{ const el=$('#'+id); if(el)el.classList.toggle('hide', m==='adv'); });
+  // Krea2 HQ swaps the generic aspect-ratio picker for its own resolution-preset
+  // dropdown. This runs AFTER the .imgonly/.advhide loops on purpose — #aspectField
+  // carries both classes, so those loops would otherwise re-show it for krea2hq.
   $('#aspectField').classList.toggle('hide', m==='krea2hq');
   $('#resPresetField').classList.toggle('hide', m!=='krea2hq');
   if(m==='krea2hq'){
@@ -1774,14 +1790,6 @@ function setMode(m){
       ? {key:'custom',width:+$('#cw').value,height:+$('#ch').value}
       : {key:b.dataset.key,width:+b.dataset.w,height:+b.dataset.h};
   }
-  // Lightning + the helper-LoRA / lightning controls are image-only, and krea2/
-  // krea2new/krea2hq have no Lightning node at all (single character LoRA only)
-  $$('.imgonly').forEach(el=>el.classList.toggle('hide', m==='video'));
-  $$('.stdlora').forEach(el=>el.classList.toggle('hide', m==='adv'||m==='krea2'||m==='krea2new'||m==='krea2hq'));
-  $$('.advlora').forEach(el=>el.classList.toggle('hide', m!=='adv'));   // two LoRA groups shown only in adv
-  // adv has its own aspect + describe in the studio -> hide the rail's (keep Trigger Word)
-  $$('.advhide').forEach(el=>el.classList.toggle('hide', m==='adv'));
-  ['visionModelField','stylePresetField','bodyTypeField','shotTypeField','detailField','explicitField','clothingNoteField','customInstrField'].forEach(id=>{ const el=$('#'+id); if(el)el.classList.toggle('hide', m==='adv'); });
   applyLightningDefault(m);
   applyCharList();
   refreshGo();
@@ -2682,6 +2690,7 @@ $('#go').onclick=async()=>{
     body.session=S.session;
     body.frame=S.frame;
     body.prompt=$('#i2iPrompt').value.trim();
+    body.denoise=+$('#krea2hqDnVal').value||0.8;   // base (1st) sampler only; refine stays static
   }
   else if(S.mode==='video'){
     try{

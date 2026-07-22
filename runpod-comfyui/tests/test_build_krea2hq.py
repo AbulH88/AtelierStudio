@@ -30,6 +30,20 @@ def test_build_krea2hq_sets_image_prompt_seed_lora_size():
     assert out["13"]["inputs"]["height"] == 1536
 
 
+def test_build_krea2hq_sets_base_denoise_only_refine_static():
+    graph = _load_graph()
+    refine_before = graph["1"]["inputs"]["denoise"]
+    out = cc._build_krea2hq(graph, {"prompt": "x", "denoise": 0.55}, seed=1, frame_name="f.png")
+    assert out["4"]["inputs"]["denoise"] == 0.55            # base (1st) pass — user-facing
+    assert out["1"]["inputs"]["denoise"] == refine_before   # refine (2nd) pass — untouched/static
+
+
+def test_build_krea2hq_base_denoise_defaults_to_0_8():
+    graph = _load_graph()
+    out = cc._build_krea2hq(graph, {"prompt": "x"}, seed=1, frame_name="f.png")
+    assert out["4"]["inputs"]["denoise"] == 0.8
+
+
 def test_build_krea2hq_size_defaults_to_1080x1920():
     graph = _load_graph()
     out = cc._build_krea2hq(graph, {"prompt": "x"}, seed=1, frame_name="f.png")

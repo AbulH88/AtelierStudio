@@ -87,8 +87,11 @@ KREA2NEW = {"load_image": "32", "positive": "6", "latent": "10",
 # KREA2). Character LoRA sits in slot 1 of an rgthree "Power Lora Loader" node
 # alongside two fixed realism-helper LoRAs (technique LoRAs, not user-selectable —
 # same treatment as KREA2NEW's control-LoRA).
+# base_ksampler (4) is the FIRST-executed ClownsharKSampler pass (denoise from the
+# VAEEncoded source — the img2img strength knob, exposed to the UI). The refine pass
+# (node 1, denoise 0.27) is left static as a fixed quality polish.
 KREA2HQ = {"load_image": "16", "positive": "5", "resize": "13",
-           "noise_aug": "14", "seed_gen": "2", "char": "11"}
+           "noise_aug": "14", "seed_gen": "2", "char": "11", "base_ksampler": "4"}
 
 
 def _bypass_node(graph, nid, in_key="image"):
@@ -404,10 +407,11 @@ def _build_krea2new(graph, inp, seed, frame_name):
 
 def _build_krea2hq(graph, inp, seed, frame_name):
     """Krea2 I2I High Quality: resize+noise-augment the source image, VAEEncode it,
-    then always run BOTH ClownsharKSampler_Beta stages (base denoise 0.8 -> quality
-    refine denoise 0.27) — unlike KREA2's optional refine pass, this mode has no
-    toggle, the second stage is the point of "High Quality". Single SaveImage of
-    the refined result. Resolution comes from the app's resolution-preset picker
+    then always run BOTH ClownsharKSampler_Beta stages (base pass -> quality-refine
+    pass) — unlike KREA2's optional refine pass, this mode has no toggle, the second
+    stage is the point of "High Quality". Only the base pass denoise is user-facing
+    (the img2img strength knob, default 0.8); the refine pass denoise stays static.
+    Single SaveImage of the refined result. Resolution comes from the app's res-preset picker
     (plain width/height ints, same convention as _build_t2i/_build_krea2new) —
     the source workflow's in-graph resolution-preset dropdown node was dropped."""
     nm = KREA2HQ
@@ -417,6 +421,8 @@ def _build_krea2hq(graph, inp, seed, frame_name):
     graph[nm["noise_aug"]]["inputs"]["seed"] = seed
     graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
     graph[nm["seed_gen"]]["inputs"]["seed"] = seed
+    # Only the base (1st) pass denoise is user-facing; the refine pass stays static.
+    graph[nm["base_ksampler"]]["inputs"]["denoise"] = float(inp.get("denoise", 0.8))
     _set_power_lora_slot(graph, nm["char"], 1, inp.get("character_lora_path"),
                          inp.get("character_strength", 1.0))
     _apply_sampler_override(graph, inp)
