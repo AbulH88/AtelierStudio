@@ -707,7 +707,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <button id="mMotion" data-mode="video"><span class="k">m</span>Wan 2.2 Animate (Wow)</button>
     <button id="mAdv" data-mode="adv"><span class="k">a</span>⚡ Instaraw Advance</button>
     <button id="mKrea2" data-mode="krea2"><span class="k">k</span>Krea2 Image to Image</button>
-    <button id="mKreaNew" data-mode="krea2new"><span class="k">n</span>Krea2 Image to Image new</button>
+    <button id="mKreaNew" data-mode="krea2new" class="hide"><span class="k">n</span>Krea2 Image to Image new</button>
     <button id="mKreaHQ" data-mode="krea2hq"><span class="k">h</span>Krea2 Image to Image High Quality</button>
   </div>
   <p id="cloudNoModes" class="hide" style="margin:10px 2px 0;font-size:12.5px;color:var(--faint)">All generation modes now run on <b>Local</b> (the home 5090). Cloud only shows endpoint status — switch to Local to generate.</p>
@@ -1736,7 +1736,9 @@ function onTargetChange(){
   // mode). So all mode buttons are hidden on Cloud — the Cloud target only surfaces
   // the endpoint status/GPU card. Modes reappear on Local.
   const cloudOnly = isCloud();
-  ['#mVid','#mTxt','#mAdv','#mKrea2','#mKreaNew','#mKreaHQ','#mMotion']
+  // #mKreaNew (depth-ControlNet) is disabled for now — left out so it stays hidden
+  // in every target (its backend/workflow code is kept intact for easy re-enable).
+  ['#mVid','#mTxt','#mAdv','#mKrea2','#mKreaHQ','#mMotion']
     .forEach(sel=>$(sel).classList.toggle('hide', cloudOnly));
   $('#cloudNoModes') && $('#cloudNoModes').classList.toggle('hide', !cloudOnly);
   if(typeof applyCharList==='function') applyCharList();   // cloud vs local character list
