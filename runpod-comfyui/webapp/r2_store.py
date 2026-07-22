@@ -17,6 +17,14 @@ PROXY_SECRET = os.environ.get("R2_PROXY_SECRET", "")
 H = {"x-auth": PROXY_SECRET}
 BUCKET = "reels"  # for the /api/reels/config display
 
+# A fresh `requests.get/put()` call opens a brand-new TLS connection every time —
+# measured ~1s of pure handshake overhead per call to the Worker, vs ~100ms with
+# keep-alive. Every function below reuses this one Session so connections to the
+# Worker's host are pooled: the very first call still pays the handshake, every
+# call after it on the same process is fast. This matters a lot here — a single
+# Gallery grid load fires off one stream() per thumbnail.
+_SESSION = requests.Session()
+
 
 def configured():
     return bool(PROXY_URL and PROXY_SECRET)
@@ -31,7 +39,7 @@ def _k(key):
 
 
 def list_folders():
-    r = requests.get(f"{PROXY_URL}/?list&delimiter=/", headers=H, timeout=30)
+    r = _SESSION.get(f"{PROXY_URL}/?list&delimiter=/", headers=H, timeout=30)
     r.raise_for_status()
     return sorted(p.rstrip("/") for p in r.json().get("prefixes", []))
 
@@ -39,12 +47,12 @@ def list_folders():
 def create_folder(name):
     name = name.strip().strip("/")
     if name:
-        requests.put(f"{PROXY_URL}/{_k(name)}/.keep", headers=H, data=b"", timeout=30).raise_for_status()
+        _SESSION.put(f"{PROXY_URL}/{_k(name)}/.keep", headers=H, data=b"", timeout=30).raise_for_status()
 
 
 def list_reels(folder):
     prefix = f"{folder.strip('/')}/" if folder else ""
-    r = requests.get(f"{PROXY_URL}/?list&prefix={quote(prefix, safe='/')}", headers=H, timeout=30)
+    r = _SESSION.get(f"{PROXY_URL}/?list&prefix={quote(prefix, safe='/')}", headers=H, timeout=30)
     r.raise_for_status()
     items = []
     for o in r.json().get("objects", []):
@@ -59,16 +67,16 @@ def list_reels(folder):
 
 def upload(local_path, key):
     with open(local_path, "rb") as f:
-        requests.put(f"{PROXY_URL}/{_k(key)}", headers=H, data=f, timeout=900).raise_for_status()
+        _SESSION.put(f"{PROXY_URL}/{_k(key)}", headers=H, data=f, timeout=900).raise_for_status()
 
 
 def upload_bytes(key, data):
-    requests.put(f"{PROXY_URL}/{_k(key)}", headers=H, data=data, timeout=300).raise_for_status()
+    _SESSION.put(f"{PROXY_URL}/{_k(key)}", headers=H, data=data, timeout=300).raise_for_status()
 
 
 def list_dirs(prefix):
     """Sub-'folders' (common prefixes) directly under `prefix`."""
-    r = requests.get(f"{PROXY_URL}/?list&prefix={quote(prefix, safe='/')}&delimiter=/",
+    r = _SESSION.get(f"{PROXY_URL}/?list&prefix={quote(prefix, safe='/')}&delimiter=/",
                      headers=H, timeout=30)
     r.raise_for_status()
     return sorted(p.rstrip("/").split("/")[-1] for p in r.json().get("prefixes", []))
@@ -76,7 +84,7 @@ def list_dirs(prefix):
 
 def list_objs(prefix, media_route="/api/media"):
     """Objects under `prefix` with a same-origin media URL."""
-    r = requests.get(f"{PROXY_URL}/?list&prefix={quote(prefix, safe='/')}", headers=H, timeout=30)
+    r = _SESSION.get(f"{PROXY_URL}/?list&prefix={quote(prefix, safe='/')}", headers=H, timeout=30)
     r.raise_for_status()
     out = []
     for o in r.json().get("objects", []):
@@ -90,7 +98,7 @@ def list_objs(prefix, media_route="/api/media"):
 
 
 def delete(key):
-    requests.delete(f"{PROXY_URL}/{_k(key)}", headers=H, timeout=30).raise_for_status()
+    _SESSION.delete(f"{PROXY_URL}/{_k(key)}", headers=H, timeout=30).raise_for_status()
 
 
 def delete_folder(folder):
@@ -99,7 +107,7 @@ def delete_folder(folder):
     if not folder:
         return
     prefix = f"{folder}/"
-    r = requests.get(f"{PROXY_URL}/?list&prefix={quote(prefix, safe='/')}", headers=H, timeout=30)
+    r = _SESSION.get(f"{PROXY_URL}/?list&prefix={quote(prefix, safe='/')}", headers=H, timeout=30)
     r.raise_for_status()
     for o in r.json().get("objects", []):
         delete(o["key"])
@@ -110,11 +118,11 @@ def stream(key, range_header=None):
     headers = dict(H)
     if range_header:
         headers["Range"] = range_header
-    return requests.get(f"{PROXY_URL}/{_k(key)}", headers=headers, stream=True, timeout=900)
+    return _SESSION.get(f"{PROXY_URL}/{_k(key)}", headers=headers, stream=True, timeout=900)
 
 
 def download_to(key, local_path):
-    with requests.get(f"{PROXY_URL}/{_k(key)}", headers=H, stream=True, timeout=900) as r:
+    with _SESSION.get(f"{PROXY_URL}/{_k(key)}", headers=H, stream=True, timeout=900) as r:
         r.raise_for_status()
         with open(local_path, "wb") as f:
             for chunk in r.iter_content(65536):
