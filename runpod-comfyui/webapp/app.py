@@ -1211,6 +1211,8 @@ def _build_input(body):
         inp["video_filename"] = body.get("video_filename", "driving.mp4")
         inp["ref_b64"] = body.get("ref_b64", "")
         inp["frame_cap"] = int(body.get("frame_cap", 81))
+        inp["fps"] = int(body.get("fps", 30))
+        inp["upscale"] = bool(body.get("upscale", False))   # RTX super-res + RIFE tail
     elif inp["mode"] == "adv":   # INSTARAW advanced (LOCAL only): t2i + image-guided i2i
         inp["img2img"] = bool(body.get("img2img", False))
         inp["aspect"] = body.get("aspect", "3:4 (Portrait)")
@@ -1641,21 +1643,26 @@ def _run_gen_job(job_id, target, inp, body):
 
         if not out or "error" in out:
             raise RuntimeError((out or {}).get("error", "No output from worker."))
-        if inp["mode"] == "video":                       # Wan Animate -> mp4
-            vids = out.get("videos", [])
-            url = None
-            try:                                          # persist to R2 (best-effort)
-                if vids:
-                    raw = _mux_audio(base64.b64decode(vids[0]), inp.get("video_b64"))
-                    vids = [base64.b64encode(raw).decode()]   # UI preview gets the audio version
-                    key = f"video_outputs/motion_{int(time.time())}.mp4"
+        if inp["mode"] == "video":                       # Wan Animate -> mp4(s)
+            # May be 1 (raw only) or 2 (raw + RTX-upscaled) videos. Carry the driving
+            # audio onto each, persist each to R2, hand the UI lightweight urls.
+            vids = out.get("videos", []) or []
+            urls, muxed = [], []
+            try:
+                ts = int(time.time())
+                for i, b64 in enumerate(vids):
+                    raw = _mux_audio(base64.b64decode(b64), inp.get("video_b64"))
+                    muxed.append(base64.b64encode(raw).decode())
+                    key = f"video_outputs/motion_{ts}_{i}.mp4"
                     r2_store.upload_bytes(key, raw)
-                    url = f"/api/media?key={key}"
+                    urls.append(f"/api/media?key={key}")
             except Exception:
-                pass
+                muxed, urls = vids, []          # R2/mux failed -> fall back to base64
             with GEN_JOBS_LOCK:
-                GEN_JOBS[job_id] = {"status": "done", "videos": vids,
-                                    "video_url": url, "seed": out.get("seed")}
+                GEN_JOBS[job_id] = {"status": "done", "videos": muxed,
+                                    "video_urls": urls,
+                                    "video_url": (urls[0] if urls else None),   # back-compat
+                                    "seed": out.get("seed")}
             return
         images = out.get("images", [])
         keys = _save_to_gallery(inp, images, out.get("seed"))   # -> R2, returns keys
@@ -1704,6 +1711,8 @@ def generate():
         if not os.path.exists(fpath):
             return jsonify({"error": "Frame not found."}), 404
     elif mode == "video":
+        if target != "local":   # heavy Wan2.2 Animate pipeline runs on the home GPU only
+            return jsonify({"error": "Motion mode runs on Local only."}), 400
         if not body.get("video_b64"):
             return jsonify({"error": "Upload a driving video."}), 400
         if not body.get("ref_b64"):

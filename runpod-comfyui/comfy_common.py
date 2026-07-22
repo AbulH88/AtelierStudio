@@ -42,11 +42,19 @@ I2I = {"load_image": "1", "positive": "5", "negative": "6", "char": "13",
 T2I = {"positive": "5", "negative": "6", "char": "12",
        "latent": "20", "ksampler": "30", "lora_after": "11"}
 
-# Wan Animate motion-transfer (workflow_video.json). Driving video + ref photo ->
-# animated character mp4. char LoRA is WanVideoLoraSelect (lora/strength, not the
-# image LoraLoaderModelOnly). Final mp4 is node 319 (save_output) under /history "gifs".
-VIDEO = {"load_video": "75", "ref_image": "515", "prompt": "549",
-         "char": "544", "sampler": "273", "output": "319"}
+# Wan 2.2 Animate "Wow" motion-transfer (workflow_video.json). Driving video + ref
+# photo -> animated character mp4. LOCAL ONLY (heavy custom-node pipeline: NLF/SDPose
+# pose detection, RTX Video Super-Res, RIFE interpolation, memory cleaners). Identity
+# comes from the reference image (CLIP-Vision + Animate Embeds); the character LoRA is
+# OPTIONAL, chained into the technique-LoRA multi-stack (276) via its prev_lora input
+# (same convention as the previous graph's node 544). Two saved outputs: 285 = raw
+# h264 animate, 369 = 2x RTX-upscaled + RIFE-interpolated final. `fps_int` (264) is the
+# force_rate the driving video is resampled to. `upscale_chain` nodes are dropped when
+# the UI upscale toggle is off (leaving only the raw 285 output).
+VIDEO = {"load_video": "275", "ref_image": "299", "prompt": "356",
+         "sampler": "222", "fps_int": "264", "lora_multi": "276",
+         "output_raw": "285", "output_final": "369"}
+VIDEO_UPSCALE_CHAIN = ["367", "368", "369", "371", "372", "373", "375"]
 
 # INSTARAW advanced (workflow_adv.json) — LOCAL ONLY. One graph does t2i + image-guided
 # "i2i" via the 576 toggle. Generation is ALWAYS txt2img on the empty latent (407); there
@@ -187,10 +195,31 @@ def _history_error(status):
     return "execution did not complete (no node output)" if status.get("status_str") == "error" else ""
 
 
+def _collect_node_videos(base, out, nid):
+    """Fetch every saved (non-temp) mp4/webm/mov a VHS_VideoCombine node produced,
+    as base64. Pose previews (save_output=false) land as type 'temp' — skip them."""
+    vids = []
+    for g in out.get(nid, {}).get("gifs", []):
+        fn = str(g.get("filename", "")).lower()
+        if not fn.endswith((".mp4", ".webm", ".mov")):
+            continue
+        if g.get("type") == "temp":
+            continue
+        v = requests.get(f"{base}/view", params={
+            "filename": g["filename"], "subfolder": g.get("subfolder", ""),
+            "type": g.get("type", "output")}, headers=CF_HEADERS, timeout=300)
+        vids.append(base64.b64encode(v.content).decode())
+    return vids
+
+
 def run_video(base, graph, out_node="319", timeout=1800, client_id=None):
-    """Queue the motion graph, wait, return the final mp4 as base64. VHS_VideoCombine
-    output lands under a 'gifs' key in /history (not 'images'). Prefer the final
-    output node; surface ComfyUI node errors if it produces nothing."""
+    """Queue the motion graph, wait, return the saved mp4(s) as base64. VHS_VideoCombine
+    output lands under a 'gifs' key in /history (not 'images'). `out_node` may be a
+    single node id OR a list of them (e.g. [raw, upscaled]) — every listed node that
+    produced a saved video is returned, in the given order, so a run can hand back both
+    the raw and the upscaled result. Falls back to any other saved-output node if none
+    of the named ones produced anything; surfaces ComfyUI node errors otherwise."""
+    wanted = [out_node] if isinstance(out_node, str) else list(out_node)
     pid = requests.post(f"{base}/prompt",
                         json={"prompt": graph, "client_id": client_id or uuid.uuid4().hex},
                         headers=CF_HEADERS, timeout=60).json()["prompt_id"]
@@ -200,33 +229,25 @@ def run_video(base, graph, out_node="319", timeout=1800, client_id=None):
         if pid in hist:
             h = hist[pid]
             outs = h.get("outputs", {}) or {}
-            # Return the final SAVED character video only. The pose preview
-            # (node 117, save_output=false) lands as type "temp" — never return it.
-            # Try the designated final node first, then any other saved-output node.
-            order = ([out_node] if out_node in outs else []) + [k for k in outs if k != out_node]
-            for nid in order:
-                vids = []
-                for g in outs.get(nid, {}).get("gifs", []):
-                    fn = str(g.get("filename", "")).lower()
-                    if not fn.endswith((".mp4", ".webm", ".mov")):
-                        continue
-                    if g.get("type") == "temp":      # skip pose/preview temp clips
-                        continue
-                    v = requests.get(f"{base}/view", params={
-                        "filename": g["filename"], "subfolder": g.get("subfolder", ""),
-                        "type": g.get("type", "output")}, headers=CF_HEADERS, timeout=300)
-                    vids.append(base64.b64encode(v.content).decode())
-                if vids:
-                    return vids
+            vids = []
+            for nid in wanted:                       # named outputs first, in order
+                if nid in outs:
+                    vids += _collect_node_videos(base, outs, nid)
+            if not vids:                             # resilience: any other saved video
+                for nid in outs:
+                    if nid not in wanted:
+                        vids += _collect_node_videos(base, outs, nid)
+            if vids:
+                return vids
             err = _history_error(h.get("status", {}) or {})
             if err:
                 raise RuntimeError("ComfyUI node error — " + err)
             # No saved video — report what each node produced so we can see why the
-            # final node (319) is missing (filename + type per node).
+            # expected output node(s) are missing (filename + type per node).
             diag = {nid: [(g.get("filename"), g.get("type")) for g in o.get("gifs", [])]
                     for nid, o in outs.items() if o.get("gifs")}
-            raise RuntimeError("No saved output video (final node #%s missing). Nodes that produced clips: %s"
-                               % (out_node, json.dumps(diag)))
+            raise RuntimeError("No saved output video (expected node(s) %s missing). Nodes that produced clips: %s"
+                               % (wanted, json.dumps(diag)))
         time.sleep(2)
     raise TimeoutError("ComfyUI timed out (video)")
 
@@ -473,25 +494,49 @@ def _normalize_model_paths(graph):
                 node["inputs"][k] = v.replace("\\", "/")
 
 
+def _drop_nodes(graph, ids):
+    """Remove nodes and blank any links from surviving nodes that pointed at them
+    (so no kept node is left referencing a dropped one). Used to strip the optional
+    upscale/interpolation tail of the motion graph."""
+    ids = set(str(i) for i in ids)
+    for nid in ids:
+        graph.pop(nid, None)
+    for node in graph.values():
+        for k, v in list((node.get("inputs") or {}).items()):
+            if isinstance(v, list) and len(v) == 2 and str(v[0]) in ids:
+                node["inputs"].pop(k, None)
+
+
 def _build_video(graph, inp, seed, video_name, ref_name):
-    """Inject the dynamic inputs into the Wan Animate graph. Everything else
-    (5-LoRA stack, sampler, pose-rig, block-swap) stays as the workflow defines it."""
+    """Inject the dynamic inputs into the Wan 2.2 Animate "Wow" graph. The technique
+    LoRA stack, pose-rig, block-swap and both output combiners stay as the workflow
+    defines them. The character LoRA is optional (identity is driven by the reference
+    image); when supplied it is chained into the multi-stack via prev_lora. The
+    RTX-upscale + RIFE tail is dropped unless inp["upscale"] is set."""
     _normalize_model_paths(graph)            # heal Windows-exported backslash paths
     nm = VIDEO
     graph[nm["load_video"]]["inputs"]["video"] = video_name
     if inp.get("frame_cap"):
         graph[nm["load_video"]]["inputs"]["frame_load_cap"] = max(1, int(inp["frame_cap"]))
-    if inp.get("fps"):                       # resample input + final output to this fps
+    if inp.get("fps"):                       # force_rate the driving video is resampled to
         fps = max(1, int(inp["fps"]))
-        graph[nm["load_video"]]["inputs"]["force_rate"] = fps
-        if nm["output"] in graph:
-            graph[nm["output"]]["inputs"]["frame_rate"] = fps
+        graph[nm["fps_int"]]["inputs"]["value"] = fps
     graph[nm["ref_image"]]["inputs"]["image"] = ref_name
     graph[nm["prompt"]]["inputs"]["text"] = _prompt_with_trigger(inp)
-    if inp.get("character_lora_path"):   # WanVideoLoraSelect: lora + strength
-        graph[nm["char"]]["inputs"]["lora"] = inp["character_lora_path"]
-        graph[nm["char"]]["inputs"]["strength"] = float(inp.get("character_strength", 1.0))
+    if inp.get("character_lora_path"):
+        # Optional character LoRA: a WanVideoLoraSelect node feeding the technique
+        # multi-stack's prev_lora input (same wiring the previous graph used at 544).
+        graph["char_lora"] = {
+            "class_type": "WanVideoLoraSelect",
+            "inputs": {"lora": inp["character_lora_path"],
+                       "strength": float(inp.get("character_strength", 1.0)),
+                       "low_mem_load": False, "merge_loras": True},
+            "_meta": {"title": "Character LoRA (optional)"},
+        }
+        graph[nm["lora_multi"]]["inputs"]["prev_lora"] = ["char_lora", 0]
     graph[nm["sampler"]]["inputs"]["seed"] = seed
+    if not inp.get("upscale"):               # off -> keep only the raw h264 output (285)
+        _drop_nodes(graph, VIDEO_UPSCALE_CHAIN)
     _apply_sampler_override(graph, inp)
     return graph
 
@@ -590,7 +635,8 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
     seed = int(inp.get("seed", 0)) or int.from_bytes(os.urandom(4), "big")
     total = max(1, int(inp.get("variations", 1)))
 
-    # Wan Animate motion-transfer: driving video + ref photo -> one mp4 (no batching).
+    # Wan Animate motion-transfer: driving video + ref photo -> mp4(s) (no batching).
+    # Returns the raw h264 output plus, when upscale is on, the RTX-upscaled+RIFE one.
     if mode == "video":
         video_name = upload_video(base, base64.b64decode(inp["video_b64"]),
                                   inp.get("video_filename", "driving.mp4"))
@@ -598,7 +644,9 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
         with open(wf_path, encoding="utf-8") as f:
             graph = json.load(f)
         graph = _build_video(graph, inp, seed, video_name, ref_name)
-        vids = run_video(base, graph, out_node=VIDEO["output"], client_id=client_id)
+        vids = run_video(base, graph,
+                         out_node=[VIDEO["output_raw"], VIDEO["output_final"]],
+                         client_id=client_id)
         if not vids:
             return {"error": "No video produced — check ComfyUI node errors / model paths."}
         return {"videos": vids, "seed": seed}

@@ -704,12 +704,13 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   <div class="seg">
     <button id="mVid" class="on" data-mode="i2i"><span class="k">i</span>Wan Image to Image</button>
     <button id="mTxt" data-mode="t2i"><span class="k">t</span>Wan Text To Image</button>
-    <button id="mMotion" data-mode="video"><span class="k">m</span>Wan Animate Motion Control</button>
+    <button id="mMotion" data-mode="video"><span class="k">m</span>Wan 2.2 Animate (Wow)</button>
     <button id="mAdv" data-mode="adv"><span class="k">a</span>⚡ Instaraw Advance</button>
     <button id="mKrea2" data-mode="krea2"><span class="k">k</span>Krea2 Image to Image</button>
     <button id="mKreaNew" data-mode="krea2new"><span class="k">n</span>Krea2 Image to Image new</button>
     <button id="mKreaHQ" data-mode="krea2hq"><span class="k">h</span>Krea2 Image to Image High Quality</button>
   </div>
+  <p id="cloudNoModes" class="hide" style="margin:10px 2px 0;font-size:12.5px;color:var(--faint)">All generation modes now run on <b>Local</b> (the home 5090). Cloud only shows endpoint status — switch to Local to generate.</p>
 </div>
 
 <div id="cloudWrap" class="hide" style="max-width:1180px;margin:18px auto 0;padding:0 34px">
@@ -809,7 +810,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 
     <!-- motion (Wan Animate) workspace -->
     <section class="card d1 hide" id="paneMotion">
-      <div class="hd"><span class="step">1</span><h2>Motion → Video</h2><span class="sub">wan animate · cloud/5090</span></div>
+      <div class="hd"><span class="step">1</span><h2>Motion → Video</h2><span class="sub">wan 2.2 animate · local · 5090</span></div>
       <div class="bd">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
           <div>
@@ -837,9 +838,14 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           <button id="mMaxFrames" class="reqsync" type="button" style="padding:7px 11px" title="Fill frames to the whole driving clip at this FPS">⤢ max</button>
           <label style="color:var(--faint)" id="mLenHint">≈ 2.7s · more frames = longer + heavier</label>
         </div>
+        <div class="inline" style="margin-top:14px;gap:10px">
+          <div class="sw" id="mUpscaleSw" title="upscale"></div>
+          <label>2× RTX super-res + RIFE upscale</label>
+          <span class="hint" style="color:var(--faint);font-size:12px">off = faster, returns the raw clip only · on = also returns an upscaled, frame-interpolated version</span>
+        </div>
         <button id="mDescribeBtn" class="go ghost" style="width:auto;margin-top:14px;padding:8px 16px;font-size:13px" type="button">🪄 Describe ref photo with AI</button>
-        <textarea id="mPrompt" placeholder="optional: describe the look (clothing, setting). Or hit 'Describe ref photo' to auto-fill from the reference image. The character identity comes from the LoRA." style="margin-top:10px"></textarea>
-        <p class="hint" style="margin:10px 0 0">Ref photo drives the character's appearance via CLIP-Vision; the LoRA owns the face. The driving video supplies the motion. Describe options are in the rail →</p>
+        <textarea id="mPrompt" placeholder="optional: describe the look (clothing, setting). Or hit 'Describe ref photo' to auto-fill from the reference image. Identity comes from the reference photo." style="margin-top:10px"></textarea>
+        <p class="hint" style="margin:10px 0 0">The reference photo drives the character's identity (CLIP-Vision + Animate Embeds); the driving video supplies the motion. A character LoRA is <b>optional</b> (pick one in the rail →, or leave it as “No character”).</p>
       </div>
     </section>
 
@@ -1427,13 +1433,23 @@ function _charList(){
   if(isCloud() && S.cloudChars && S.cloudChars.length) return S.cloudChars;
   return (S.chars && S.chars.length) ? S.chars : (S.cloudChars||[]);
 }
+// Display list backing the Character dropdown. In motion mode identity comes from the
+// reference photo, so a character LoRA is optional — a "No character" entry (default,
+// empty LoRA path) is prepended. Everything that maps a dropdown index <-> character
+// must use THIS list (not _charList()) so the prepended entry doesn't cause an
+// off-by-one.
+function _charListUI(){
+  const list=_charList().slice();
+  if(S.mode==='video') list.unshift({label:'— No character (identity from photo) —', variants:[{label:'none', path:''}]});
+  return list;
+}
 function applyCharList(){
-  const list=_charList();
+  const list=_charListUI();
   $('#character').innerHTML=list.map((x,i)=>`<option value="${i}">${x.label}</option>`).join('');
   fillVariants();
 }
 function fillVariants(){
-  const ch=_charList()[+$('#character').value]; if(!ch) return;
+  const ch=_charListUI()[+$('#character').value]; if(!ch) return;
   $('#variant').innerHTML=ch.variants.map(v=>`<option value="${v.path}">${v.label}</option>`).join('');
   $('#vCount').textContent=ch.variants.length>1?ch.variants.length+' ckpts':'';
 }
@@ -1446,7 +1462,7 @@ async function refreshCharacters(el){
     const d=await(await fetch('/api/characters?t='+Date.now())).json();
     if(d.characters) S.chars=d.characters;
     applyCharList();
-    if(cur){ const list=_charList();
+    if(cur){ const list=_charListUI();
       for(let i=0;i<list.length;i++){ if((list[i].variants||[]).some(v=>v.path===cur)){
         $('#character').value=i; fillVariants(); $('#variant').value=cur; break; } } }
   }catch(e){ console.error('refresh characters failed', e); }
@@ -1713,17 +1729,14 @@ async function pollCloudStatus(){
 }
 function onTargetChange(){
   if(CLOUD.poll){ clearInterval(CLOUD.poll); CLOUD.poll=null; }
-  // Cloud volume holds only the Motion (Wan Animate) models -> Cloud runs Motion only.
-  // Hide the image modes (Frame->Character, Text->Character) and force Motion on Cloud;
-  // they reappear on Local (the home 5090 has every model).
+  // Every generation mode now runs on the home 5090 (the new Wan 2.2 Animate motion
+  // pipeline is too heavy for the cloud volume, and it was the last cloud-capable
+  // mode). So all mode buttons are hidden on Cloud — the Cloud target only surfaces
+  // the endpoint status/GPU card. Modes reappear on Local.
   const cloudOnly = isCloud();
-  $('#mVid').classList.toggle('hide', cloudOnly);
-  $('#mTxt').classList.toggle('hide', cloudOnly);
-  $('#mAdv').classList.toggle('hide', cloudOnly);   // advanced = local only
-  $('#mKrea2').classList.toggle('hide', cloudOnly);   // krea2 = local only
-  $('#mKreaNew').classList.toggle('hide', cloudOnly);   // krea2new = local only
-  $('#mKreaHQ').classList.toggle('hide', cloudOnly);   // krea2hq = local only
-  if(cloudOnly && S.mode!=='video') setMode('video');
+  ['#mVid','#mTxt','#mAdv','#mKrea2','#mKreaNew','#mKreaHQ','#mMotion']
+    .forEach(sel=>$(sel).classList.toggle('hide', cloudOnly));
+  $('#cloudNoModes') && $('#cloudNoModes').classList.toggle('hide', !cloudOnly);
   if(typeof applyCharList==='function') applyCharList();   // cloud vs local character list
   renderCloudCard();
   if(isCloud()){ pollCloudStatus(); CLOUD.poll=setInterval(pollCloudStatus,7000); }
@@ -1749,6 +1762,7 @@ $('#krea2RefineSw').onclick=()=>{
   $('#krea2RefineSw').classList.toggle('on',on);
   $('#krea2Denoise2Field').classList.toggle('hide',!on);
 };
+$('#mUpscaleSw').onclick=()=>$('#mUpscaleSw').classList.toggle('on');
 
 // mode switch
 function setMode(m){
@@ -2751,6 +2765,7 @@ $('#go').onclick=async()=>{
     body.frame_cap=+$('#mFrames').value||81;
     body.fps=+$('#mFps').value||30;
     body.prompt=$('#mPrompt').value.trim();
+    body.upscale=$('#mUpscaleSw').classList.contains('on');
   }
   else if(S.mode==='adv'){   // INSTARAW advanced — AI prompts if generated, else the raw scene
     body.ref_b64=S.advRefB64||'';
@@ -2826,9 +2841,14 @@ $('#go').onclick=async()=>{
       if(d.status==='done'){
         clearInterval(poll);
         $('#empty').classList.add('hide');
-        if(d.videos||d.video_url){   // Wan Animate motion result -> mp4
-          const src=d.video_url||('data:video/mp4;base64,'+((d.videos||[])[0]||''));
-          $('#results').innerHTML=`<video controls autoplay loop playsinline style="width:100%;max-width:460px;border-radius:12px;background:#000" src="${src}"></video>`;
+        if(d.videos||d.video_urls||d.video_url){   // Wan 2.2 Animate motion result -> mp4(s)
+          // May be 1 (raw only) or 2 (raw + RTX-upscaled). Prefer lightweight R2 urls.
+          let srcs=(d.video_urls&&d.video_urls.length)?d.video_urls
+                   :(d.videos||[]).map(b=>'data:video/mp4;base64,'+b);
+          if(!srcs.length && d.video_url) srcs=[d.video_url];
+          const label=(i)=>srcs.length>1?`<div class="hint" style="margin:2px 0 6px;color:var(--faint);font-size:12px">${i===0?'Raw':'Upscaled · 2× + RIFE'}</div>`:'';
+          $('#results').innerHTML=srcs.map((src,i)=>
+            `<div style="margin-bottom:14px">${label(i)}<video controls autoplay loop muted playsinline style="width:100%;max-width:460px;border-radius:12px;background:#000" src="${src}"></video></div>`).join('');
         } else {
           // Prefer lightweight R2 URLs (lazy-loaded); fall back to base64 only if the server sent it.
           const urls=(d.image_urls&&d.image_urls.length)?d.image_urls:(d.images||[]).map(b=>'data:image/png;base64,'+b);
