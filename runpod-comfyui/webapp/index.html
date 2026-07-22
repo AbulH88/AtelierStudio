@@ -831,12 +831,12 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           </div>
         </div>
         <div class="inline" style="margin-top:16px">
-          <label>Frames</label>
-          <input type="number" id="mFrames" value="81" min="9" max="100000" step="4" style="width:90px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+          <label>Seconds</label>
+          <input type="number" id="mSeconds" value="3" min="1" max="60" step="1" style="width:80px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
           <label style="margin-left:8px">FPS</label>
           <input type="number" id="mFps" value="30" min="1" max="60" step="1" style="width:64px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
-          <button id="mMaxFrames" class="reqsync" type="button" style="padding:7px 11px" title="Fill frames to the whole driving clip at this FPS">⤢ max</button>
-          <label style="color:var(--faint)" id="mLenHint">≈ 2.7s · more frames = longer + heavier</label>
+          <button id="mMaxFrames" class="reqsync" type="button" style="padding:7px 11px" title="Set seconds to the whole driving clip">⤢ full clip</button>
+          <label style="color:var(--faint)" id="mLenHint">= 90 frames @ 30 fps · longer = heavier</label>
         </div>
         <div class="inline" style="margin-top:14px;gap:10px">
           <div class="sw" id="mUpscaleSw" title="upscale"></div>
@@ -1036,7 +1036,8 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <div id="krea2hqHelpers"></div>
         <button class="go ghost" id="krea2hqAddLora" type="button" style="width:100%;margin-top:10px;font-size:13px;padding:9px">+ Add helper LoRA</button>
       </div>
-      <!-- Sampler Override (all modes) -->
+      <!-- Sampler Override (all modes except video — the Wan pipeline sizes/samples itself) -->
+      <div id="samplerOverrideSection">
       <div style="margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);
         font-family:var(--serif);font-style:italic;font-size:14px;color:var(--amber)">⚙ Override Sampler</div>
       <div class="field">
@@ -1072,6 +1073,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           <option value="karras">karras</option>
         </select>
       </div>
+      </div><!-- /samplerOverrideSection -->
       <!-- OpenRouter Vision Settings -->
       <div class="advhide" style="margin:18px 0 12px;padding-top:14px;border-top:1px solid var(--line);
         font-family:var(--serif);font-style:italic;font-size:14px;color:var(--amber)">✦ Describe with AI</div>
@@ -1796,11 +1798,18 @@ function setMode(m){
   // adv has its own aspect + describe in the studio -> hide the rail's (keep Trigger Word)
   $$('.advhide').forEach(el=>el.classList.toggle('hide', m==='adv'));
   ['visionModelField','stylePresetField','bodyTypeField','shotTypeField','detailField','explicitField','clothingNoteField','customInstrField'].forEach(id=>{ const el=$('#'+id); if(el)el.classList.toggle('hide', m==='adv'); });
-  // Krea2 HQ swaps the generic aspect-ratio picker for its own resolution-preset
-  // dropdown. This runs AFTER the .imgonly/.advhide loops on purpose — #aspectField
-  // carries both classes, so those loops would otherwise re-show it for krea2hq.
-  $('#aspectField').classList.toggle('hide', m==='krea2hq');
+  // The generic aspect-ratio picker only applies to modes that size an empty latent
+  // from it: i2i, t2i, krea2, krea2new. video sizes from the ref image/driving clip,
+  // adv has its own aspect in the studio, and krea2hq uses its resolution-preset
+  // dropdown instead. This runs AFTER the .imgonly/.advhide loops on purpose (those
+  // would otherwise leave #aspectField shown for the wrong modes).
+  const usesAspect = (m==='i2i'||m==='t2i'||m==='krea2'||m==='krea2new');
+  $('#aspectField').classList.toggle('hide', !usesAspect);
+  if(!usesAspect) $('#customResField').classList.add('hide');   // don't leave the custom-size box dangling
   $('#resPresetField').classList.toggle('hide', m!=='krea2hq');
+  // Motion mode sizes + samples itself (fixed ~720×1280 from the ref image); the
+  // generic sampler-override panel doesn't apply, so hide it in video.
+  $('#samplerOverrideSection').classList.toggle('hide', m==='video');
   if(m==='krea2hq'){
     const o=$('#resPreset').selectedOptions[0];
     if(o) S.aspect={key:o.dataset.key,width:+o.dataset.w,height:+o.dataset.h};
@@ -2004,17 +2013,19 @@ $('#mDescribeBtn').onclick=async()=>{
   }catch(e){ alert('Describe failed: '+e); }
   finally{ btn.disabled=false; btn.textContent=old; }
 };
-function _mUpdateLen(){ const fr=+$('#mFrames').value||81, fps=Math.max(1,+$('#mFps').value||30);
-  let t='≈ '+(fr/fps).toFixed(1)+'s';
-  if(S.motionVidDur){ const maxF=Math.floor(S.motionVidDur*fps);
-    t+=' · clip '+S.motionVidDur.toFixed(1)+'s = '+maxF+'f max';
-    $('#mFrames').style.borderColor = fr>maxF ? 'var(--rose)' : 'var(--line)'; }
+// Motion length is driven by SECONDS now; frames = seconds × fps is auto-computed
+// (mirrors the workflow's node300 × fps math, but the app owns the seconds value).
+function _mFrames(){ const sec=Math.max(1,+$('#mSeconds').value||3), fps=Math.max(1,+$('#mFps').value||30);
+  return Math.round(sec*fps); }
+function _mUpdateLen(){ const sec=Math.max(1,+$('#mSeconds').value||3), fps=Math.max(1,+$('#mFps').value||30);
+  let t='= '+_mFrames()+' frames @ '+fps+' fps';
+  if(S.motionVidDur){ t+=' · clip '+S.motionVidDur.toFixed(1)+'s';
+    $('#mSeconds').style.borderColor = sec>S.motionVidDur+0.05 ? 'var(--rose)' : 'var(--line)'; }
   $('#mLenHint').textContent=t; }
-$('#mFrames').oninput=_mUpdateLen; $('#mFps').oninput=_mUpdateLen;
+$('#mSeconds').oninput=_mUpdateLen; $('#mFps').oninput=_mUpdateLen;
 $('#mMaxFrames').onclick=()=>{
   if(!S.motionVidDur){ alert('Drop a driving video first.'); return; }
-  const fps=Math.max(1,+$('#mFps').value||30);
-  $('#mFrames').value=Math.max(9, Math.floor(S.motionVidDur*fps));
+  $('#mSeconds').value=Math.max(1, Math.ceil(S.motionVidDur));   // set to the full clip length
   _mUpdateLen(); refreshGo();
 };
 // send a generated image straight into Motion mode as the reference photo
@@ -2762,8 +2773,8 @@ $('#go').onclick=async()=>{
       body.video_b64=await _fileToB64(S.motionVid); body.video_filename=S.motionVid.name;
       body.ref_b64=await _fileToB64(S.motionRef);
     }catch(e){ $('#genErr').textContent='Could not read the files.'; return; }
-    body.frame_cap=+$('#mFrames').value||81;
     body.fps=+$('#mFps').value||30;
+    body.frame_cap=_mFrames();          // seconds × fps, auto-computed
     body.prompt=$('#mPrompt').value.trim();
     body.upscale=$('#mUpscaleSw').classList.contains('on');
   }
