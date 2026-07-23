@@ -17,6 +17,7 @@ Optional env: RUNPOD_ENDPOINT_ID, RUNPOD_API_KEY (for cloud),
 
 import base64
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -106,9 +107,15 @@ OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "qwen/qwen3-vl-235b-a22b-instruct")
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# So the app can start ComfyUI for you when it's not running.
-COMFY_DIR = os.environ.get("COMFY_DIR", "I:/@home/jimi/Documents/ComfyUI_V82")
-COMFY_BAT = os.environ.get("COMFY_BAT", "Windows_Run_GPU.bat")
+# So the app can start ComfyUI for you when it's not running (only used when
+# AGENT_URL is unset, i.e. running directly on the same dual-boot box as ComfyUI).
+_IS_WINDOWS = platform.system() == "Windows"
+if _IS_WINDOWS:
+    COMFY_DIR = os.environ.get("COMFY_DIR", "I:/@home/jimi/Documents/ComfyUI_V82")
+    COMFY_LAUNCH = os.environ.get("COMFY_BAT", "Windows_Run_GPU.bat")
+else:
+    COMFY_DIR = os.environ.get("COMFY_DIR", "/media/hirokgupta/New Volume/ComfyUI_V82")
+    COMFY_LAUNCH = os.environ.get("COMFY_SH", "Linux_Run_GPU.sh")
 
 # Home agent — when set (on the VPS), start/stop go through it instead of a local
 # subprocess (the VPS can't launch programs on the home PC directly).
@@ -762,7 +769,9 @@ def api_characters():
 
 @app.get("/api/health")
 def health():
-    """Report which compute targets are available so the UI can auto-pick."""
+    """Report which compute targets are available so the UI can auto-pick.
+    Also reports which OS the home PC is currently booted into (dual-boot box)
+    so the UI can warn when a mode's models won't be found on that OS."""
     local = False
     try:
         r = requests.get(f"{LOCAL_COMFY}/system_stats", headers=comfy_common.CF_HEADERS,
@@ -770,7 +779,16 @@ def health():
         local = r.status_code == 200  # 302 (Access login) / 502 (tunnel down) => not ready
     except Exception:
         pass
-    return jsonify({"local": local, "cloud": bool(ENDPOINT_ID and API_KEY)})
+    agent_os = None
+    if AGENT_URL:
+        try:
+            r = requests.get(f"{AGENT_URL}/status", headers={"x-agent-secret": AGENT_SECRET}, timeout=6)
+            agent_os = r.json().get("os")
+        except Exception:
+            pass
+    else:
+        agent_os = "windows" if _IS_WINDOWS else "linux"
+    return jsonify({"local": local, "cloud": bool(ENDPOINT_ID and API_KEY), "agent_os": agent_os})
 
 
 @app.get("/api/cloud/info")
@@ -925,11 +943,16 @@ def start_comfy():
         return jsonify({"already": True})
     except Exception:
         pass
-    bat = os.path.join(COMFY_DIR, COMFY_BAT)
-    if not os.path.exists(bat):
-        return jsonify({"error": f"Launch script not found: {bat}"}), 500
+    script = os.path.join(COMFY_DIR, COMFY_LAUNCH)
+    if not os.path.exists(script):
+        return jsonify({"error": f"Launch script not found: {script}"}), 500
     try:
-        subprocess.Popen(["cmd", "/c", "start", "", COMFY_BAT], cwd=COMFY_DIR)
+        if _IS_WINDOWS:
+            subprocess.Popen(["cmd", "/c", "start", "", COMFY_LAUNCH], cwd=COMFY_DIR)
+        else:
+            log = open(os.path.join(COMFY_DIR, "comfyui_agent.log"), "ab")
+            subprocess.Popen(["bash", script], cwd=COMFY_DIR, stdin=subprocess.DEVNULL,
+                              stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         return jsonify({"started": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
