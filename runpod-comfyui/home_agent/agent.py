@@ -209,7 +209,11 @@ def start():
         if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
             cmd = f'cd {shlex.quote(COMFY_DIR)} && bash {shlex.quote(script)} 2>&1 | tee -a {shlex.quote(log_path)}'
             try:
-                subprocess.Popen(["xterm", "-T", "ComfyUI", "-e", "bash", "-c", cmd],
+                subprocess.Popen(["xterm", "-T", "ComfyUI",
+                                  "-fa", "DejaVu Sans Mono", "-fs", "12",
+                                  "-bg", "#1e1e2e", "-fg", "#cdd6f4",
+                                  "-geometry", "110x30",
+                                  "-e", "bash", "-c", cmd],
                                   cwd=COMFY_DIR, stdin=subprocess.DEVNULL, start_new_session=True)
                 launched = True
             except FileNotFoundError:
