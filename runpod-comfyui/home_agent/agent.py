@@ -13,6 +13,7 @@ import base64
 import json
 import os
 import platform
+import shlex
 import subprocess
 import threading
 import time
@@ -201,9 +202,22 @@ def start():
     if IS_WINDOWS:
         subprocess.Popen(["cmd", "/c", "start", "", COMFY_LAUNCH], cwd=COMFY_DIR)
     else:
-        log = open(os.path.join(COMFY_DIR, "comfyui_agent.log"), "ab")
-        subprocess.Popen(["bash", script], cwd=COMFY_DIR, stdin=subprocess.DEVNULL,
-                          stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        log_path = os.path.join(COMFY_DIR, "comfyui_agent.log")
+        # Prefer a visible terminal (like the Windows console window) when a desktop
+        # session is available; still tee to a log file either way for `tail -f`.
+        launched = False
+        if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
+            cmd = f'cd {shlex.quote(COMFY_DIR)} && bash {shlex.quote(script)} 2>&1 | tee -a {shlex.quote(log_path)}'
+            try:
+                subprocess.Popen(["xterm", "-T", "ComfyUI", "-e", "bash", "-c", cmd],
+                                  cwd=COMFY_DIR, stdin=subprocess.DEVNULL, start_new_session=True)
+                launched = True
+            except FileNotFoundError:
+                pass
+        if not launched:
+            log = open(log_path, "ab")
+            subprocess.Popen(["bash", script], cwd=COMFY_DIR, stdin=subprocess.DEVNULL,
+                              stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
     return jsonify({"ok": True, "started": True})
 
 
