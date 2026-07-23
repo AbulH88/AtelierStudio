@@ -210,9 +210,9 @@ def start():
             cmd = f'cd {shlex.quote(COMFY_DIR)} && bash {shlex.quote(script)} 2>&1 | tee -a {shlex.quote(log_path)}'
             try:
                 subprocess.Popen(["xterm", "-T", "ComfyUI",
-                                  "-fa", "DejaVu Sans Mono", "-fs", "12",
+                                  "-fa", "DejaVu Sans Mono", "-fs", "20",
                                   "-bg", "#1e1e2e", "-fg", "#cdd6f4",
-                                  "-geometry", "110x30",
+                                  "-geometry", "130x30",
                                   "-e", "bash", "-c", cmd],
                                   cwd=COMFY_DIR, stdin=subprocess.DEVNULL, start_new_session=True)
                 launched = True
