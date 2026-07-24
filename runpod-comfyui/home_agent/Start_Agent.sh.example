@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Copy this to Start_Agent.sh and fill in your AGENT_SECRET (must match the
+# AGENT_SECRET in the VPS webapp/.env — same value as the Windows side, since
+# this is the same dual-boot box). Keep Start_Agent.sh private (gitignored).
+
+export AGENT_SECRET="PUT_YOUR_AGENT_SECRET_HERE"
+export COMFY_DIR="/media/hirokgupta/New Volume/ComfyUI_V82"
+export COMFY_SH="Linux_Run_GPU.sh"
+
+cd "$(dirname "$0")"
+echo "Home agent running on 127.0.0.1:8190 (published via cloudflared as agent.thecristinaadam.com)"
+exec python3 agent.py

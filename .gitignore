@@ -20,6 +20,7 @@ runpod-comfyui/webapp/ig_cookies.txt
 
 # Home agent (contains the agent secret) + its logs/scratch
 runpod-comfyui/home_agent/Start_Agent.bat
+runpod-comfyui/home_agent/Start_Agent.sh
 runpod-comfyui/home_agent/agent.log
 runpod-comfyui/home_agent/_*.txt
 

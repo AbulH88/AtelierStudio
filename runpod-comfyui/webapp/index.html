@@ -1562,7 +1562,8 @@ function updateStatus(){
     $('#statusText').textContent = (st&&st.warming) ? 'RunPod · warming GPU'
       : (S.avail.cloud?'RunPod · cloud':'cloud not set');
   }else{
-    $('#statusText').textContent = S.avail.local?'ComfyUI · 5090':'ComfyUI offline';
+    const os=S.avail.agent_os, osTag=os?` (${os[0].toUpperCase()+os.slice(1)})`:'';
+    $('#statusText').textContent = (S.avail.local?'ComfyUI · 5090':'ComfyUI offline')+osTag;
   }
 }
 

@@ -549,7 +549,6 @@ def _build_video(graph, inp, seed, video_name, ref_name):
     defines them. The character LoRA is optional (identity is driven by the reference
     image); when supplied it is chained into the multi-stack via prev_lora. The
     RTX-upscale + RIFE tail is dropped unless inp["upscale"] is set."""
-    _normalize_model_paths(graph)            # heal Windows-exported backslash paths
     nm = VIDEO
     graph[nm["load_video"]]["inputs"]["video"] = video_name
     if inp.get("frame_cap"):
@@ -679,6 +678,7 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
         ref_name = upload_image(base, base64.b64decode(inp["ref_b64"]))
         with open(wf_path, encoding="utf-8") as f:
             graph = json.load(f)
+        _normalize_model_paths(graph)   # heal Windows-exported backslash paths (runs on Linux too)
         graph = _build_video(graph, inp, seed, video_name, ref_name)
         vids = run_video(base, graph,
                          out_node=[VIDEO["output_raw"], VIDEO["output_final"]],
@@ -695,6 +695,7 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
             ref_name = upload_image(base, base64.b64decode(inp["ref_b64"]))
         with open(wf_path, encoding="utf-8") as f:
             graph = json.load(f)
+        _normalize_model_paths(graph)   # heal Windows-exported backslash paths (runs on Linux too)
         graph = _build_adv(graph, inp, seed, ref_name=ref_name)
         images = run(base, graph, client_id=client_id, out_node=ADV["output"], timeout=1800)
         if not images:
@@ -710,6 +711,7 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
         chunk = min(max_batch, total - done)
         with open(wf_path, encoding="utf-8") as f:
             graph = json.load(f)
+        _normalize_model_paths(graph)   # heal Windows-exported backslash paths (runs on Linux too)
         sub = dict(inp, variations=chunk)
         cseed = seed + done   # distinct seed per chunk so variations differ
         if mode == "i2i":

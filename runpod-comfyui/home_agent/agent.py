@@ -12,6 +12,8 @@ the outside world reaches it solely through the Cloudflare tunnel + the secret.
 import base64
 import json
 import os
+import platform
+import shlex
 import subprocess
 import threading
 import time
@@ -20,10 +22,18 @@ import urllib.request
 
 from flask import Flask, request, jsonify
 
+# Same physical (dual-boot) machine, two OSes — pick the launcher that matches
+# whichever OS this process is actually running under right now.
+IS_WINDOWS = platform.system() == "Windows"
+
 SECRET = os.environ.get("AGENT_SECRET", "")
 COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8189")
-COMFY_DIR = os.environ.get("COMFY_DIR", r"I:\@home\jimi\Documents\ComfyUI_V82")
-COMFY_BAT = os.environ.get("COMFY_BAT", "Windows_Run_GPU.bat")
+if IS_WINDOWS:
+    COMFY_DIR = os.environ.get("COMFY_DIR", r"I:\@home\jimi\Documents\ComfyUI_V82")
+    COMFY_LAUNCH = os.environ.get("COMFY_BAT", "Windows_Run_GPU.bat")
+else:
+    COMFY_DIR = os.environ.get("COMFY_DIR", "/media/hirokgupta/New Volume/ComfyUI_V82")
+    COMFY_LAUNCH = os.environ.get("COMFY_SH", "Linux_Run_GPU.sh")
 COMFY_PORT = "8189"
 
 app = Flask(__name__)
@@ -177,7 +187,7 @@ def batch_upload():
 def status():
     if not authed():
         return jsonify({"error": "unauthorized"}), 401
-    return jsonify({"ok": True, "running": comfy_up()})
+    return jsonify({"ok": True, "running": comfy_up(), "os": "windows" if IS_WINDOWS else "linux"})
 
 
 @app.post("/start")
@@ -186,22 +196,62 @@ def start():
         return jsonify({"error": "unauthorized"}), 401
     if comfy_up():
         return jsonify({"ok": True, "already": True})
-    bat = os.path.join(COMFY_DIR, COMFY_BAT)
-    if not os.path.exists(bat):
-        return jsonify({"error": f"launch script not found: {bat}"}), 500
-    subprocess.Popen(["cmd", "/c", "start", "", COMFY_BAT], cwd=COMFY_DIR)
+    script = os.path.join(COMFY_DIR, COMFY_LAUNCH)
+    if not os.path.exists(script):
+        return jsonify({"error": f"launch script not found: {script}"}), 500
+    if IS_WINDOWS:
+        subprocess.Popen(["cmd", "/c", "start", "", COMFY_LAUNCH], cwd=COMFY_DIR)
+    else:
+        log_path = os.path.join(COMFY_DIR, "comfyui_agent.log")
+        # Prefer a visible terminal (like the Windows console window) when a desktop
+        # session is available; still tee to a log file either way for `tail -f`.
+        launched = False
+        if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
+            cmd = f'cd {shlex.quote(COMFY_DIR)} && bash {shlex.quote(script)} 2>&1 | tee -a {shlex.quote(log_path)}'
+            try:
+                subprocess.Popen(["xterm", "-T", "ComfyUI",
+                                  "-fa", "DejaVu Sans Mono", "-fs", "20",
+                                  "-bg", "#1e1e2e", "-fg", "#cdd6f4",
+                                  "-geometry", "130x30",
+                                  "-e", "bash", "-c", cmd],
+                                  cwd=COMFY_DIR, stdin=subprocess.DEVNULL, start_new_session=True)
+                launched = True
+            except FileNotFoundError:
+                pass
+        if not launched:
+            log = open(log_path, "ab")
+            subprocess.Popen(["bash", script], cwd=COMFY_DIR, stdin=subprocess.DEVNULL,
+                              stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
     return jsonify({"ok": True, "started": True})
+
+
+def _linux_port_pids():
+    for cmd in (["lsof", "-ti", f"tcp:{COMFY_PORT}"], ["fuser", f"{COMFY_PORT}/tcp"]):
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True)
+        except FileNotFoundError:
+            continue
+        out = r.stdout if cmd[0] == "lsof" else r.stderr  # fuser prints pids to stderr
+        pids = {p for p in out.split() if p.isdigit()}
+        if pids:
+            return pids
+    return set()
 
 
 @app.post("/stop")
 def stop():
     if not authed():
         return jsonify({"error": "unauthorized"}), 401
-    out = subprocess.run("netstat -ano", shell=True, capture_output=True, text=True).stdout
-    pids = {ln.split()[-1] for ln in out.splitlines()
-            if f":{COMFY_PORT}" in ln and "LISTENING" in ln}
-    for pid in pids:
-        subprocess.run(f"taskkill /F /PID {pid}", shell=True)
+    if IS_WINDOWS:
+        out = subprocess.run("netstat -ano", shell=True, capture_output=True, text=True).stdout
+        pids = {ln.split()[-1] for ln in out.splitlines()
+                if f":{COMFY_PORT}" in ln and "LISTENING" in ln}
+        for pid in pids:
+            subprocess.run(f"taskkill /F /PID {pid}", shell=True)
+    else:
+        pids = _linux_port_pids()
+        for pid in pids:
+            subprocess.run(["kill", "-9", pid])
     return jsonify({"ok": True, "stopped": True, "killed": list(pids),
                     "message": "Stopped." if pids else "ComfyUI was not running."})
 
