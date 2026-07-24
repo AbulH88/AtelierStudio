@@ -101,6 +101,18 @@ KREA2NEW = {"load_image": "32", "positive": "6", "latent": "10",
 KREA2HQ = {"load_image": "16", "positive": "5", "resize": "13",
            "noise_aug": "14", "seed_gen": "2", "char": "11", "base_ksampler": "4"}
 
+# Krea2 Text to Image High Quality (workflow_krea2t2ihq.json) — the pure-t2i
+# sibling of KREA2HQ: same two-stage ClownsharKSampler_Beta pipeline (base
+# denoise 1 -> quality-refine denoise 0.27, both static — denoise isn't a
+# tunable knob here since there's no source image, unlike KREA2HQ's base pass),
+# same Power Lora Loader (character + 2 fixed helpers). Starts from a plain
+# EmptyLatentImage (no VAEEncode, no LoadImage at all) sized by the app's
+# resolution-preset picker — the source workflow's in-graph
+# EmptyLatentImageResPreset dropdown was dropped in favor of that, same as
+# KREA2HQ. Unlike KREA2HQ (img2img, one image per generate() call), this mode
+# batches natively via EmptyLatentImage.batch_size, same as T2I.
+KREA2T2IHQ = {"positive": "439", "seed_gen": "433", "latent": "458", "char": "449"}
+
 
 def _bypass_node(graph, nid, in_key="image"):
     """Bypass an image->image node: rewire every consumer of its output to its image
@@ -480,6 +492,30 @@ def _build_krea2hq(graph, inp, seed, frame_name):
     return graph
 
 
+def _build_krea2t2ihq(graph, inp, seed):
+    """Krea2 Text to Image High Quality: pure t2i, no source image at all — an
+    EmptyLatentImage (sized by the app's resolution-preset picker, batched
+    natively via batch_size) feeds the same fixed two-stage ClownsharKSampler_Beta
+    pipeline as KREA2HQ (base denoise 1, static — no img2img strength knob here
+    since there's no source pixels to partially preserve — into a static
+    quality-refine pass). Character + helper LoRAs share the same Power Lora
+    Loader convention as KREA2HQ."""
+    nm = KREA2T2IHQ
+    graph[nm["latent"]]["inputs"]["width"] = int(inp.get("width", 1080))
+    graph[nm["latent"]]["inputs"]["height"] = int(inp.get("height", 1920))
+    graph[nm["latent"]]["inputs"]["batch_size"] = max(1, int(inp.get("variations", 1)))
+    graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
+    graph[nm["seed_gen"]]["inputs"]["seed"] = seed
+    if "helper_loras" in inp:
+        _apply_power_loras(graph, nm["char"], inp.get("character_lora_path"),
+                           inp.get("character_strength", 1.0), inp["helper_loras"])
+    else:
+        _set_power_lora_slot(graph, nm["char"], 1, inp.get("character_lora_path"),
+                             inp.get("character_strength", 1.0))
+    _apply_sampler_override(graph, inp)
+    return graph
+
+
 # --- high level ---------------------------------------------------------------
 _MODEL_EXT = (".safetensors", ".onnx", ".pkl", ".pth", ".ckpt", ".pt", ".bin", ".sft")
 
@@ -684,6 +720,8 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
             graph = _build_krea2new(graph, sub, cseed, frame_name)
         elif mode == "krea2hq":
             graph = _build_krea2hq(graph, sub, cseed, frame_name)
+        elif mode == "krea2t2ihq":
+            graph = _build_krea2t2ihq(graph, sub, cseed)
         else:
             graph = _build_t2i(graph, sub, cseed)
         images += run(base, graph, client_id=client_id)

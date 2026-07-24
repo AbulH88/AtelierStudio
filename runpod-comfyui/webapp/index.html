@@ -709,6 +709,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <button id="mKrea2" data-mode="krea2"><span class="k">k</span>Krea2 Image to Image</button>
     <button id="mKreaNew" data-mode="krea2new" class="hide"><span class="k">n</span>Krea2 Image to Image new</button>
     <button id="mKreaHQ" data-mode="krea2hq"><span class="k">h</span>Krea2 Image to Image High Quality</button>
+    <button id="mKreaT2IHQ" data-mode="krea2t2ihq"><span class="k">q</span>Krea2 Text to Image High Quality</button>
   </div>
   <p id="cloudNoModes" class="hide" style="margin:10px 2px 0;font-size:12.5px;color:var(--faint)">All generation modes now run on <b>Local</b> (the home 5090). Cloud only shows endpoint status — switch to Local to generate.</p>
 </div>
@@ -805,6 +806,24 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 
         <textarea id="prompt" placeholder="e.g. standing on a rooftop at blue hour, fitted black blazer, gold necklace, city skyline behind, editorial photoshoot lighting…"></textarea>
         <p class="hint" style="margin:10px 0 0">Your character's identity comes from the LoRA — describe the outfit, pose & setting.</p>
+      </div>
+    </section>
+
+    <!-- Krea2 Text to Image High Quality workspace -->
+    <section class="card d1 hide" id="paneKreaT2IHQ">
+      <div class="hd"><span class="step">1</span><h2>Describe the scene</h2><span class="sub">krea2 t2i hq · local</span></div>
+      <div class="bd">
+        <textarea id="krea2t2ihqPrompt" placeholder="e.g. standing on a rooftop at blue hour, fitted black blazer, gold necklace, city skyline behind, editorial photoshoot lighting…"></textarea>
+        <p class="hint" style="margin:10px 0 14px">Your character's identity comes from the LoRA — describe the outfit, pose & setting. Or leave this blank and attach a photo below — it'll be auto-described and used as the prompt.</p>
+        <div id="krea2t2ihqDrop" style="cursor:pointer;border:1px dashed var(--line2);border-radius:12px;padding:16px;text-align:center;background:rgba(255,255,255,.01)">
+          <span style="font-size:24px;color:var(--faint)">📁</span>
+          <p style="margin:6px 0;font-size:13.5px">Click to attach a photo to describe · optional</p>
+        </div>
+        <input type="file" id="krea2t2ihqDescFile" accept="image/*" class="hide">
+        <div id="krea2t2ihqDescPreviewWrap" class="hide" style="margin-top:10px;text-align:center">
+          <img id="krea2t2ihqDescPreview" style="max-height:150px;border-radius:8px;display:inline-block">
+          <button id="krea2t2ihqDescClear" type="button" class="go ghost" style="display:block;margin:8px auto 0;width:auto;padding:6px 14px;font-size:12px">✕ remove photo</button>
+        </div>
       </div>
     </section>
 
@@ -1428,7 +1447,7 @@ const S={mode:"i2i",session:null,frame:null,aspect:null,variations:2,rand:true,t
 
 function _charList(){
   // Krea2 characters live under a completely different LoRA root -> its own list.
-  if(S.mode==='krea2'||S.mode==='krea2new'||S.mode==='krea2hq') return S.krea2Chars||[];
+  if(S.mode==='krea2'||S.mode==='krea2new'||S.mode==='krea2hq'||S.mode==='krea2t2ihq') return S.krea2Chars||[];
   // Cloud mode -> characters from the volume manifest (every char on the volume,
   // with the volume's real paths). Local -> the live ComfyUI list. Fall back to
   // whichever is non-empty so the picker is never empty.
@@ -1738,7 +1757,7 @@ function onTargetChange(){
   const cloudOnly = isCloud();
   // #mKreaNew (depth-ControlNet) is disabled for now — left out so it stays hidden
   // in every target (its backend/workflow code is kept intact for easy re-enable).
-  ['#mVid','#mTxt','#mAdv','#mKrea2','#mKreaHQ','#mMotion']
+  ['#mVid','#mTxt','#mAdv','#mKrea2','#mKreaHQ','#mKreaT2IHQ','#mMotion']
     .forEach(sel=>$(sel).classList.toggle('hide', cloudOnly));
   $('#cloudNoModes') && $('#cloudNoModes').classList.toggle('hide', !cloudOnly);
   if(typeof applyCharList==='function') applyCharList();   // cloud vs local character list
@@ -1777,8 +1796,10 @@ function setMode(m){
   $('#mKrea2').classList.toggle('on',m==='krea2');
   $('#mKreaNew').classList.toggle('on',m==='krea2new');
   $('#mKreaHQ').classList.toggle('on',m==='krea2hq');
+  $('#mKreaT2IHQ').classList.toggle('on',m==='krea2t2ihq');
   $('#paneVideo').classList.toggle('hide',m!=='i2i'&&m!=='krea2'&&m!=='krea2new'&&m!=='krea2hq');   // krea2/krea2new/krea2hq reuse the frame-picker pane
   $('#paneText').classList.toggle('hide',m!=='t2i');
+  $('#paneKreaT2IHQ').classList.toggle('hide',m!=='krea2t2ihq');
   $('#paneMotion').classList.toggle('hide',m!=='video');
   $('#paneAdv').classList.toggle('hide',m!=='adv');
   // Steps + Denoise only apply to I2I; T2I uses its fixed schedule; video uses its own
@@ -1789,30 +1810,34 @@ function setMode(m){
   $('#krea2RefineField').classList.toggle('hide',m!=='krea2');
   $('#krea2Denoise2Field').classList.toggle('hide',m!=='krea2'||!$('#krea2RefineSw').classList.contains('on'));
   // Krea2 HQ exposes only the BASE (1st) sampler's denoise; the refine (2nd)
-  // sampler stays static (fixed at the workflow default).
+  // sampler stays static (fixed at the workflow default). krea2t2ihq has no
+  // img2img strength knob at all (no source image), so it never shows this.
   $('#krea2hqDenoiseField').classList.toggle('hide',m!=='krea2hq');
-  $('#krea2hqLoraField').classList.toggle('hide',m!=='krea2hq');
+  // Helper LoRAs section is shared: both krea2hq and krea2t2ihq use the same
+  // Power Lora Loader convention (character + 2 fixed realism helpers).
+  $('#krea2hqLoraField').classList.toggle('hide',m!=='krea2hq'&&m!=='krea2t2ihq');
   // Lightning + the helper-LoRA / lightning controls are image-only, and krea2/
-  // krea2new/krea2hq have no Lightning node at all (single character LoRA only)
+  // krea2new/krea2hq/krea2t2ihq have no Lightning node at all (Power Lora Loader instead)
   $$('.imgonly').forEach(el=>el.classList.toggle('hide', m==='video'));
-  $$('.stdlora').forEach(el=>el.classList.toggle('hide', m==='adv'||m==='krea2'||m==='krea2new'||m==='krea2hq'));
+  $$('.stdlora').forEach(el=>el.classList.toggle('hide', m==='adv'||m==='krea2'||m==='krea2new'||m==='krea2hq'||m==='krea2t2ihq'));
   $$('.advlora').forEach(el=>el.classList.toggle('hide', m!=='adv'));   // two LoRA groups shown only in adv
   // adv has its own aspect + describe in the studio -> hide the rail's (keep Trigger Word)
   $$('.advhide').forEach(el=>el.classList.toggle('hide', m==='adv'));
   ['visionModelField','stylePresetField','bodyTypeField','shotTypeField','detailField','explicitField','clothingNoteField','customInstrField'].forEach(id=>{ const el=$('#'+id); if(el)el.classList.toggle('hide', m==='adv'); });
   // The generic aspect-ratio picker only applies to modes that size an empty latent
   // from it: i2i, t2i, krea2, krea2new. video sizes from the ref image/driving clip,
-  // adv has its own aspect in the studio, and krea2hq uses its resolution-preset
-  // dropdown instead. This runs AFTER the .imgonly/.advhide loops on purpose (those
-  // would otherwise leave #aspectField shown for the wrong modes).
+  // adv has its own aspect in the studio, and krea2hq/krea2t2ihq use the shared
+  // resolution-preset dropdown instead. This runs AFTER the .imgonly/.advhide loops
+  // on purpose (those would otherwise leave #aspectField shown for the wrong modes).
   const usesAspect = (m==='i2i'||m==='t2i'||m==='krea2'||m==='krea2new');
+  const usesResPreset = (m==='krea2hq'||m==='krea2t2ihq');
   $('#aspectField').classList.toggle('hide', !usesAspect);
   if(!usesAspect) $('#customResField').classList.add('hide');   // don't leave the custom-size box dangling
-  $('#resPresetField').classList.toggle('hide', m!=='krea2hq');
+  $('#resPresetField').classList.toggle('hide', !usesResPreset);
   // Motion mode sizes + samples itself (fixed ~720×1280 from the ref image); the
   // generic sampler-override panel doesn't apply, so hide it in video.
   $('#samplerOverrideSection').classList.toggle('hide', m==='video');
-  if(m==='krea2hq'){
+  if(usesResPreset){
     const o=$('#resPreset').selectedOptions[0];
     if(o) S.aspect={key:o.dataset.key,width:+o.dataset.w,height:+o.dataset.h};
   }else{
@@ -1830,6 +1855,7 @@ $('#mVid').onclick=()=>setMode('i2i');$('#mTxt').onclick=()=>setMode('t2i');$('#
 $('#mAdv').onclick=()=>setMode('adv');$('#mKrea2').onclick=()=>setMode('krea2');
 $('#mKreaNew').onclick=()=>setMode('krea2new');
 $('#mKreaHQ').onclick=()=>setMode('krea2hq');
+$('#mKreaT2IHQ').onclick=()=>setMode('krea2t2ihq');
 // --- Advanced (INSTARAW) panel wiring (increment A: scene -> prompt_batch_data) ---
 $('#advDropRef').onclick=()=>$('#advRefFile').click();
 $('#advRefFile').onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
@@ -2182,6 +2208,14 @@ function addKrea2Helper(path='', strength=0.6, on=true){
 }
 $('#krea2hqAddLora').onclick=()=>addKrea2Helper('',0.6,true);
 $('#krea2hqRefreshLoras') && ($('#krea2hqRefreshLoras').onclick=()=>refreshKrea2Helpers($('#krea2hqRefreshLoras')));
+// Shared by krea2hq and krea2t2ihq (same #krea2hqHelpers section, same Power Lora
+// Loader convention). Only rows toggled ON with a selected LoRA; [] = both off.
+function _krea2hqHelperLoras(){
+  return $$('#krea2hqHelpers .tog')
+    .filter(r=>r.querySelector('[data-role=hsw]').classList.contains('on'))
+    .map(r=>({path:r.querySelector('.lora-pick').value,strength:+r.querySelector('.lora-str').value}))
+    .filter(l=>l.path);
+}
 
 // Re-fetch the LoRA list and refresh every dropdown in place (preserving each
 // current selection), without reloading the page. Use after copying a file into
@@ -2399,11 +2433,35 @@ function refreshGo(){
   if(S.mode==='video') ok = !!(S.motionVid && S.motionRef);   // need driving video + ref photo
   else if(S.mode==='adv') ok = !!($('#variant').value && ($('#advScene').value.trim().length>3 || (S.advPrompts&&S.advPrompts.length)));
   else if(S.mode==='i2i' || S.mode==='krea2' || S.mode==='krea2new' || S.mode==='krea2hq') ok = !!S.frame;
+  // krea2t2ihq: ready with either a typed prompt OR an attached describe-photo
+  // (auto-described server-side at generate time if the prompt is left blank)
+  else if(S.mode==='krea2t2ihq') ok = !!($('#krea2t2ihqPrompt').value.trim() || S.krea2t2ihqDescB64);
   else ok = $('#prompt').value.trim().length>3;
   if(ok && cloudMissing().length) ok=false;   // grey out: a selected LoRA isn't on the cloud volume
   $('#go').disabled=!ok; $('#goTop').disabled=!ok;
 }
 $('#prompt').oninput=refreshGo;
+$('#krea2t2ihqPrompt').oninput=refreshGo;
+
+// Krea2 T2I HQ — optional "describe from image" upload (image never touches
+// ComfyUI, it's used only to auto-generate the prompt server-side when blank)
+S.krea2t2ihqDescB64=null;
+$('#krea2t2ihqDrop').onclick=()=>$('#krea2t2ihqDescFile').click();
+$('#krea2t2ihqDescFile').onchange=async(e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    S.krea2t2ihqDescB64=await _fileToB64(f);
+    $('#krea2t2ihqDescPreview').src='data:image/png;base64,'+S.krea2t2ihqDescB64;
+    $('#krea2t2ihqDescPreviewWrap').classList.remove('hide');
+  }catch(err){ alert('Could not read that image.'); }
+  refreshGo();
+};
+$('#krea2t2ihqDescClear').onclick=()=>{
+  S.krea2t2ihqDescB64=null;
+  $('#krea2t2ihqDescFile').value='';
+  $('#krea2t2ihqDescPreviewWrap').classList.add('hide');
+  refreshGo();
+};
 $('#goTop').onclick=()=>{ if(!$('#go').disabled) $('#go').click(); };
 
 $('#extractBtn').onclick=async()=>{
@@ -2765,10 +2823,12 @@ $('#go').onclick=async()=>{
     body.prompt=$('#i2iPrompt').value.trim();
     body.denoise=+$('#krea2hqDnVal').value||0.8;   // base (1st) sampler only; refine stays static
     // only rows toggled ON with a selected LoRA; empty array = both helpers off
-    body.helper_loras=$$('#krea2hqHelpers .tog')
-      .filter(r=>r.querySelector('[data-role=hsw]').classList.contains('on'))
-      .map(r=>({path:r.querySelector('.lora-pick').value,strength:+r.querySelector('.lora-str').value}))
-      .filter(l=>l.path);
+    body.helper_loras=_krea2hqHelperLoras();
+  }
+  else if(S.mode==='krea2t2ihq'){
+    body.prompt=$('#krea2t2ihqPrompt').value.trim();
+    if(S.krea2t2ihqDescB64) body.image_b64=S.krea2t2ihqDescB64;   // describe-only, never sent to ComfyUI
+    body.helper_loras=_krea2hqHelperLoras();
   }
   else if(S.mode==='video'){
     try{

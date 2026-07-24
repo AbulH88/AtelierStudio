@@ -1206,6 +1206,16 @@ def _build_input(body):
         if "helper_loras" in body:   # only override the baked-in helper slots when the UI sent a list
             inp["helper_loras"] = [{"path": l.get("path", ""), "strength": float(l.get("strength", 0.6))}
                                    for l in body.get("helper_loras", []) if l.get("path")]
+    elif inp["mode"] == "krea2t2ihq":
+        # Pure t2i — no required image. An optional "describe from image" photo may
+        # be attached directly as base64 (single-image uploader, not the frame-picker
+        # session/frame flow) — it's used ONLY to auto-generate the prompt via
+        # OpenRouter when the prompt is left blank, never sent to ComfyUI at all.
+        if body.get("image_b64"):
+            inp["image_b64"] = body["image_b64"]
+        if "helper_loras" in body:
+            inp["helper_loras"] = [{"path": l.get("path", ""), "strength": float(l.get("strength", 0.6))}
+                                   for l in body.get("helper_loras", []) if l.get("path")]
     elif inp["mode"] == "video":   # Wan Animate: driving video + ref photo
         inp["video_b64"] = body.get("video_b64", "")
         inp["video_filename"] = body.get("video_filename", "driving.mp4")
@@ -1610,6 +1620,11 @@ def _run_gen_job(job_id, target, inp, body):
         if inp["mode"] in ("i2i", "krea2", "krea2new", "krea2hq") and not inp.get("prompt"):
             p = _describe_params(body, False)
             inp["prompt"] = describe_image(inp["image_b64"], p, p["model"])
+        # krea2t2ihq: same auto-describe, but the image is optional (pure t2i) —
+        # only fires if the user actually attached a description photo.
+        elif inp["mode"] == "krea2t2ihq" and not inp.get("prompt") and inp.get("image_b64"):
+            p = _describe_params(body, False)
+            inp["prompt"] = describe_image(inp["image_b64"], p, p["model"])
 
         if target == "local":
             out = comfy_common.generate(LOCAL_COMFY, WORKFLOW_DIR, inp, client_id=CLIENT_ID,
@@ -1715,6 +1730,11 @@ def generate():
         fpath = os.path.join(FRAMES_DIR, body.get("session", ""), body.get("frame", ""))
         if not os.path.exists(fpath):
             return jsonify({"error": "Frame not found."}), 404
+    elif mode == "krea2t2ihq":
+        if target != "local":
+            return jsonify({"error": "Krea2 Text to Image High Quality mode runs on Local only."}), 400
+        if not body.get("prompt", "").strip() and not body.get("image_b64"):
+            return jsonify({"error": "Type a prompt or attach an image to describe."}), 400
     elif mode == "video":
         if target != "local":   # heavy Wan2.2 Animate pipeline runs on the home GPU only
             return jsonify({"error": "Motion mode runs on Local only."}), 400
