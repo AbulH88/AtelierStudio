@@ -821,7 +821,8 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         </div>
         <input type="file" id="krea2t2ihqDescFile" accept="image/*" class="hide">
         <div id="krea2t2ihqDescPreviewWrap" class="hide" style="margin-top:10px;text-align:center">
-          <img id="krea2t2ihqDescPreview" style="max-height:150px;border-radius:8px;display:inline-block">
+          <img id="krea2t2ihqDescPreview" style="max-height:150px;border-radius:8px;display:block;margin:0 auto">
+          <button id="krea2t2ihqDescBtn" class="go" style="width:auto;margin:10px auto 0;padding:8px 16px;font-size:13px" type="button">🪄 Describe with AI</button>
           <button id="krea2t2ihqDescClear" type="button" class="go ghost" style="display:block;margin:8px auto 0;width:auto;padding:6px 14px;font-size:12px">✕ remove photo</button>
         </div>
       </div>
@@ -3412,12 +3413,12 @@ $('#t2iDescribeBtn').onclick = async (e) => {
     alert("Please upload an image first.");
     return;
   }
-  
+
   const btn = $('#t2iDescribeBtn');
   const oldText = btn.textContent;
   btn.disabled = true;
   btn.textContent = "🪄 Describing...";
-  
+
   const formData = new FormData();
   formData.append("image", fileInput.files[0]);
   Object.entries(describeOpts()).forEach(([k, v]) => formData.append(k, v));
@@ -3432,6 +3433,39 @@ $('#t2iDescribeBtn').onclick = async (e) => {
       alert("AI Description failed: " + d.error);
     } else if (d.prompt) {
       $('#prompt').value = d.prompt;
+      refreshGo();
+    }
+  } catch (err) {
+    alert("AI Description failed: " + err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+};
+
+$('#krea2t2ihqDescBtn').onclick = async (e) => {
+  e.preventDefault();
+  const fileInput = $('#krea2t2ihqDescFile');
+  if (!fileInput.files || !fileInput.files[0]) {
+    alert("Attach a photo first.");
+    return;
+  }
+  const btn = $('#krea2t2ihqDescBtn');
+  const oldText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "🪄 Describing...";
+
+  const formData = new FormData();
+  formData.append("image", fileInput.files[0]);
+  Object.entries(describeOpts()).forEach(([k, v]) => formData.append(k, v));
+
+  try {
+    const r = await fetch('/api/describe', { method: 'POST', body: formData });
+    const d = await safeJson(r);
+    if (d.error) {
+      alert("AI Description failed: " + d.error);
+    } else if (d.prompt) {
+      $('#krea2t2ihqPrompt').value = d.prompt;
       refreshGo();
     }
   } catch (err) {
