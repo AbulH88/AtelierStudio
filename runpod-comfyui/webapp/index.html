@@ -813,17 +813,42 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <section class="card d1 hide" id="paneKreaT2IHQ">
       <div class="hd"><span class="step">1</span><h2>Describe the scene</h2><span class="sub">krea2 t2i hq · local</span></div>
       <div class="bd">
-        <textarea id="krea2t2ihqPrompt" placeholder="e.g. standing on a rooftop at blue hour, fitted black blazer, gold necklace, city skyline behind, editorial photoshoot lighting…"></textarea>
-        <p class="hint" style="margin:10px 0 14px">Your character's identity comes from the LoRA — describe the outfit, pose & setting. Or leave this blank and attach a photo below — it'll be auto-described and used as the prompt.</p>
-        <div id="krea2t2ihqDrop" style="cursor:pointer;border:1px dashed var(--line2);border-radius:12px;padding:16px;text-align:center;background:rgba(255,255,255,.01)">
-          <span style="font-size:24px;color:var(--faint)">📁</span>
-          <p style="margin:6px 0;font-size:13.5px">Click to attach a photo to describe · optional</p>
+        <div class="seg" style="margin-bottom:14px;max-width:300px">
+          <button id="k2TabPrompt" class="on" type="button" style="padding:6px 14px;font-size:13px">Prompt</button>
+          <button id="k2TabLib" type="button" style="padding:6px 14px;font-size:13px">⛁ Library</button>
         </div>
-        <input type="file" id="krea2t2ihqDescFile" accept="image/*" class="hide">
-        <div id="krea2t2ihqDescPreviewWrap" class="hide" style="margin-top:10px;text-align:center">
-          <img id="krea2t2ihqDescPreview" style="max-height:150px;border-radius:8px;display:block;margin:0 auto">
-          <button id="krea2t2ihqDescBtn" class="go" style="width:auto;margin:10px auto 0;padding:8px 16px;font-size:13px" type="button">🪄 Describe with AI</button>
-          <button id="krea2t2ihqDescClear" type="button" class="go ghost" style="display:block;margin:8px auto 0;width:auto;padding:6px 14px;font-size:12px">✕ remove photo</button>
+
+        <div id="k2PromptView">
+          <textarea id="krea2t2ihqPrompt" placeholder="e.g. standing on a rooftop at blue hour, fitted black blazer, gold necklace, city skyline behind, editorial photoshoot lighting…"></textarea>
+          <p class="hint" style="margin:10px 0 14px">Your character's identity comes from the LoRA — describe the outfit, pose &amp; setting. Or leave this blank and attach a photo below — it'll be auto-described and used as the prompt.</p>
+          <div id="krea2t2ihqDrop" style="cursor:pointer;border:1px dashed var(--line2);border-radius:12px;padding:16px;text-align:center;background:rgba(255,255,255,.01)">
+            <span style="font-size:24px;color:var(--faint)">📁</span>
+            <p style="margin:6px 0;font-size:13.5px">Click to attach a photo to describe · optional</p>
+          </div>
+          <input type="file" id="krea2t2ihqDescFile" accept="image/*" class="hide">
+          <div id="krea2t2ihqDescPreviewWrap" class="hide" style="margin-top:10px;text-align:center">
+            <img id="krea2t2ihqDescPreview" style="max-height:150px;border-radius:8px;display:block;margin:0 auto">
+            <button id="krea2t2ihqDescBtn" class="go" style="width:auto;margin:10px auto 0;padding:8px 16px;font-size:13px" type="button">🪄 Describe with AI</button>
+            <button id="krea2t2ihqDescClear" type="button" class="go ghost" style="display:block;margin:8px auto 0;width:auto;padding:6px 14px;font-size:12px">✕ remove photo</button>
+          </div>
+        </div>
+
+        <div id="k2LibView" class="hide">
+          <input id="k2LibSearch" placeholder="search prompts, tags, id…" style="width:100%;box-sizing:border-box;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 11px;font-size:12.5px;margin-bottom:9px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+            <select id="k2LibContent" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:6px 8px;font-size:11.5px"></select>
+            <select id="k2LibSafety" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:6px 8px;font-size:11.5px"></select>
+            <select id="k2LibShot" style="background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:6px 8px;font-size:11.5px"></select>
+            <label style="font-size:11.5px;color:var(--mut);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="k2LibFav"> ★ favs</label>
+            <button id="k2LibClear" class="go ghost" type="button" style="width:auto;padding:6px 10px;font-size:11.5px">clear</button>
+          </div>
+          <div id="k2LibCount" style="font-size:11px;color:var(--mut);margin-bottom:8px"></div>
+          <div id="k2LibGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+            <button id="k2LibPrev" class="go ghost" type="button" style="width:auto;padding:6px 12px;font-size:12px">← prev</button>
+            <span id="k2LibPage" style="font-size:11px;color:var(--mut)"></span>
+            <button id="k2LibNext" class="go ghost" type="button" style="width:auto;padding:6px 12px;font-size:12px">next →</button>
+          </div>
         </div>
       </div>
     </section>
@@ -2402,6 +2427,69 @@ $('#libSearch').oninput=()=>{ clearTimeout(_libT); _libT=setTimeout(()=>libFetch
 $('#libClear').onclick=()=>{ $('#libSearch').value=''; $('#libContent').value=''; $('#libSafety').value=''; $('#libShot').value=''; $('#libFav').checked=false; libFetch(0); };
 $('#libPrev').onclick=()=>{ if(S.libPage>0)libFetch(S.libPage-1); };
 $('#libNext').onclick=()=>{ if(S.libPage<Math.ceil(S.libTotal/12)-1)libFetch(S.libPage+1); };
+
+// ===== Krea2 T2I HQ prompt library =====
+// Same backend endpoints and the same favourites store as the Advanced library
+// (star a prompt in either mode and it's starred in both). Separate element ids +
+// paging state so the two views can't fight over each other; the card action is
+// "Use" (drop the prompt into the textarea) instead of adv's "+ Add" to a batch,
+// because this mode generates from a single prompt.
+S.k2LibPage=0; S.k2LibTotal=0; S.k2LibPagePrompts=[]; S.k2LibLoaded=false; let _k2LibT=null;
+$('#k2TabPrompt').onclick=()=>{ $('#k2TabPrompt').classList.add('on'); $('#k2TabLib').classList.remove('on');
+  $('#k2PromptView').classList.remove('hide'); $('#k2LibView').classList.add('hide'); };
+$('#k2TabLib').onclick=()=>{ $('#k2TabLib').classList.add('on'); $('#k2TabPrompt').classList.remove('on');
+  $('#k2LibView').classList.remove('hide'); $('#k2PromptView').classList.add('hide'); k2LoadLib(); };
+
+async function k2LoadLib(){ if(S.k2LibLoaded){ k2LibFetch(S.k2LibPage); return; }
+  $('#k2LibCount').textContent='loading library…';
+  try{ const f=await safeJson(await fetch('/api/instaraw/prompts_filters')); if(f.error)throw new Error(f.error);
+    const fmt=v=>{ const u=(v||'').toLowerCase(); if(u==='nsfw')return'NSFW'; if(u==='sfw')return'SFW'; return (v||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); };
+    const opt=(a,lbl)=>`<option value="">${lbl}</option>`+(a||[]).map(v=>`<option value="${_esc(v)}">${_esc(fmt(v))}</option>`).join('');
+    $('#k2LibContent').innerHTML=opt(f.content,'All Content Types'); $('#k2LibSafety').innerHTML=opt(f.safety,'All Safety Levels'); $('#k2LibShot').innerHTML=opt(f.shot,'All Shot Types');
+    S.k2LibLoaded=true; k2LibFetch(0);
+  }catch(e){ $('#k2LibCount').textContent='failed to load library: '+e.message; }
+}
+async function k2LibFetch(page){ S.k2LibPage=Math.max(0,page);
+  const params=new URLSearchParams({q:$('#k2LibSearch').value.trim(),content:$('#k2LibContent').value,safety:$('#k2LibSafety').value,shot:$('#k2LibShot').value,page:S.k2LibPage,per:12});
+  if($('#k2LibFav').checked){ params.set('favonly','1'); params.set('favs',[...S.libFavs].join(',')); }
+  $('#k2LibCount').textContent='searching…';
+  try{ const d=await safeJson(await fetch('/api/instaraw/prompts_db?'+params.toString())); if(d.error)throw new Error(d.error);
+    S.k2LibPagePrompts=d.prompts||[]; S.k2LibTotal=d.total||0; k2RenderLib();
+  }catch(e){ $('#k2LibCount').textContent='error: '+e.message; }
+}
+function k2RenderLib(){ const per=12, pages=Math.max(1,Math.ceil(S.k2LibTotal/per));
+  $('#k2LibCount').textContent=S.k2LibTotal.toLocaleString()+' prompts found';
+  $('#k2LibPage').textContent='page '+(S.k2LibPage+1)+' / '+pages;
+  $('#k2LibGrid').innerHTML=(S.k2LibPagePrompts.map((p,i)=>{ const fav=S.libFavs.has(p.id);
+    return `<div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:8px;padding:9px 11px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+        <span style="font-size:9.5px;color:var(--faint);font-family:var(--mono)">${_esc((p.id||'').slice(0,10))}</span>
+        <span style="font-size:9px;color:#cdbcff;background:rgba(139,92,246,.15);border-radius:4px;padding:1px 5px">${_esc(p.safety_level||'')}</span>
+        <button class="k2lib-fav" data-id="${_esc(p.id)}" type="button" style="margin-left:auto;background:none;border:none;font-size:14px;cursor:pointer;color:${fav?'#fbbf24':'var(--faint)'}">★</button>
+        <button class="k2lib-use" data-i="${i}" type="button" style="background:linear-gradient(135deg,#8b5cf6,#a78bfa);border:none;color:#15102b;font-size:11px;padding:4px 11px;border-radius:6px;cursor:pointer">Use</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--txt);line-height:1.5">${_esc((p.positive||'').slice(0,260))}${(p.positive||'').length>260?'…':''}</div>
+      <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">${(p.tags||[]).slice(0,8).map(t=>`<span style="font-size:10px;color:#cdbcff;background:rgba(139,92,246,.12);border:1px solid rgba(167,139,250,.3);border-radius:4px;padding:1px 6px">${_esc(t)}</span>`).join('')}</div>
+    </div>`; }).join('')) || '<div style="font-size:12px;color:var(--mut);padding:16px;text-align:center">no prompts match</div>';
+  $('#k2LibGrid').querySelectorAll('.k2lib-use').forEach(b=>b.onclick=()=>k2LibUse(+b.dataset.i));
+  $('#k2LibGrid').querySelectorAll('.k2lib-fav').forEach(b=>b.onclick=()=>{ const id=b.dataset.id;
+    if(S.libFavs.has(id))S.libFavs.delete(id); else S.libFavs.add(id);
+    try{localStorage.setItem('adv_lib_favs',JSON.stringify([...S.libFavs]));}catch(e){}
+    if($('#k2LibFav').checked) k2LibFetch(S.k2LibPage); else k2RenderLib(); });
+}
+// Drop the chosen prompt into the textarea and jump back to the Prompt tab so it
+// can be reviewed/edited before generating. The negative field is intentionally
+// ignored: this workflow samples at cfg=1, where negative conditioning has no effect.
+function k2LibUse(i){ const p=S.k2LibPagePrompts[i]; if(!p)return;
+  $('#krea2t2ihqPrompt').value=p.positive||'';
+  $('#k2TabPrompt').click();
+  refreshGo();
+}
+$('#k2LibSearch').oninput=()=>{ clearTimeout(_k2LibT); _k2LibT=setTimeout(()=>k2LibFetch(0),350); };
+['#k2LibContent','#k2LibSafety','#k2LibShot'].forEach(s=>$(s).onchange=()=>k2LibFetch(0)); $('#k2LibFav').onchange=()=>k2LibFetch(0);
+$('#k2LibClear').onclick=()=>{ $('#k2LibSearch').value=''; $('#k2LibContent').value=''; $('#k2LibSafety').value=''; $('#k2LibShot').value=''; $('#k2LibFav').checked=false; k2LibFetch(0); };
+$('#k2LibPrev').onclick=()=>{ if(S.k2LibPage>0)k2LibFetch(S.k2LibPage-1); };
+$('#k2LibNext').onclick=()=>{ if(S.k2LibPage<Math.ceil(S.k2LibTotal/12)-1)k2LibFetch(S.k2LibPage+1); };
 
 // ===== Main Menu: pipeline stage toggles =====
 const ADV_STAGE_DEFS=[['face','Face detailer'],['eyes','Eye detailer'],['hands','Hand detailer'],['pussy','Pussy detailer'],['nipples','Breast detailer'],['feet','Feet detailer'],['lips','Mouth / lips'],['color','Color science'],['glcm','GLCM normalize'],['grain','Neural grain'],['perturb','Pixel perturb'],['compress','Multi-compression']];
