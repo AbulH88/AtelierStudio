@@ -81,7 +81,7 @@
     "_meta": {"title": "Image Noise Augmentation"}
   },
   "324": {
-    "inputs": {"Number": "1920"},
+    "inputs": {"value": 1920},
     "class_type": "Int",
     "_meta": {"title": "Int"}
   },

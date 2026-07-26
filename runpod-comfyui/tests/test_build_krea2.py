@@ -24,13 +24,13 @@ def test_build_krea2_sets_image_prompt_seed_lora_resize():
     assert out["302"]["inputs"]["seed"] == 12345
     assert out["313"]["inputs"]["lora_name"] == inp["character_lora_path"]
     assert out["313"]["inputs"]["strength_model"] == 0.9
-    assert out["324"]["inputs"]["Number"] == "1536"
+    assert out["324"]["inputs"]["value"] == 1536
 
 
 def test_build_krea2_resize_defaults_to_1920():
     graph = _load_graph()
     out = cc._build_krea2(graph, {"prompt": "x"}, seed=1, frame_name="f.png")
-    assert out["324"]["inputs"]["Number"] == "1920"
+    assert out["324"]["inputs"]["value"] == 1920
 
 
 def test_build_krea2_denoise_defaults_match_baked_workflow_values():

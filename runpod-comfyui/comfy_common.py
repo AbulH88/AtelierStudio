@@ -424,7 +424,7 @@ def _build_krea2(graph, inp, seed, frame_name):
     the single character LoRA node."""
     nm = KREA2
     graph[nm["load_image"]]["inputs"]["image"] = frame_name
-    graph[nm["resize_size"]]["inputs"]["Number"] = str(int(inp.get("resize_size", 1920)))
+    graph[nm["resize_size"]]["inputs"]["value"] = int(inp.get("resize_size", 1920))
     graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
     graph[nm["base_ksampler"]]["inputs"]["seed"] = seed
     graph[nm["base_ksampler"]]["inputs"]["denoise"] = float(inp.get("denoise", 0.71))
