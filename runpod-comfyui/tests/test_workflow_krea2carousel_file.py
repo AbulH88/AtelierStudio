@@ -1,7 +1,10 @@
+import ast
 import json
 import os
+import re
 
 WF_PATH = os.path.join(os.path.dirname(__file__), "..", "workflow_krea2carousel.json")
+APP_PATH = os.path.join(os.path.dirname(__file__), "..", "webapp", "app.py")
 
 
 def _load():
@@ -83,6 +86,35 @@ def test_camera_look_tail_chain_reaches_the_only_save_node():
     assert graph["112"]["inputs"]["images"] == ["111", 0]
     savers = [nid for nid, n in graph.items() if "Save" in n["class_type"]]
     assert savers == ["112"]
+
+
+def _app_constant(name):
+    """Read a list-of-dicts constant out of webapp/app.py without importing it
+    (app.py pulls in flask/boto3 and reads env at import time)."""
+    src = open(APP_PATH, encoding="utf-8").read()
+    m = re.search(rf"^{name} = (\[.*?^\])", src, re.S | re.M)
+    assert m, f"{name} not found in app.py"
+    return ast.literal_eval(m.group(1))
+
+
+def test_ui_default_helpers_match_the_workflows_baked_in_slots():
+    """The UI ALWAYS sends helper_loras, so app.py's carousel defaults must mirror
+    slots 2..N of node 28 exactly. If they drift, picking this mode silently swaps
+    the workflow's own LoRAs for whatever the app seeded — the whole reason this
+    mode needs its own default set instead of reusing krea2hq's."""
+    graph = _load()
+    slots = sorted(k for k in graph["28"]["inputs"] if re.fullmatch(r"lora_\d+", k))
+    baked = [{"path": graph["28"]["inputs"][k]["lora"].replace("\\", "/"),
+              "strength": graph["28"]["inputs"][k]["strength"]}
+             for k in slots[1:]]          # slot 1 is the character LoRA, not a helper
+    assert _app_constant("KREA2CAROUSEL_DEFAULT_HELPERS") == baked
+
+
+def test_carousel_defaults_are_not_the_krea2hq_defaults():
+    hq = _app_constant("KREA2HQ_DEFAULT_HELPERS")
+    carousel = _app_constant("KREA2CAROUSEL_DEFAULT_HELPERS")
+    assert carousel != hq
+    assert not {h["path"] for h in carousel} & {h["path"] for h in hq}
 
 
 def test_every_link_points_at_a_node_that_exists():

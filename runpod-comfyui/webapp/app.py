@@ -488,6 +488,17 @@ KREA2HQ_DEFAULT_HELPERS = [
     {"path": "Keara2/mix/RealisomHelper/realism_engine_krea2_v3.1.safetensors", "strength": 0.6},
 ]
 
+# krea2carousel ships a DIFFERENT baked-in helper set (slots 2-4 of node 28 in
+# workflow_krea2carousel.json). It needs its own list because the UI always sends
+# helper_loras, so seeding the krea2hq set while in carousel mode would silently
+# replace this workflow's own LoRAs with krea2hq's. Must stay in sync with the
+# workflow file, in the same forward-slash form the picker's options use.
+KREA2CAROUSEL_DEFAULT_HELPERS = [
+    {"path": "Keara2/mix/skindetails_krea2_loraholic.safetensors", "strength": 0.5},
+    {"path": "Keara2/mix/RawGirlV2_epoch_10 (1).safetensors", "strength": 0.75},
+    {"path": "Keara2/mix/Krea2_TextFusion_Refusal_Reduction.safetensors", "strength": 1.0},
+]
+
 
 def build_krea2_helper_loras():
     """Krea2 helper (non-identity) LoRAs available to the krea2hq picker — every
@@ -520,8 +531,8 @@ def build_krea2_helper_loras():
             items = _json.load(open(cache, encoding="utf-8"))
         except Exception:
             items = []
-    for d in KREA2HQ_DEFAULT_HELPERS:      # always selectable, even if the scan missed them
-        items.append(d["path"])
+    for d in KREA2HQ_DEFAULT_HELPERS + KREA2CAROUSEL_DEFAULT_HELPERS:
+        items.append(d["path"])            # always selectable, even if the scan missed them
     items = sorted(set(items))
     return [{"path": p, "label": os.path.splitext(p.split("/")[-1])[0]} for p in items]
 
@@ -746,6 +757,7 @@ def config():
                     "res_presets": RES_PRESETS,
                     "krea2_helpers": build_krea2_helper_loras(),
                     "krea2hq_default_helpers": KREA2HQ_DEFAULT_HELPERS,
+                    "krea2carousel_default_helpers": KREA2CAROUSEL_DEFAULT_HELPERS,
                     "lightning": {"options": _folder_loras("WanLightning", ".lightning_loras.json"),
                                   "defaults": LIGHTNING_DEFAULTS}})
 

@@ -1850,6 +1850,7 @@ function setMode(m){
   // Helper LoRAs section is shared: krea2hq, krea2t2ihq and krea2carousel all use
   // the same Power Lora Loader convention (character in slot 1 + realism helpers).
   $('#krea2hqLoraField').classList.toggle('hide',m!=='krea2hq'&&m!=='krea2t2ihq'&&m!=='krea2carousel');
+  seedKrea2Helpers(m);   // carousel ships its own baked-in helper set, not krea2hq's
   // Lightning + the helper-LoRA / lightning controls are image-only, and every krea2
   // mode has no Lightning node at all (Power Lora Loader / single char LoRA instead)
   $$('.imgonly').forEach(el=>el.classList.toggle('hide', m==='video'));
@@ -2143,8 +2144,10 @@ async function loadConfig(){
   // realism helpers, toggle-able off / retunable / extendable from the UI)
   KREA2_HELPER_OPTIONS_HTML='<option value="">— select a LoRA —</option>'+
     (c.krea2_helpers||[]).map(it=>`<option value="${it.path}">${it.label}</option>`).join('');
-  $('#krea2hqHelpers').innerHTML='';
-  (c.krea2hq_default_helpers||[]).forEach(h=>addKrea2Helper(h.path,h.strength,true));
+  S.k2hqHelpers=c.krea2hq_default_helpers||[];
+  S.k2CarouselHelpers=c.krea2carousel_default_helpers||[];
+  S.k2HelperSet=null;
+  seedKrea2Helpers(S.mode,true);
   // Lightning lightx2v — editable dropdown + strength, defaults per mode
   S.lightning = c.lightning || {options:[], defaults:{}};
   $('#lightningPick').innerHTML = (S.lightning.options||[])
@@ -2244,8 +2247,23 @@ function addKrea2Helper(path='', strength=0.6, on=true){
 }
 $('#krea2hqAddLora').onclick=()=>addKrea2Helper('',0.6,true);
 $('#krea2hqRefreshLoras') && ($('#krea2hqRefreshLoras').onclick=()=>refreshKrea2Helpers($('#krea2hqRefreshLoras')));
-// Shared by krea2hq and krea2t2ihq (same #krea2hqHelpers section, same Power Lora
-// Loader convention). Only rows toggled ON with a selected LoRA; [] = both off.
+
+// One #krea2hqHelpers section is shared by every Power-Lora-Loader mode, but the
+// baked-in helper set is NOT the same: krea2hq/krea2t2ihq share two realism
+// helpers, krea2carousel's workflow has its own three. Since generate() always
+// sends this list, showing the wrong set would silently swap the carousel's own
+// LoRAs for krea2hq's — so reseed whenever the mode crosses between the two sets.
+// Within a set the rows are left alone, so edits survive mode flips like
+// krea2hq -> i2i -> krea2hq.
+function seedKrea2Helpers(m,force){
+  const set = (m==='krea2carousel') ? 'carousel' : 'hq';
+  if(!force && S.k2HelperSet===set) return;
+  S.k2HelperSet=set;
+  $('#krea2hqHelpers').innerHTML='';
+  ((set==='carousel'?S.k2CarouselHelpers:S.k2hqHelpers)||[])
+    .forEach(h=>addKrea2Helper(h.path,h.strength,true));
+}
+// Only rows toggled ON with a selected LoRA; [] = every helper off.
 function _krea2hqHelperLoras(){
   return $$('#krea2hqHelpers .tog')
     .filter(r=>r.querySelector('[data-role=hsw]').classList.contains('on'))
