@@ -113,6 +113,28 @@ KREA2HQ = {"load_image": "16", "positive": "5", "resize": "13",
 # batches natively via EmptyLatentImage.batch_size, same as T2I.
 KREA2T2IHQ = {"positive": "439", "seed_gen": "433", "latent": "458", "char": "449"}
 
+# Krea2 Carousel Maker (workflow_krea2carousel.json) — pure t2i built to shoot a
+# whole carousel/photo-dump in ONE sampler pass: a single EmptyLatentImage batch
+# (batch_size = the app's Variations = slide count) through the krea2 TURBO fp8
+# model at 8 steps / cfg 1 (ModelSamplingAuraFlow shift 6). Much faster and
+# lighter than KREA2T2IHQ's two-stage ClownsharKSampler pipeline — the trade is
+# turbo-quality frames instead of a refine pass.
+# What makes it "carousel" rather than plain t2i is the fixed camera-look tail
+# every slide runs through, so a batch comes out looking like one phone shoot:
+# Camera Look (demosaic blur + jpeg) -> Renoise (ISO grain, seeded) -> CRT
+# Post-Process (levels/sharpen/glow) -> SaveImageNoMetadata. That tail is static,
+# same treatment as KREA2HQ's refine pass — not user-tunable.
+# Character LoRA sits in slot 1 of the same rgthree Power Lora Loader convention
+# as KREA2HQ/KREA2T2IHQ, with the source workflow's 3 realism/helper LoRAs moved
+# into slots 2-4 (the source graph had the character in slot 3).
+# Dropped from the source workflow on import: the ResolutionSelector node (the
+# app's res-preset picker sizes the latent instead, same as KREA2HQ/KREA2T2IHQ),
+# the Grok prompt-generator + image-batch-loader branch (needs an API key and its
+# output fed nothing), and the rgthree Image Comparer (a UI-only node whose temp
+# images would otherwise flood the gallery).
+KREA2CAROUSEL = {"positive": "6", "latent": "10", "ksampler": "98",
+                 "char": "28", "renoise": "110"}
+
 
 def _bypass_node(graph, nid, in_key="image"):
     """Bypass an image->image node: rewire every consumer of its output to its image
@@ -516,6 +538,31 @@ def _build_krea2t2ihq(graph, inp, seed):
     return graph
 
 
+def _build_krea2carousel(graph, inp, seed):
+    """Krea2 Carousel Maker: one turbo KSampler pass over an EmptyLatentImage batch
+    (batch_size = variations = how many slides the carousel gets), then the fixed
+    camera-look tail every slide shares. No source image, no refine stage — the
+    8-step turbo schedule is the point, so steps/denoise stay as the workflow
+    defines them (unlike _build_i2i, which exposes both).
+    The Renoise grain node is seeded from the run seed too, so re-rolling gives a
+    different grain pattern instead of the same film noise over new frames."""
+    nm = KREA2CAROUSEL
+    graph[nm["latent"]]["inputs"]["width"] = int(inp.get("width", 1080))
+    graph[nm["latent"]]["inputs"]["height"] = int(inp.get("height", 1920))
+    graph[nm["latent"]]["inputs"]["batch_size"] = max(1, int(inp.get("variations", 1)))
+    graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
+    graph[nm["ksampler"]]["inputs"]["seed"] = seed
+    graph[nm["renoise"]]["inputs"]["seed"] = seed
+    if "helper_loras" in inp:
+        _apply_power_loras(graph, nm["char"], inp.get("character_lora_path"),
+                           inp.get("character_strength", 1.0), inp["helper_loras"])
+    else:
+        _set_power_lora_slot(graph, nm["char"], 1, inp.get("character_lora_path"),
+                             inp.get("character_strength", 1.0))
+    _apply_sampler_override(graph, inp)
+    return graph
+
+
 # --- high level ---------------------------------------------------------------
 _MODEL_EXT = (".safetensors", ".onnx", ".pkl", ".pth", ".ckpt", ".pt", ".bin", ".sft")
 
@@ -724,6 +771,8 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
             graph = _build_krea2hq(graph, sub, cseed, frame_name)
         elif mode == "krea2t2ihq":
             graph = _build_krea2t2ihq(graph, sub, cseed)
+        elif mode == "krea2carousel":
+            graph = _build_krea2carousel(graph, sub, cseed)
         else:
             graph = _build_t2i(graph, sub, cseed)
         images += run(base, graph, client_id=client_id)
