@@ -1,6 +1,6 @@
 {
   "1": {
-    "inputs": {"unet_name": "Kera2\\krea2_turbo_fp8_scaled.safetensors", "weight_dtype": "default"},
+    "inputs": {"unet_name": "Kera2\\krea2_turbo_bf16.safetensors", "weight_dtype": "default"},
     "class_type": "UNETLoader",
     "_meta": {"title": "Load Diffusion Model"}
   },

@@ -40,6 +40,15 @@ def test_grok_prompt_branch_and_comparer_dropped():
     assert "ResolutionSelector" not in classes
 
 
+def test_uses_the_full_bf16_checkpoint_not_the_fp8():
+    """The source export shipped the fp8_scaled build; this mode runs the full
+    bf16 weights (24.5GB vs 12.2GB) for quality — same checkpoint krea2t2ihq uses."""
+    graph = _load()
+    unet = graph["1"]["inputs"]["unet_name"]
+    assert unet.replace("\\", "/") == "Kera2/krea2_turbo_bf16.safetensors"
+    assert "fp8" not in unet
+
+
 def test_no_load_image_node_pure_t2i():
     graph = _load()
     assert all(n["class_type"] != "LoadImage" for n in graph.values())
