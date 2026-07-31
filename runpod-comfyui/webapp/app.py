@@ -1258,6 +1258,13 @@ def _build_input(body):
         inp["frame_cap"] = int(body.get("frame_cap", 81))
         inp["fps"] = int(body.get("fps", 30))
         inp["upscale"] = bool(body.get("upscale", False))   # RTX super-res + RIFE tail
+    elif inp["mode"] == "scail2motion":   # SCAIL-2 motion control: same shape as "video"
+        inp["video_b64"] = body.get("video_b64", "")
+        inp["video_filename"] = body.get("video_filename", "driving.mp4")
+        inp["ref_b64"] = body.get("ref_b64", "")
+        inp["frame_cap"] = int(body.get("frame_cap", 81))
+        inp["fps"] = int(body.get("fps", 24))
+        inp["upscale"] = bool(body.get("upscale", False))   # RTX super-res + RIFE tail
     elif inp["mode"] == "adv":   # INSTARAW advanced (LOCAL only): t2i + image-guided i2i
         inp["img2img"] = bool(body.get("img2img", False))
         inp["aspect"] = body.get("aspect", "3:4 (Portrait)")
@@ -1694,7 +1701,7 @@ def _run_gen_job(job_id, target, inp, body):
 
         if not out or "error" in out:
             raise RuntimeError((out or {}).get("error", "No output from worker."))
-        if inp["mode"] == "video":                       # Wan Animate -> mp4(s)
+        if inp["mode"] in ("video", "scail2motion"):     # Wan Animate / SCAIL-2 -> mp4(s)
             # May be 1 (raw only) or 2 (raw + RTX-upscaled) videos. Carry the driving
             # audio onto each, persist each to R2 under gallery/ (same prefix images
             # use) so motion results show up in the Gallery tab too — /api/gallery/list
@@ -1773,9 +1780,10 @@ def generate():
             return jsonify({"error": f"{label} mode runs on Local only."}), 400
         if not body.get("prompt", "").strip() and not body.get("image_b64"):
             return jsonify({"error": "Type a prompt or attach an image to describe."}), 400
-    elif mode == "video":
-        if target != "local":   # heavy Wan2.2 Animate pipeline runs on the home GPU only
-            return jsonify({"error": "Motion mode runs on Local only."}), 400
+    elif mode in ("video", "scail2motion"):
+        if target != "local":   # heavy Wan2.2 Animate / SCAIL-2 pipeline runs on the home GPU only
+            label = "Motion" if mode == "video" else "High Quality Motion Control Scail 2"
+            return jsonify({"error": f"{label} mode runs on Local only."}), 400
         if not body.get("video_b64"):
             return jsonify({"error": "Upload a driving video."}), 400
         if not body.get("ref_b64"):

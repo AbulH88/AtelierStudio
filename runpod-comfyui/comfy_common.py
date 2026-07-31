@@ -135,6 +135,31 @@ KREA2T2IHQ = {"positive": "439", "seed_gen": "433", "latent": "458", "char": "44
 KREA2CAROUSEL = {"positive": "6", "latent": "10", "ksampler": "98",
                  "char": "28", "renoise": "110"}
 
+# High Quality Motion Control SCAIL 2 (workflow_scail2motion.json) — driving video +
+# reference photo -> character motion transfer via SAM3 object tracking (109/112 on the
+# driving video, 115/116 on the reference photo) feeding a SCAIL2ColoredMask (107) that
+# conditions WanSCAILInfinity's auto-windowed sampler (132) against the Wan 2.1 14B
+# SCAIL-2 int8 checkpoint. The reference photo is resized to a 0.9-megapixel/32-multiple
+# frame size (102/103) and the driving video is resampled to match it (113's
+# custom_width/height come from that resize via GetImageSize/104) — so there's no
+# separate resolution picker, sizing comes entirely from the uploaded photo, same as
+# KREA2NEW needing no picker of its own.
+# Two locked technique LoRAs are always on (96 i2v lightx2v lightning, 130 Pusa v1),
+# chained 37->96->130->128(sage-attn)->127(torch settings)->48(ModelSamplingSD3)->132.
+# An OPTIONAL user character LoRA is inserted after 130 (mirrors VIDEO's optional
+# char_lora convention) — identity is otherwise driven entirely by the reference photo
+# (CLIP-Vision embed at 56 + reference_image/reference_image_mask straight into 132).
+# Two outputs, same convention as VIDEO: 163 = raw sampler result at the driving fps,
+# 133 = after a fixed color-match -> 2x RTX super-res -> 2x RIFE tail at 2x the fps (a
+# 30fps source becomes a 60fps final) — dropped unless inp["upscale"] is set.
+# "Character Replacement in original scene" (155) and the two SAM3 tracking prompts
+# (109/115, hardcoded "human, girl") are left at the workflow's shipped defaults — not
+# exposed, unlike VIDEO's fps/frame_cap which are.
+SCAIL2MOTION = {"positive": "6", "negative": "7", "ref_image": "58", "load_video": "113",
+                "fps_primitive": "157", "sampler": "132", "char_lora_after": "130",
+                "sage_attn": "128", "output_raw": "163", "output_final": "133"}
+SCAIL2MOTION_UPSCALE_CHAIN = ["172:160", "172:161", "172:162", "172:164", "172:165", "172:166", "133"]
+
 
 def _bypass_node(graph, nid, in_key="image"):
     """Bypass an image->image node: rewire every consumer of its output to its image
@@ -563,6 +588,37 @@ def _build_krea2carousel(graph, inp, seed):
     return graph
 
 
+def _build_scail2motion(graph, inp, seed, video_name, ref_name):
+    """SCAIL-2 motion control: wire the driving video + reference photo, prompt,
+    seed and optional character LoRA, then drop the upscale/RIFE tail unless the
+    UI's upscale toggle is on (same _drop_nodes convention as _build_video)."""
+    nm = SCAIL2MOTION
+    graph[nm["load_video"]]["inputs"]["video"] = video_name
+    if inp.get("frame_cap"):
+        graph[nm["load_video"]]["inputs"]["frame_load_cap"] = max(1, int(inp["frame_cap"]))
+    if inp.get("fps"):                       # force_rate the driving video is resampled to
+        graph[nm["fps_primitive"]]["inputs"]["value"] = max(1, int(inp["fps"]))
+    graph[nm["ref_image"]]["inputs"]["image"] = ref_name
+    graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
+    graph[nm["sampler"]]["inputs"]["seed"] = seed
+    if inp.get("character_lora_path"):
+        # Optional identity reinforcement on top of the reference-photo-driven CLIP
+        # Vision embed — same "optional, chained after the locked technique LoRAs"
+        # treatment as VIDEO's char_lora node.
+        graph["sc2_char_lora"] = {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {"model": [nm["char_lora_after"], 0],
+                       "lora_name": inp["character_lora_path"],
+                       "strength_model": float(inp.get("character_strength", 1.0))},
+            "_meta": {"title": "Character LoRA (optional)"},
+        }
+        graph[nm["sage_attn"]]["inputs"]["model"] = ["sc2_char_lora", 0]
+    if not inp.get("upscale"):               # off -> keep only the raw h264 output (163)
+        _drop_nodes(graph, SCAIL2MOTION_UPSCALE_CHAIN)
+    _apply_sampler_override(graph, inp)
+    return graph
+
+
 # --- high level ---------------------------------------------------------------
 _MODEL_EXT = (".safetensors", ".onnx", ".pkl", ".pth", ".ckpt", ".pt", ".bin", ".sft")
 
@@ -730,6 +786,23 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
         vids = run_video(base, graph,
                          out_node=[VIDEO["output_raw"], VIDEO["output_final"]],
                          client_id=client_id)
+        if not vids:
+            return {"error": "No video produced — check ComfyUI node errors / model paths."}
+        return {"videos": vids, "seed": seed}
+
+    # SCAIL-2 motion control: same driving-video + ref-photo shape as "video" above,
+    # different pipeline (SAM3 tracking + WanSCAILInfinity instead of Wan 2.2 Animate).
+    if mode == "scail2motion":
+        video_name = upload_video(base, base64.b64decode(inp["video_b64"]),
+                                  inp.get("video_filename", "driving.mp4"))
+        ref_name = upload_image(base, base64.b64decode(inp["ref_b64"]))
+        with open(wf_path, encoding="utf-8") as f:
+            graph = json.load(f)
+        _normalize_model_paths(graph)   # heal Windows-exported backslash paths (runs on Linux too)
+        graph = _build_scail2motion(graph, inp, seed, video_name, ref_name)
+        vids = run_video(base, graph,
+                         out_node=[SCAIL2MOTION["output_raw"], SCAIL2MOTION["output_final"]],
+                         client_id=client_id, timeout=1800)
         if not vids:
             return {"error": "No video produced — check ComfyUI node errors / model paths."}
         return {"videos": vids, "seed": seed}

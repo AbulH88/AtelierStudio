@@ -1,0 +1,297 @@
+{
+  "6": {
+    "inputs": {"text": "", "clip": ["38", 0]},
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "CLIP Text Encode (Positive Prompt)"}
+  },
+  "7": {
+    "inputs": {
+      "text": "oversaturated colors, overexposed, static image, blurry details, subtitles, text, style, artwork, painting, still image, grayish overall tone, worst quality, low quality, JPEG artifacts, ugly, deformed, missing parts, extra fingers, poorly drawn hands, poorly drawn face, malformed, disfigured, anatomically incorrect limbs, fused fingers, frozen pose, static scene, messy background, three legs, crowded background with many people, walking backwards",
+      "clip": ["38", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "CLIP Text Encode (Negative Prompt)"}
+  },
+  "37": {
+    "inputs": {"unet_name": "WAN\\INT8Convert\\wan2.1_14B_SCAIL_2_int8_convrot.safetensors", "weight_dtype": "default"},
+    "class_type": "UNETLoader",
+    "_meta": {"title": "Load Diffusion Model"}
+  },
+  "38": {
+    "inputs": {"clip_name": "Wan\\nsfw_wan_umt5-xxl_fp8_scaled.safetensors", "type": "wan", "device": "default"},
+    "class_type": "CLIPLoader",
+    "_meta": {"title": "Load CLIP"}
+  },
+  "39": {
+    "inputs": {"vae_name": "Wan\\Wan2_1_VAE_fp32.safetensors"},
+    "class_type": "VAELoader",
+    "_meta": {"title": "Load VAE"}
+  },
+  "48": {
+    "inputs": {"shift": 5, "model": ["127", 0]},
+    "class_type": "ModelSamplingSD3",
+    "_meta": {"title": "ModelSamplingSD3"}
+  },
+  "56": {
+    "inputs": {"crop": "none", "clip_vision": ["57", 0], "image": ["103", 0]},
+    "class_type": "CLIPVisionEncode",
+    "_meta": {"title": "CLIP Vision Encode"}
+  },
+  "57": {
+    "inputs": {"clip_name": "clip_vision_h.safetensors"},
+    "class_type": "CLIPVisionLoader",
+    "_meta": {"title": "Load CLIP Vision"}
+  },
+  "58": {
+    "inputs": {"image": "hf_20260704_170936_0239399e-e54f-44cb-ac49-ec24f1ab0aef.png"},
+    "class_type": "LoadImage",
+    "_meta": {"title": "Load Image"}
+  },
+  "96": {
+    "inputs": {
+      "lora_name": "wan\\WanLightning\\wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise\\wan21-lightx2v-i2v-14b-480p-cfg-step-distill-rank256-bf16.safetensors",
+      "strength_model": 1,
+      "model": ["37", 0]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {"title": "Load LoRA"}
+  },
+  "102": {
+    "inputs": {
+      "resize_type": "scale total pixels",
+      "resize_type.megapixels": 0.9,
+      "scale_method": "nearest-exact",
+      "input": ["58", 0]
+    },
+    "class_type": "ResizeImageMaskNode",
+    "_meta": {"title": "Resize Image/Mask"}
+  },
+  "103": {
+    "inputs": {
+      "resize_type": "scale to multiple",
+      "resize_type.multiple": 32,
+      "scale_method": "nearest-exact",
+      "input": ["102", 0]
+    },
+    "class_type": "ResizeImageMaskNode",
+    "_meta": {"title": "Resize Image/Mask"}
+  },
+  "104": {
+    "inputs": {"image": ["103", 0]},
+    "class_type": "GetImageSize",
+    "_meta": {"title": "Get Image Size"}
+  },
+  "107": {
+    "inputs": {
+      "object_indices": "",
+      "sort_by": "area",
+      "replacement_mode": ["155", 0],
+      "driving_track_data": ["112", 0],
+      "ref_track_data": ["116", 0]
+    },
+    "class_type": "SCAIL2ColoredMask",
+    "_meta": {"title": "Create SCAIL-2 Colored Mask"}
+  },
+  "109": {
+    "inputs": {"text": "human, girl", "clip": ["110", 1]},
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "CLIP Text Encode (Prompt)"}
+  },
+  "110": {
+    "inputs": {"ckpt_name": "sam3.1_multiplex_fp16.safetensors"},
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {"title": "Load Checkpoint"}
+  },
+  "112": {
+    "inputs": {
+      "detection_threshold": 0.5,
+      "max_objects": 0,
+      "detect_interval": 1,
+      "images": ["113", 0],
+      "model": ["110", 0],
+      "conditioning": ["109", 0]
+    },
+    "class_type": "SAM3_VideoTrack",
+    "_meta": {"title": "Run SAM3 Video Track"}
+  },
+  "113": {
+    "inputs": {
+      "video": "5f54e51f-be74-409f-8a4a-f1f0c4164777.mp4",
+      "force_rate": ["157", 0],
+      "custom_width": ["104", 0],
+      "custom_height": ["104", 1],
+      "frame_load_cap": 81,
+      "skip_first_frames": 0,
+      "select_every_nth": 1,
+      "format": "None"
+    },
+    "class_type": "VHS_LoadVideo",
+    "_meta": {"title": "Load Video (Upload) 🎥🅥🅗🅢"}
+  },
+  "115": {
+    "inputs": {"text": "human, girl", "clip": ["110", 1]},
+    "class_type": "CLIPTextEncode",
+    "_meta": {"title": "CLIP Text Encode (Prompt)"}
+  },
+  "116": {
+    "inputs": {
+      "detection_threshold": 0.5,
+      "max_objects": 0,
+      "detect_interval": 1,
+      "images": ["103", 0],
+      "model": ["110", 0],
+      "conditioning": ["115", 0]
+    },
+    "class_type": "SAM3_VideoTrack",
+    "_meta": {"title": "Run SAM3 Video Track"}
+  },
+  "127": {
+    "inputs": {"enable_fp16_accumulation": true, "model": ["128", 0]},
+    "class_type": "ModelPatchTorchSettings",
+    "_meta": {"title": "Model Patch Torch Settings"}
+  },
+  "128": {
+    "inputs": {"sage_attention": "auto", "allow_compile": true, "model": ["130", 0]},
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {"title": "Patch Sage Attention KJ"}
+  },
+  "130": {
+    "inputs": {
+      "lora_name": "wan\\WanLightning\\KijjiLora\\Wan21_PusaV1_LoRA_14B_rank512_bf16\\Wan21_PusaV1_LoRA_14B_rank512_bf16.safetensors",
+      "strength_model": 1,
+      "model": ["96", 0]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {"title": "Load LoRA"}
+  },
+  "132": {
+    "inputs": {
+      "width": ["104", 0],
+      "height": ["104", 1],
+      "seed": 123,
+      "steps": 6,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "window_length": 81,
+      "previous_frame_count": 5,
+      "max_frames": 0,
+      "decode_tiled": false,
+      "vary_seed_per_window": false,
+      "pose_strength": 1,
+      "pose_start": 0,
+      "pose_end": 1,
+      "replacement_mode": ["155", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "model": ["48", 0],
+      "vae": ["39", 0],
+      "pose_video": ["113", 0],
+      "pose_video_mask": ["107", 0],
+      "reference_image": ["103", 0],
+      "reference_image_mask": ["107", 1],
+      "clip_vision_output": ["56", 0]
+    },
+    "class_type": "WanSCAILInfinity",
+    "_meta": {"title": "SCAIL-2 Infinity (auto window)"}
+  },
+  "133": {
+    "inputs": {
+      "frame_rate": ["172:166", 1],
+      "loop_count": 0,
+      "filename_prefix": "SCAIL/scail2",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "images": ["172:165", 0],
+      "audio": ["113", 2]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {"title": "Video Combine 🎥🅥🅗🅢"}
+  },
+  "155": {
+    "inputs": {"value": false},
+    "class_type": "PrimitiveBoolean",
+    "_meta": {"title": "Character Replacement in original scene"}
+  },
+  "157": {
+    "inputs": {"value": 24},
+    "class_type": "PrimitiveFloat",
+    "_meta": {"title": "Frame Rate (FPS)"}
+  },
+  "163": {
+    "inputs": {
+      "frame_rate": ["157", 0],
+      "loop_count": 0,
+      "filename_prefix": "SCAIL/scail2",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "images": ["132", 0],
+      "audio": ["113", 2]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {"title": "Video Combine 🎥🅥🅗🅢"}
+  },
+  "172:160": {
+    "inputs": {
+      "method": "reinhard",
+      "image_output": "Hide",
+      "save_prefix": "ComfyUI",
+      "image_ref": ["58", 0],
+      "image_target": ["172:162", 0]
+    },
+    "class_type": "easy imageColorMatch",
+    "_meta": {"title": "Image Color Match"}
+  },
+  "172:162": {
+    "inputs": {"anything": ["172:161", 0]},
+    "class_type": "easy clearCacheAll",
+    "_meta": {"title": "Clear Cache All"}
+  },
+  "172:161": {
+    "inputs": {"anything": ["132", 0]},
+    "class_type": "easy cleanGpuUsed",
+    "_meta": {"title": "Clean VRAM Used"}
+  },
+  "172:165": {
+    "inputs": {
+      "ckpt_name": "rife49.pth",
+      "clear_cache_after_n_frames": 10,
+      "multiplier": 2,
+      "fast_mode": true,
+      "ensemble": true,
+      "scale_factor": 1,
+      "dtype": "float32",
+      "torch_compile": false,
+      "batch_size": 1,
+      "frames": ["172:164", 0]
+    },
+    "class_type": "RIFE VFI",
+    "_meta": {"title": "RIFE VFI (recommend rife4.25+)"}
+  },
+  "172:164": {
+    "inputs": {
+      "resize_type": "scale by multiplier",
+      "resize_type.scale": 2,
+      "quality": "ULTRA",
+      "images": ["172:160", 0]
+    },
+    "class_type": "RTXVideoSuperResolution",
+    "_meta": {"title": "RTX Video Super Resolution"}
+  },
+  "172:166": {
+    "inputs": {"expression": "a*2", "a": ["157", 0]},
+    "class_type": "MathExpression|pysssss",
+    "_meta": {"title": "Math Expression 🐍"}
+  }
+}
