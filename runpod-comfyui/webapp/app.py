@@ -1162,6 +1162,37 @@ def reels_upload():
     return jsonify({"ok": True, "key": key, "name": name})
 
 
+_THUMB_BUILD_LOCK = threading.Lock()
+_THUMB_BUILDING = set()
+
+
+def _ensure_thumb(thumb_key):
+    """Build a missing thumbnail from its gallery original and store it.
+
+    Returns the WebP bytes, or None when the original is gone / unreadable.
+    Concurrent requests for the same key build once; the losers fall through to
+    the normal not-found path and pick it up on the next load."""
+    if not thumb_key.startswith("thumbs/") or not thumb_key.endswith(".webp"):
+        return None
+    src_key = "gallery/" + thumb_key[len("thumbs/"):-len(".webp")] + ".png"
+    with _THUMB_BUILD_LOCK:
+        if thumb_key in _THUMB_BUILDING:
+            return None
+        _THUMB_BUILDING.add(thumb_key)
+    try:
+        src = r2_store.stream(src_key, None)
+        if src.status_code != 200:
+            return None
+        thumb = _make_thumb(src.content)
+        r2_store.upload_bytes(thumb_key, thumb)
+        return thumb
+    except Exception:
+        return None
+    finally:
+        with _THUMB_BUILD_LOCK:
+            _THUMB_BUILDING.discard(thumb_key)
+
+
 @app.get("/api/reels/media")
 @app.get("/api/media")
 def reels_media():
@@ -1171,6 +1202,16 @@ def reels_media():
     if not key:
         return jsonify({"error": "no key"}), 400
     up = r2_store.stream(key, request.headers.get("Range"))
+    if up.status_code not in (200, 206) and key.startswith("thumbs/"):
+        # Self-heal: any gallery image without a thumbnail yet (everything made
+        # before thumbnailing existed) gets one built on first view, then served
+        # from R2 forever after. Keeps the grid fast without a bulk migration.
+        made = _ensure_thumb(key)
+        if made is not None:
+            return Response(made, status=200, headers={
+                "Content-Type": "image/webp",
+                "Content-Length": str(len(made)),
+                "Cache-Control": "public, max-age=31536000, immutable"})
     if up.status_code not in (200, 206):
         return ("not found", up.status_code)
     ext = key.lower().rsplit(".", 1)[-1]
@@ -1943,6 +1984,10 @@ def gallery_list():
     group = request.args.get("group", "")
     prefix = f"gallery/{group}/" if group else "gallery/"
     imgs = r2_store.list_objs(prefix)
+    # Every PNG gets a thumb_url even when the thumbnail doesn't exist yet:
+    # /api/media builds a missing one on first request (see _ensure_thumb), so
+    # older images heal themselves as they're browsed instead of needing a
+    # bulk migration.
     for im in imgs:
         if im["key"].lower().endswith(".png"):
             thumb_key = "thumbs/" + im["key"][len("gallery/"):-4] + ".webp"
