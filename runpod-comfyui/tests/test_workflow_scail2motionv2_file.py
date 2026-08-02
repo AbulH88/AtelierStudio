@@ -1,7 +1,7 @@
 import json
 import os
 
-WF_PATH = os.path.join(os.path.dirname(__file__), "..", "workflow_scail2motion.json")
+WF_PATH = os.path.join(os.path.dirname(__file__), "..", "workflow_scail2motionv2.json")
 
 
 def _load():
@@ -18,8 +18,8 @@ def test_no_leaked_api_key():
 
 def test_remaining_nodes_present():
     """Every node from the user's export, unmodified — including the idle 117/134
-    preview/debug nodes (see test_build_scail2motion.py for why keeping them is
-    harmless)."""
+    preview/debug nodes and the now-orphaned 172:166 (see test_build_scail2motion.py
+    for why keeping them is harmless)."""
     graph = _load()
     expected = {"6", "7", "37", "38", "39", "48", "56", "57", "58", "96", "102", "103",
                 "104", "107", "109", "110", "112", "113", "115", "116", "117", "127",
@@ -55,17 +55,18 @@ def test_final_output_chain_runs_through_color_match_rtx_and_rife():
     assert graph["172:164"]["inputs"]["images"] == ["172:160", 0]
     assert graph["172:165"]["inputs"]["frames"] == ["172:164", 0]
     assert graph["133"]["inputs"]["images"] == ["172:165", 0]
-    # V1: 133 reads the "fps*2" MathExpression (172:166) — a real frame-doubled
-    # final, unlike V2.0 where 133 reads the fps primitive directly.
-    assert graph["133"]["inputs"]["frame_rate"] == ["172:166", 1]
-    assert graph["172:166"]["inputs"]["expression"] == "a*2"
-    assert graph["172:165"]["inputs"]["multiplier"] == 2   # RIFE doubles frame count
+    # V2.0: reads the fps primitive directly (no more "fps*2" doubling node) —
+    # 133 and 163 tag the same frame rate now.
+    assert graph["133"]["inputs"]["frame_rate"] == ["157", 0]
+    assert graph["133"]["inputs"]["frame_rate"] == graph["163"]["inputs"]["frame_rate"]
+    assert graph["172:165"]["inputs"]["multiplier"] == 1   # RIFE no longer doubles frame count
 
 
-def test_v1_uses_the_nsfw_tuned_fp8_clip_text_encoder():
+def test_v2_uses_the_standard_clip_text_encoder_not_the_nsfw_fp8_one():
     graph = _load()
     clip = graph["38"]["inputs"]["clip_name"]
-    assert clip.replace("\\", "/") == "Wan/nsfw_wan_umt5-xxl_fp8_scaled.safetensors"
+    assert clip.replace("\\", "/") == "Wan/umt5_xxl_fp16.safetensors"
+    assert "nsfw" not in clip.lower()
 
 
 def test_reference_photo_sizing_drives_the_driving_video_resize():

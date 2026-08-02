@@ -705,7 +705,8 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <button id="mVid" class="on" data-mode="i2i"><span class="k">i</span>Wan Image to Image</button>
     <button id="mTxt" data-mode="t2i"><span class="k">t</span>Wan Text To Image</button>
     <button id="mMotion" data-mode="video"><span class="k">m</span>Wan 2.2 Animate (Wow)</button>
-    <button id="mScail2" data-mode="scail2motion"><span class="k">s</span>🏃 High Quality Motion Control Scail 2 · V2.0</button>
+    <button id="mScail2" data-mode="scail2motion"><span class="k">s</span>🏃 High Quality Motion Control Scail 2 · V1.0</button>
+    <button id="mScail2V2" data-mode="scail2motionv2"><span class="k">2</span>🏃 High Quality Motion Control Scail 2 · V2.0</button>
     <button id="mAdv" data-mode="adv"><span class="k">a</span>⚡ Instaraw Advance</button>
     <button id="mKrea2" data-mode="krea2"><span class="k">k</span>Krea2 Image to Image</button>
     <button id="mKreaNew" data-mode="krea2new" class="hide"><span class="k">n</span>Krea2 Image to Image new</button>
@@ -1489,7 +1490,7 @@ function _charList(){
 // off-by-one.
 function _charListUI(){
   const list=_charList().slice();
-  if(S.mode==='video'||S.mode==='scail2motion') list.unshift({label:'— No character (identity from photo) —', variants:[{label:'none', path:''}]});
+  if(S.mode==='video'||S.mode==='scail2motion'||S.mode==='scail2motionv2') list.unshift({label:'— No character (identity from photo) —', variants:[{label:'none', path:''}]});
   return list;
 }
 function applyCharList(){
@@ -1675,7 +1676,7 @@ function currentLoraSelection(){
   // Motion modes (Wan Animate + SCAIL-2) use ONLY the character LoRA — each has its own
   // baked-in lightning/technique LoRA stack. Image lightning/helper LoRAs don't apply
   // there, so don't count them against the cloud volume (no false "blocked"/sync tags).
-  if(S.mode!=='video'&&S.mode!=='scail2motion'){
+  if(S.mode!=='video'&&S.mode!=='scail2motion'&&S.mode!=='scail2motionv2'){
     const lp=$('#lightningPick'); if(lp&&lp.value) out.push({path:lp.value,label:'Lightning',kind:'lightning'});
     $$('#extraLoras .lora-pick').forEach(s=>{ if(s.value) out.push({path:s.value,label:s.options[s.selectedIndex].text,kind:'helper'}); });
   }
@@ -1786,7 +1787,7 @@ function onTargetChange(){
   const cloudOnly = isCloud();
   // #mKreaNew (depth-ControlNet) is disabled for now — left out so it stays hidden
   // in every target (its backend/workflow code is kept intact for easy re-enable).
-  ['#mVid','#mTxt','#mAdv','#mKrea2','#mKreaHQ','#mKreaT2IHQ','#mKreaCarousel','#mMotion','#mScail2']
+  ['#mVid','#mTxt','#mAdv','#mKrea2','#mKreaHQ','#mKreaT2IHQ','#mKreaCarousel','#mMotion','#mScail2','#mScail2V2']
     .forEach(sel=>$(sel).classList.toggle('hide', cloudOnly));
   $('#cloudNoModes') && $('#cloudNoModes').classList.toggle('hide', !cloudOnly);
   if(typeof applyCharList==='function') applyCharList();   // cloud vs local character list
@@ -1828,6 +1829,7 @@ function setMode(m){
   $('#mKreaT2IHQ').classList.toggle('on',m==='krea2t2ihq');
   $('#mKreaCarousel').classList.toggle('on',m==='krea2carousel');
   $('#mScail2').classList.toggle('on',m==='scail2motion');
+  $('#mScail2V2').classList.toggle('on',m==='scail2motionv2');
   $('#paneVideo').classList.toggle('hide',m!=='i2i'&&m!=='krea2'&&m!=='krea2new'&&m!=='krea2hq');   // krea2/krea2new/krea2hq reuse the frame-picker pane
   $('#paneText').classList.toggle('hide',m!=='t2i');
   // krea2carousel reuses krea2t2ihq's pane wholesale — same single-prompt model,
@@ -1836,12 +1838,15 @@ function setMode(m){
   $('#paneKreaT2IHQ').classList.toggle('hide',!k2Pane);
   if(k2Pane) $('#k2PaneSub').textContent = m==='krea2carousel'
     ? 'krea2 carousel · turbo · local' : 'krea2 t2i hq · local';
-  // scail2motion reuses the Motion pane wholesale — same driving-video + ref-photo
-  // shape, same fps/frame-length/upscale controls. Only the sub-label differs.
-  const motionPane = (m==='video'||m==='scail2motion');
+  // Both scail2motion versions reuse the Motion pane wholesale — same driving-video
+  // + ref-photo shape, same fps/frame-length/upscale controls. Only the sub-label
+  // (and, server-side, which workflow file mode routes to) differs.
+  const motionPane = (m==='video'||m==='scail2motion'||m==='scail2motionv2');
   $('#paneMotion').classList.toggle('hide',!motionPane);
-  if(motionPane) $('#motionPaneSub').textContent = m==='scail2motion'
-    ? 'scail 2 v2.0 · sam3 tracking · local · 5090' : 'wan 2.2 animate · local · 5090';
+  if(motionPane) $('#motionPaneSub').textContent =
+    m==='scail2motion' ? 'scail 2 v1.0 · sam3 tracking · local · 5090' :
+    m==='scail2motionv2' ? 'scail 2 v2.0 · sam3 tracking · local · 5090' :
+    'wan 2.2 animate · local · 5090';
   $('#paneAdv').classList.toggle('hide',m!=='adv');
   // Steps + Denoise only apply to I2I; T2I uses its fixed schedule; video uses its own
   $('#denoiseField').classList.toggle('hide',m!=='i2i');
@@ -1904,6 +1909,7 @@ $('#mKreaHQ').onclick=()=>setMode('krea2hq');
 $('#mKreaT2IHQ').onclick=()=>setMode('krea2t2ihq');
 $('#mKreaCarousel').onclick=()=>setMode('krea2carousel');
 $('#mScail2').onclick=()=>setMode('scail2motion');
+$('#mScail2V2').onclick=()=>setMode('scail2motionv2');
 // --- Advanced (INSTARAW) panel wiring (increment A: scene -> prompt_batch_data) ---
 $('#advDropRef').onclick=()=>$('#advRefFile').click();
 $('#advRefFile').onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
@@ -2558,7 +2564,7 @@ $('#video').onchange=()=>{if($('#video').files[0])$('#drop').querySelector('p').
 
 function refreshGo(){
   let ok;
-  if(S.mode==='video'||S.mode==='scail2motion') ok = !!(S.motionVid && S.motionRef);   // need driving video + ref photo
+  if(S.mode==='video'||S.mode==='scail2motion'||S.mode==='scail2motionv2') ok = !!(S.motionVid && S.motionRef);   // need driving video + ref photo
   else if(S.mode==='adv') ok = !!($('#variant').value && ($('#advScene').value.trim().length>3 || (S.advPrompts&&S.advPrompts.length)));
   else if(S.mode==='i2i' || S.mode==='krea2' || S.mode==='krea2new' || S.mode==='krea2hq') ok = !!S.frame;
   // krea2t2ihq/krea2carousel: ready with either a typed prompt OR an attached
@@ -2960,9 +2966,10 @@ $('#go').onclick=async()=>{
     if(S.krea2t2ihqDescB64) body.image_b64=S.krea2t2ihqDescB64;   // describe-only, never sent to ComfyUI
     body.helper_loras=_krea2hqHelperLoras();
   }
-  // Both motion modes share the Motion pane, so the same payload — the mode key
-  // alone picks the pipeline (Wan 2.2 Animate vs SCAIL-2) server-side.
-  else if(S.mode==='video'||S.mode==='scail2motion'){
+  // All three motion modes share the Motion pane, so the same payload — the mode
+  // key alone picks the pipeline/workflow file (Wan 2.2 Animate vs SCAIL-2 V1/V2.0)
+  // server-side.
+  else if(S.mode==='video'||S.mode==='scail2motion'||S.mode==='scail2motionv2'){
     try{
       body.video_b64=await _fileToB64(S.motionVid); body.video_filename=S.motionVid.name;
       body.ref_b64=await _fileToB64(S.motionRef);

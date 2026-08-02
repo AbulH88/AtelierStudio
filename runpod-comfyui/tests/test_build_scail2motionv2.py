@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import comfy_common as cc
 
-WF_PATH = os.path.join(os.path.dirname(__file__), "..", "workflow_scail2motion.json")
+WF_PATH = os.path.join(os.path.dirname(__file__), "..", "workflow_scail2motionv2.json")
 
 
 def _load_graph():
@@ -22,16 +22,18 @@ def test_workflow_has_no_leaked_keys():
 
 def test_workflow_is_the_users_export_verbatim():
     """The app must not strip or rewire anything in the shipped JSON — including
-    117/134 (idle preview/debug nodes). They're harmless: neither is reachable
-    from either result output (163/133), so run_video never surfaces them, but
-    they stay in the file exactly as exported."""
+    117/134 (idle preview/debug nodes) and 172:166 (now-orphaned "fps*2" node,
+    since 133 reads fps straight from 157 in this V2.0 export). They're harmless:
+    none of them are reachable from either result output (163/133), so run_video
+    never surfaces them, but they stay in the file exactly as exported."""
     graph = _load_graph()
     assert "117" in graph
     assert "134" in graph
+    assert "172:166" in graph
     assert graph["117"]["class_type"] == "PreviewImage"
 
 
-def test_build_scail2motion_wires_core_inputs():
+def test_build_scail2motionv2_wires_core_inputs():
     graph = _load_graph()
     inp = {"prompt": "walking through a market", "trigger": "ing2lorance",
            "fps": 30, "frame_cap": 60}
@@ -44,7 +46,7 @@ def test_build_scail2motion_wires_core_inputs():
     assert out["132"]["inputs"]["seed"] == 999
 
 
-def test_build_scail2motion_negative_prompt_left_at_workflow_default():
+def test_build_scail2motionv2_negative_prompt_left_at_workflow_default():
     """Unlike i2i/t2i, this mode's negative prompt isn't overwritten with the
     generic NEGATIVE constant — the shipped Wan 2.1 negative stays as-is."""
     graph = _load_graph()
@@ -54,21 +56,23 @@ def test_build_scail2motion_negative_prompt_left_at_workflow_default():
     assert baked != cc.NEGATIVE
 
 
-def test_build_scail2motion_no_fps_or_frame_cap_leaves_workflow_defaults():
+def test_build_scail2motionv2_no_fps_or_frame_cap_leaves_workflow_defaults():
+    """V2.0 shipped defaults: fps 30 (was 24 in V1), frame_load_cap 0 = uncapped
+    (was 81 in V1)."""
     graph = _load_graph()
     out = cc._build_scail2motion(graph, {"prompt": "x"}, seed=1, video_name="v.mp4", ref_name="r.png")
-    assert out["157"]["inputs"]["value"] == 24
-    assert out["113"]["inputs"]["frame_load_cap"] == 81
+    assert out["157"]["inputs"]["value"] == 30
+    assert out["113"]["inputs"]["frame_load_cap"] == 0
 
 
-def test_build_scail2motion_no_character_lora_by_default():
+def test_build_scail2motionv2_no_character_lora_by_default():
     graph = _load_graph()
     out = cc._build_scail2motion(graph, {"prompt": "x"}, seed=1, video_name="v.mp4", ref_name="r.png")
     assert "sc2_char_lora" not in out
     assert out["128"]["inputs"]["model"] == ["130", 0]   # sage-attn left reading the locked chain
 
 
-def test_build_scail2motion_optional_character_lora_chains_after_locked_loras():
+def test_build_scail2motionv2_optional_character_lora_chains_after_locked_loras():
     graph = _load_graph()
     inp = {"prompt": "x", "character_lora_path": "wan/Own/Alice/Alice.safetensors",
            "character_strength": 0.85}
@@ -80,7 +84,7 @@ def test_build_scail2motion_optional_character_lora_chains_after_locked_loras():
     assert out["128"]["inputs"]["model"] == ["sc2_char_lora", 0]   # sage-attn rewired to it
 
 
-def test_build_scail2motion_upscale_off_drops_tail_keeps_raw():
+def test_build_scail2motionv2_upscale_off_drops_tail_keeps_raw():
     graph = _load_graph()
     out = cc._build_scail2motion(graph, {"prompt": "x"}, seed=1, video_name="v.mp4", ref_name="r.png")
     for nid in cc.SCAIL2MOTION_UPSCALE_CHAIN:
@@ -93,7 +97,7 @@ def test_build_scail2motion_upscale_off_drops_tail_keeps_raw():
                 assert str(v[0]) not in dropped
 
 
-def test_build_scail2motion_upscale_on_keeps_both_outputs():
+def test_build_scail2motionv2_upscale_on_keeps_both_outputs():
     graph = _load_graph()
     out = cc._build_scail2motion(graph, {"prompt": "x", "upscale": True}, seed=1,
                                  video_name="v.mp4", ref_name="r.png")
@@ -102,21 +106,20 @@ def test_build_scail2motion_upscale_on_keeps_both_outputs():
     assert "172:164" in out        # RTX super-res survives
 
 
-def test_build_scail2motion_final_output_is_frame_doubled_vs_raw():
-    """V1: RIFE runs at multiplier 2 and 133's frame_rate reads the "fps*2"
-    MathExpression (172:166), so the final output is a real 2x-interpolated
-    version of the raw output — not just spatially upscaled (that's V2.0's
-    behavior, see test_build_scail2motionv2.py)."""
+def test_build_scail2motionv2_final_output_is_same_framerate_as_raw():
+    """V2.0 behavior change from V1: the "final" (upscaled) output no longer runs
+    at 2x the fps via RIFE frame-doubling — it's the same frame rate as the raw
+    output, just spatially upscaled. Both combiners must tag the same fps."""
     graph = _load_graph()
     out = cc._build_scail2motion(graph, {"prompt": "x", "fps": 25, "upscale": True},
                                  seed=1, video_name="v.mp4", ref_name="r.png")
     assert out["163"]["inputs"]["frame_rate"] == ["157", 0]
-    assert out["133"]["inputs"]["frame_rate"] == ["172:166", 1]
+    assert out["133"]["inputs"]["frame_rate"] == ["157", 0]
     assert out["157"]["inputs"]["value"] == 25
-    assert out["172:165"]["inputs"]["multiplier"] == 2   # RIFE doubles frame count
+    assert out["172:165"]["inputs"]["multiplier"] == 1   # RIFE no longer doubles frame count
 
 
-def test_build_scail2motion_applies_sampler_override_where_applicable():
+def test_build_scail2motionv2_applies_sampler_override_where_applicable():
     """WanSCAILInfinity's class_type has no 'Sampler' substring, so the generic
     broadcast is a no-op on node 132 — verifying that rather than assuming it."""
     graph = _load_graph()
@@ -125,3 +128,10 @@ def test_build_scail2motion_applies_sampler_override_where_applicable():
     assert out["132"]["inputs"]["cfg"] == 1          # untouched — not a "*Sampler*" class_type
     assert "WanSCAILInfinity" == out["132"]["class_type"]
     assert "Sampler" not in out["132"]["class_type"]
+
+
+def test_v2_uses_the_standard_clip_text_encoder_not_the_nsfw_fp8_one():
+    graph = _load_graph()
+    clip = graph["38"]["inputs"]["clip_name"]
+    assert clip.replace("\\", "/") == "Wan/umt5_xxl_fp16.safetensors"
+    assert "nsfw" not in clip.lower()

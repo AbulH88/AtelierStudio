@@ -135,9 +135,16 @@ KREA2T2IHQ = {"positive": "439", "seed_gen": "433", "latent": "458", "char": "44
 KREA2CAROUSEL = {"positive": "6", "latent": "10", "ksampler": "98",
                  "char": "28", "renoise": "110"}
 
-# High Quality Motion Control SCAIL 2 · V2.0 (workflow_scail2motion.json) — driving
-# video + reference photo -> character motion transfer via SAM3 object tracking
-# (109/112 on the driving video, 115/116 on the reference photo) feeding a
+# High Quality Motion Control SCAIL 2 — two coexisting versions, V1
+# (workflow_scail2motion.json) and V2.0 (workflow_scail2motionv2.json), both
+# selectable in the UI as separate modes ("scail2motion" / "scail2motionv2"). Both
+# are the user's exports verbatim — the app does not strip or rewire anything in
+# either shipped JSON. Node ids are IDENTICAL between the two files (same graph,
+# different tuning), so both modes share this one node-id map and _build_scail2motion
+# — only wf_path (computed from the mode name) differs.
+#
+# Driving video + reference photo -> character motion transfer via SAM3 object
+# tracking (109/112 on the driving video, 115/116 on the reference photo) feeding a
 # SCAIL2ColoredMask (107) that conditions WanSCAILInfinity's auto-windowed sampler
 # (132) against the Wan 2.1 14B SCAIL-2 int8 checkpoint. The reference photo is
 # resized to a 0.9-megapixel/32-multiple frame size (102/103) and the driving video
@@ -150,18 +157,22 @@ KREA2CAROUSEL = {"positive": "6", "latent": "10", "ksampler": "98",
 # char_lora convention) — identity is otherwise driven entirely by the reference photo
 # (CLIP-Vision embed at 56 + reference_image/reference_image_mask straight into 132).
 # Two outputs, same convention as VIDEO: 163 = raw sampler result, 133 = after a fixed
-# color-match -> 2x RTX super-res (spatial only) -> RIFE — dropped unless
-# inp["upscale"] is set. UNLIKE V1: in the user's V2.0 export RIFE now runs at
-# multiplier 1 and 133's frame_rate reads the fps primitive (157) directly instead of
-# a "fps*2" MathExpression (133 and 163 tag the same frame rate now — no more
-# frame-doubled "60fps" final). The CLIP text encoder switched from the NSFW-tuned
-# fp8 build to the standard umt5_xxl_fp16, and the shipped fps default moved 24->30.
-# This is the user's export verbatim — the app does not strip or rewire anything in
-# the shipped JSON, including 117/134 (harmless idle preview/debug nodes carried over
-# from the source graph, unreachable from either result output so run_video never
-# surfaces them) and 172:166 (the now-orphaned "fps*2" node, likewise never reached).
+# color-match -> 2x RTX super-res -> RIFE tail — dropped unless inp["upscale"] is set.
+#
+# V1 vs V2.0, what actually differs (both graphs otherwise identical):
+#   - V1: RIFE multiplier 2 + 133's frame_rate = "fps*2" (172:166) -> a frame-doubled
+#     "60fps" final (a 30fps source becomes 60fps). fps default 24, frame_load_cap 81.
+#     CLIP text encoder: the NSFW-tuned nsfw_wan_umt5-xxl_fp8_scaled.
+#   - V2.0: RIFE multiplier 1 + 133 reads the fps primitive (157) directly -> 133 and
+#     163 tag the SAME frame rate (spatially 2x-upscaled only, no interpolation).
+#     172:166 is still present in the file but now orphaned/unreached. fps default 30,
+#     frame_load_cap 0 (uncapped). CLIP text encoder: standard umt5_xxl_fp16.
+# Both files also carry 117 (PreviewImage) and 134 (a save_output:false
+# VHS_VideoCombine) — harmless idle debug nodes from the source graphs, unreachable
+# from either result output (163/133) so run_video never surfaces them.
+#
 # "Character Replacement in original scene" (155) and the two SAM3 tracking prompts
-# (109/115, hardcoded "human, girl") are left at the workflow's shipped defaults — not
+# (109/115, hardcoded "human, girl") are left at each file's shipped default — not
 # exposed, unlike VIDEO's fps/frame_cap which are.
 SCAIL2MOTION = {"positive": "6", "negative": "7", "ref_image": "58", "load_video": "113",
                 "fps_primitive": "157", "sampler": "132", "char_lora_after": "130",
@@ -800,7 +811,11 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
 
     # SCAIL-2 motion control: same driving-video + ref-photo shape as "video" above,
     # different pipeline (SAM3 tracking + WanSCAILInfinity instead of Wan 2.2 Animate).
-    if mode == "scail2motion":
+    # "scail2motion" (V1) and "scail2motionv2" (V2.0) are two separate, coexisting
+    # workflow files with identical node ids (see the SCAIL2MOTION comment above) —
+    # wf_path already resolved to the right one from `mode` above, so one branch
+    # covers both.
+    if mode in ("scail2motion", "scail2motionv2"):
         video_name = upload_video(base, base64.b64decode(inp["video_b64"]),
                                   inp.get("video_filename", "driving.mp4"))
         ref_name = upload_image(base, base64.b64decode(inp["ref_b64"]))
