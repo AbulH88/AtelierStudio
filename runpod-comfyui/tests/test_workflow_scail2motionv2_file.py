@@ -69,6 +69,14 @@ def test_v2_uses_the_standard_clip_text_encoder_not_the_nsfw_fp8_one():
     assert "nsfw" not in clip.lower()
 
 
+def test_v2_stays_on_the_int8_convrot_checkpoint():
+    """V1 was switched to the full fp16 diffusion checkpoint (test_workflow_
+    scail2motion_file.py) — V2.0 keeps the int8_convrot build it shipped with."""
+    graph = _load()
+    unet = graph["37"]["inputs"]["unet_name"]
+    assert unet.replace("\\", "/") == "WAN/INT8Convert/wan2.1_14B_SCAIL_2_int8_convrot.safetensors"
+
+
 def test_reference_photo_sizing_drives_the_driving_video_resize():
     """No separate resolution picker: the ref photo's resize (102/103) sizes both
     the video load (113) and the sampler (132) via GetImageSize (104)."""

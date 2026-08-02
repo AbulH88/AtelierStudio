@@ -68,6 +68,15 @@ def test_v1_uses_the_nsfw_tuned_fp8_clip_text_encoder():
     assert clip.replace("\\", "/") == "Wan/nsfw_wan_umt5-xxl_fp8_scaled.safetensors"
 
 
+def test_v1_uses_the_full_fp16_checkpoint_not_convrot():
+    """V1's diffusion checkpoint was switched from the int8_convrot build to the
+    full fp16 weights — V2.0 stays on convrot (see test_workflow_scail2motionv2_file.py)."""
+    graph = _load()
+    unet = graph["37"]["inputs"]["unet_name"]
+    assert unet.replace("\\", "/") == "SCAIL 2/wan2.1_14B_SCAIL_2_fp16.safetensors"
+    assert "convrot" not in unet.lower()
+
+
 def test_reference_photo_sizing_drives_the_driving_video_resize():
     """No separate resolution picker: the ref photo's resize (102/103) sizes both
     the video load (113) and the sampler (132) via GetImageSize (104)."""
