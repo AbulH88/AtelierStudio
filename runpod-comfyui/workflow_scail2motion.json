@@ -18,7 +18,7 @@
     "_meta": {"title": "Load Diffusion Model"}
   },
   "38": {
-    "inputs": {"clip_name": "Wan\\nsfw_wan_umt5-xxl_fp8_scaled.safetensors", "type": "wan", "device": "default"},
+    "inputs": {"clip_name": "Wan\\umt5_xxl_fp16.safetensors", "type": "wan", "device": "default"},
     "class_type": "CLIPLoader",
     "_meta": {"title": "Load CLIP"}
   },
@@ -43,7 +43,7 @@
     "_meta": {"title": "Load CLIP Vision"}
   },
   "58": {
-    "inputs": {"image": "hf_20260704_170936_0239399e-e54f-44cb-ac49-ec24f1ab0aef.png"},
+    "inputs": {"image": "ChatGPT Image Aug 2, 2026, 07_47_13 PM.png"},
     "class_type": "LoadImage",
     "_meta": {"title": "Load Image"}
   },
@@ -116,11 +116,11 @@
   },
   "113": {
     "inputs": {
-      "video": "5f54e51f-be74-409f-8a4a-f1f0c4164777.mp4",
+      "video": "h264 yuv420p_00003-audio.mp4",
       "force_rate": ["157", 0],
       "custom_width": ["104", 0],
       "custom_height": ["104", 1],
-      "frame_load_cap": 81,
+      "frame_load_cap": 0,
       "skip_first_frames": 0,
       "select_every_nth": 1,
       "format": "None"
@@ -144,6 +144,11 @@
     },
     "class_type": "SAM3_VideoTrack",
     "_meta": {"title": "Run SAM3 Video Track"}
+  },
+  "117": {
+    "inputs": {"images": ["107", 1]},
+    "class_type": "PreviewImage",
+    "_meta": {"title": "Preview Image"}
   },
   "127": {
     "inputs": {"enable_fp16_accumulation": true, "model": ["128", 0]},
@@ -198,7 +203,7 @@
   },
   "133": {
     "inputs": {
-      "frame_rate": ["172:166", 1],
+      "frame_rate": ["157", 0],
       "loop_count": 0,
       "filename_prefix": "SCAIL/scail2",
       "format": "video/h264-mp4",
@@ -214,13 +219,30 @@
     "class_type": "VHS_VideoCombine",
     "_meta": {"title": "Video Combine 🎥🅥🅗🅢"}
   },
+  "134": {
+    "inputs": {
+      "frame_rate": ["157", 0],
+      "loop_count": 0,
+      "filename_prefix": "AnimateDiff",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": false,
+      "images": ["107", 0]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {"title": "Video Combine 🎥🅥🅗🅢"}
+  },
   "155": {
     "inputs": {"value": false},
     "class_type": "PrimitiveBoolean",
     "_meta": {"title": "Character Replacement in original scene"}
   },
   "157": {
-    "inputs": {"value": 24},
+    "inputs": {"value": 30},
     "class_type": "PrimitiveFloat",
     "_meta": {"title": "Frame Rate (FPS)"}
   },
@@ -267,7 +289,7 @@
     "inputs": {
       "ckpt_name": "rife49.pth",
       "clear_cache_after_n_frames": 10,
-      "multiplier": 2,
+      "multiplier": 1,
       "fast_mode": true,
       "ensemble": true,
       "scale_factor": 1,

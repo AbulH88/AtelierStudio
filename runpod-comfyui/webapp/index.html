@@ -705,7 +705,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <button id="mVid" class="on" data-mode="i2i"><span class="k">i</span>Wan Image to Image</button>
     <button id="mTxt" data-mode="t2i"><span class="k">t</span>Wan Text To Image</button>
     <button id="mMotion" data-mode="video"><span class="k">m</span>Wan 2.2 Animate (Wow)</button>
-    <button id="mScail2" data-mode="scail2motion"><span class="k">s</span>🏃 High Quality Motion Control Scail 2</button>
+    <button id="mScail2" data-mode="scail2motion"><span class="k">s</span>🏃 High Quality Motion Control Scail 2 · V2.0</button>
     <button id="mAdv" data-mode="adv"><span class="k">a</span>⚡ Instaraw Advance</button>
     <button id="mKrea2" data-mode="krea2"><span class="k">k</span>Krea2 Image to Image</button>
     <button id="mKreaNew" data-mode="krea2new" class="hide"><span class="k">n</span>Krea2 Image to Image new</button>
@@ -1841,7 +1841,7 @@ function setMode(m){
   const motionPane = (m==='video'||m==='scail2motion');
   $('#paneMotion').classList.toggle('hide',!motionPane);
   if(motionPane) $('#motionPaneSub').textContent = m==='scail2motion'
-    ? 'scail 2 · sam3 tracking · local · 5090' : 'wan 2.2 animate · local · 5090';
+    ? 'scail 2 v2.0 · sam3 tracking · local · 5090' : 'wan 2.2 animate · local · 5090';
   $('#paneAdv').classList.toggle('hide',m!=='adv');
   // Steps + Denoise only apply to I2I; T2I uses its fixed schedule; video uses its own
   $('#denoiseField').classList.toggle('hide',m!=='i2i');

@@ -20,14 +20,17 @@ def test_workflow_has_no_leaked_keys():
     assert "api_key" not in raw.lower()
 
 
-def test_ui_only_preview_nodes_stripped():
-    """117 (PreviewImage) and 134 (a save_output:false VHS_VideoCombine) never
-    produce a usable headless output — both must be gone from the shipped file."""
+def test_workflow_is_the_users_export_verbatim():
+    """The app must not strip or rewire anything in the shipped JSON — including
+    117/134 (idle preview/debug nodes) and 172:166 (now-orphaned "fps*2" node,
+    since 133 reads fps straight from 157 in this export). They're harmless: none
+    of them are reachable from either result output (163/133), so run_video never
+    surfaces them, but they stay in the file exactly as exported."""
     graph = _load_graph()
-    assert "117" not in graph
-    assert "134" not in graph
-    classes = {n["class_type"] for n in graph.values()}
-    assert "PreviewImage" not in classes
+    assert "117" in graph
+    assert "134" in graph
+    assert "172:166" in graph
+    assert graph["117"]["class_type"] == "PreviewImage"
 
 
 def test_build_scail2motion_wires_core_inputs():
@@ -54,10 +57,12 @@ def test_build_scail2motion_negative_prompt_left_at_workflow_default():
 
 
 def test_build_scail2motion_no_fps_or_frame_cap_leaves_workflow_defaults():
+    """V2.0 shipped defaults: fps 30 (was 24 in V1), frame_load_cap 0 = uncapped
+    (was 81 in V1)."""
     graph = _load_graph()
     out = cc._build_scail2motion(graph, {"prompt": "x"}, seed=1, video_name="v.mp4", ref_name="r.png")
-    assert out["157"]["inputs"]["value"] == 24
-    assert out["113"]["inputs"]["frame_load_cap"] == 81
+    assert out["157"]["inputs"]["value"] == 30
+    assert out["113"]["inputs"]["frame_load_cap"] == 0
 
 
 def test_build_scail2motion_no_character_lora_by_default():
@@ -99,6 +104,19 @@ def test_build_scail2motion_upscale_on_keeps_both_outputs():
     assert "163" in out            # raw
     assert "133" in out            # color-matched + RTX + RIFE final
     assert "172:164" in out        # RTX super-res survives
+
+
+def test_build_scail2motion_final_output_is_same_framerate_as_raw():
+    """V2.0 behavior change from V1: the "final" (upscaled) output no longer runs
+    at 2x the fps via RIFE frame-doubling — it's the same frame rate as the raw
+    output, just spatially upscaled. Both combiners must tag the same fps."""
+    graph = _load_graph()
+    out = cc._build_scail2motion(graph, {"prompt": "x", "fps": 25, "upscale": True},
+                                 seed=1, video_name="v.mp4", ref_name="r.png")
+    assert out["163"]["inputs"]["frame_rate"] == ["157", 0]
+    assert out["133"]["inputs"]["frame_rate"] == ["157", 0]
+    assert out["157"]["inputs"]["value"] == 25
+    assert out["172:165"]["inputs"]["multiplier"] == 1   # RIFE no longer doubles frame count
 
 
 def test_build_scail2motion_applies_sampler_override_where_applicable():

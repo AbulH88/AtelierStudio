@@ -135,23 +135,31 @@ KREA2T2IHQ = {"positive": "439", "seed_gen": "433", "latent": "458", "char": "44
 KREA2CAROUSEL = {"positive": "6", "latent": "10", "ksampler": "98",
                  "char": "28", "renoise": "110"}
 
-# High Quality Motion Control SCAIL 2 (workflow_scail2motion.json) — driving video +
-# reference photo -> character motion transfer via SAM3 object tracking (109/112 on the
-# driving video, 115/116 on the reference photo) feeding a SCAIL2ColoredMask (107) that
-# conditions WanSCAILInfinity's auto-windowed sampler (132) against the Wan 2.1 14B
-# SCAIL-2 int8 checkpoint. The reference photo is resized to a 0.9-megapixel/32-multiple
-# frame size (102/103) and the driving video is resampled to match it (113's
-# custom_width/height come from that resize via GetImageSize/104) — so there's no
-# separate resolution picker, sizing comes entirely from the uploaded photo, same as
-# KREA2NEW needing no picker of its own.
+# High Quality Motion Control SCAIL 2 · V2.0 (workflow_scail2motion.json) — driving
+# video + reference photo -> character motion transfer via SAM3 object tracking
+# (109/112 on the driving video, 115/116 on the reference photo) feeding a
+# SCAIL2ColoredMask (107) that conditions WanSCAILInfinity's auto-windowed sampler
+# (132) against the Wan 2.1 14B SCAIL-2 int8 checkpoint. The reference photo is
+# resized to a 0.9-megapixel/32-multiple frame size (102/103) and the driving video
+# is resampled to match it (113's custom_width/height come from that resize via
+# GetImageSize/104) — so there's no separate resolution picker, sizing comes
+# entirely from the uploaded photo, same as KREA2NEW needing no picker of its own.
 # Two locked technique LoRAs are always on (96 i2v lightx2v lightning, 130 Pusa v1),
 # chained 37->96->130->128(sage-attn)->127(torch settings)->48(ModelSamplingSD3)->132.
 # An OPTIONAL user character LoRA is inserted after 130 (mirrors VIDEO's optional
 # char_lora convention) — identity is otherwise driven entirely by the reference photo
 # (CLIP-Vision embed at 56 + reference_image/reference_image_mask straight into 132).
-# Two outputs, same convention as VIDEO: 163 = raw sampler result at the driving fps,
-# 133 = after a fixed color-match -> 2x RTX super-res -> 2x RIFE tail at 2x the fps (a
-# 30fps source becomes a 60fps final) — dropped unless inp["upscale"] is set.
+# Two outputs, same convention as VIDEO: 163 = raw sampler result, 133 = after a fixed
+# color-match -> 2x RTX super-res (spatial only) -> RIFE — dropped unless
+# inp["upscale"] is set. UNLIKE V1: in the user's V2.0 export RIFE now runs at
+# multiplier 1 and 133's frame_rate reads the fps primitive (157) directly instead of
+# a "fps*2" MathExpression (133 and 163 tag the same frame rate now — no more
+# frame-doubled "60fps" final). The CLIP text encoder switched from the NSFW-tuned
+# fp8 build to the standard umt5_xxl_fp16, and the shipped fps default moved 24->30.
+# This is the user's export verbatim — the app does not strip or rewire anything in
+# the shipped JSON, including 117/134 (harmless idle preview/debug nodes carried over
+# from the source graph, unreachable from either result output so run_video never
+# surfaces them) and 172:166 (the now-orphaned "fps*2" node, likewise never reached).
 # "Character Replacement in original scene" (155) and the two SAM3 tracking prompts
 # (109/115, hardcoded "human, girl") are left at the workflow's shipped defaults — not
 # exposed, unlike VIDEO's fps/frame_cap which are.
