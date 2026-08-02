@@ -3,3 +3,4 @@ requests
 boto3
 yt-dlp
 websocket-client
+Pillow

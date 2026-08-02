@@ -122,6 +122,33 @@ else:
 AGENT_URL = os.environ.get("AGENT_URL", "").rstrip("/")
 AGENT_SECRET = os.environ.get("AGENT_SECRET", "")
 
+# Cloud generation runs on RunPod and bills the owner, so it is gated on the home
+# agent being up: the agent is the owner's on/off switch for letting other people
+# spend credits. Set CLOUD_REQUIRES_AGENT=0 to leave Cloud always open.
+CLOUD_REQUIRES_AGENT = os.environ.get("CLOUD_REQUIRES_AGENT", "1") not in ("0", "false", "no")
+_AGENT_UP_TTL = 10          # seconds; the UI polls status, don't hammer the tunnel
+_agent_up_cache = {"at": 0.0, "up": False}
+
+
+def _agent_up(force=False):
+    """Is the home agent reachable? Cached briefly — this is polled by the UI and
+    checked on every cloud generate."""
+    if not AGENT_URL:
+        # No agent configured (running on the same box as ComfyUI) — nothing to gate.
+        return True
+    now = time.time()
+    if not force and now - _agent_up_cache["at"] < _AGENT_UP_TTL:
+        return _agent_up_cache["up"]
+    up = False
+    try:
+        r = requests.get(f"{AGENT_URL}/status",
+                         headers={"x-agent-secret": AGENT_SECRET}, timeout=6)
+        up = r.status_code == 200
+    except Exception:
+        pass
+    _agent_up_cache.update(at=now, up=up)
+    return up
+
 # --- live generation progress ------------------------------------------------
 # Shared client id: the VPS submits /prompt with it and the home agent's WS
 # listens with it, so ComfyUI routes step-progress to the agent. On the VPS we
@@ -800,7 +827,15 @@ def health():
             pass
     else:
         agent_os = "windows" if _IS_WINDOWS else "linux"
-    return jsonify({"local": local, "cloud": bool(ENDPOINT_ID and API_KEY), "agent_os": agent_os})
+    agent_up = _agent_up()
+    return jsonify({"local": local,
+                    "cloud": bool(ENDPOINT_ID and API_KEY),
+                    "agent_os": agent_os,
+                    "agent_up": agent_up,
+                    # UI greys out Cloud generation while the owner's agent is off
+                    "cloud_open": bool(ENDPOINT_ID and API_KEY)
+                                  and (agent_up or not CLOUD_REQUIRES_AGENT),
+                    "cloud_gated": CLOUD_REQUIRES_AGENT})
 
 
 @app.get("/api/cloud/info")
@@ -819,7 +854,11 @@ def cloud_info():
 @app.get("/api/cloud/status")
 def cloud_status():
     """Live endpoint health for the warming/health strip (polled in cloud mode)."""
-    return jsonify(_cloud_status())
+    st = _cloud_status()
+    st["agent_up"] = _agent_up()
+    st["gated"] = CLOUD_REQUIRES_AGENT
+    st["open"] = st["agent_up"] or not CLOUD_REQUIRES_AGENT
+    return jsonify(st)
 
 
 def _live_gpus(dc=None):
@@ -1134,11 +1173,18 @@ def reels_media():
         return ("not found", up.status_code)
     ext = key.lower().rsplit(".", 1)[-1]
     ct = ("video/mp4" if ext in ("mp4", "mov", "webm")
-          else "image/png" if ext == "png" else "image/jpeg")
+          else "image/png" if ext == "png"
+          else "image/webp" if ext == "webp"
+          else "image/jpeg")
     headers = {"Content-Type": ct, "Accept-Ranges": "bytes"}
     for h in ("Content-Range", "Content-Length"):
         if h in up.headers:
             headers[h] = up.headers[h]
+    # Gallery/thumb keys embed a timestamp+seed and are never overwritten in
+    # place, so they're safe to cache "forever" — repeat gallery visits then
+    # cost zero network requests instead of re-streaming through the R2 proxy.
+    if key.startswith(("gallery/", "thumbs/")):
+        headers["Cache-Control"] = "public, max-age=31536000, immutable"
     if request.args.get("download"):
         headers["Content-Disposition"] = f'attachment; filename="{key.split("/")[-1]}"'
     return Response(up.iter_content(65536), status=up.status_code, headers=headers)
@@ -1750,6 +1796,12 @@ def generate():
     body = request.get_json(force=True)
     target = body.get("target", "local")
 
+    # Cloud spends the owner's RunPod credits, so it only runs while the home
+    # agent is up — that's the owner's switch for granting access.
+    if target != "local" and CLOUD_REQUIRES_AGENT and not _agent_up(force=True):
+        return jsonify({"error": "Cloud generation is off right now — the studio "
+                                 "host has to start the session first."}), 503
+
     mode = body.get("mode", "i2i")
     if mode == "i2i":
         fpath = os.path.join(FRAMES_DIR, body.get("session", ""), body.get("frame", ""))
@@ -1835,21 +1887,42 @@ def _gallery_group(inp):
     return "misc"
 
 
+def _make_thumb(png_bytes, max_dim=480, quality=72):
+    """Small WebP preview of a generated image, for fast gallery-grid loads."""
+    from io import BytesIO
+    from PIL import Image
+    img = Image.open(BytesIO(png_bytes))
+    img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+    buf = BytesIO()
+    img.convert("RGB").save(buf, "WEBP", quality=quality, method=4)
+    return buf.getvalue()
+
+
 def _save_to_gallery(inp, images, seed):
     """Persist each generated image to R2. Returns the list of R2 keys written,
-    so the result can be served as lightweight URLs instead of base64 blobs."""
+    so the result can be served as lightweight URLs instead of base64 blobs.
+
+    Also writes a small WebP thumbnail alongside each full-res PNG (under a
+    parallel thumbs/ prefix) so the gallery grid can load previews instead of
+    the multi-MB originals; see gallery_list()."""
     if not images:
         return []
     group = _gallery_group(inp)
     ts = int(time.time())
     keys = []
     for i, b64 in enumerate(images):
+        raw = base64.b64decode(b64)
         key = f"gallery/{group}/{ts}_{seed}_{i}.png"
         try:
-            r2_store.upload_bytes(key, base64.b64decode(b64))
+            r2_store.upload_bytes(key, raw)
             keys.append(key)
         except Exception:
-            pass
+            continue
+        try:
+            thumb = _make_thumb(raw)
+            r2_store.upload_bytes(f"thumbs/{group}/{ts}_{seed}_{i}.webp", thumb)
+        except Exception:
+            pass  # non-fatal; grid just falls back to the full image
     return keys
 
 
@@ -1863,9 +1936,14 @@ def gallery_groups():
 
 @app.get("/api/gallery/list")
 def gallery_list():
+    from urllib.parse import quote
     group = request.args.get("group", "")
     prefix = f"gallery/{group}/" if group else "gallery/"
     imgs = r2_store.list_objs(prefix)
+    for im in imgs:
+        if im["key"].lower().endswith(".png"):
+            thumb_key = "thumbs/" + im["key"][len("gallery/"):-4] + ".webp"
+            im["thumb_url"] = f"/api/media?key={quote(thumb_key, safe='')}"
     imgs.sort(key=lambda x: x["name"], reverse=True)   # newest first
     return jsonify({"images": imgs})
 

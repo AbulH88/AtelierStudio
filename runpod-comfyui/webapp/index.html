@@ -1232,6 +1232,9 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           <div class="sw on" id="randSw" title="random"></div>
         </div>
       </div>
+      <div id="cloudGate" class="hide" style="margin-top:14px;padding:10px 12px;border:1px solid rgba(217,139,122,.3);background:rgba(217,139,122,.12);border-radius:10px;font-size:12.5px;line-height:1.45;color:var(--rose)">
+        <b>Studio offline.</b> Cloud generation is paused until the studio host starts the session.
+      </div>
       <div style="display:flex;gap:10px;margin-top:14px">
         <button class="go" id="go" style="flex:1;margin:0" disabled>Develop</button>
         <button class="go hide" id="stopGen" style="flex:none;width:50px;margin:0;background:rgba(217,139,122,.15);border-color:rgba(217,139,122,.3);color:var(--rose)" title="Stop Generation">✕</button>
@@ -1775,8 +1778,8 @@ function renderCloudCard(){
 async function pollCloudStatus(){
   if(!isCloud()) return;
   try{ CLOUD.status=await(await fetch('/api/cloud/status')).json(); }
-  catch(e){ CLOUD.status={configured:true,error:'unreachable'}; }
-  updateStatus(); renderCloudCard();
+  catch(e){ CLOUD.status={configured:true,error:'unreachable',open:false}; }
+  updateStatus(); renderCloudCard(); refreshGo();   // gate follows agent state
 }
 function onTargetChange(){
   if(CLOUD.poll){ clearInterval(CLOUD.poll); CLOUD.poll=null; }
@@ -1793,6 +1796,7 @@ function onTargetChange(){
   if(typeof applyCharList==='function') applyCharList();   // cloud vs local character list
   renderCloudCard();
   if(isCloud()){ pollCloudStatus(); CLOUD.poll=setInterval(pollCloudStatus,7000); }
+  refreshGo();   // clears the cloud gate banner when switching back to Local
 }
 
 function setRange(el){el.style.setProperty('--p',((el.value-el.min)/(el.max-el.min)*100)+'%');}
@@ -2572,6 +2576,11 @@ function refreshGo(){
   else if(S.mode==='krea2t2ihq'||S.mode==='krea2carousel') ok = !!($('#krea2t2ihqPrompt').value.trim() || S.krea2t2ihqDescB64);
   else ok = $('#prompt').value.trim().length>3;
   if(ok && cloudMissing().length) ok=false;   // grey out: a selected LoRA isn't on the cloud volume
+  // Cloud burns the owner's RunPod credits, so it stays locked until their home
+  // agent is up. /api/cloud/status reports open:false while it's down.
+  const gated = isCloud() && CLOUD.status && CLOUD.status.open === false;
+  if(gated) ok=false;
+  $('#cloudGate').classList.toggle('hide', !gated);
   $('#go').disabled=!ok; $('#goTop').disabled=!ok;
 }
 $('#prompt').oninput=refreshGo;
@@ -3247,7 +3256,7 @@ function renderGallery() {
     const isVid = _isVid(im.name);
     const media = isVid
       ? `<video src="${im.url}" data-url="${im.url}" data-name="${im.name}" muted preload="metadata" style="cursor:pointer" onmouseover="this.play()" onmouseout="this.pause();this.currentTime=0"></video>`
-      : `<img src="${im.url}" loading="lazy" data-url="${im.url}">`;
+      : `<img src="${im.thumb_url || im.url}" loading="lazy" data-url="${im.url}" onerror="this.onerror=null;this.src=this.dataset.url;">`;
     // "Use as Motion reference photo" only makes sense for images
     const motionBtn = isVid ? '' : `<button class="gmotion" data-url="${im.url}" title="Use as Motion reference photo">→ Motion ref</button>`;
     return `<div class="gal-card${selClass}" data-key="${im.key}" data-index="${idx}">
