@@ -122,10 +122,13 @@ else:
 AGENT_URL = os.environ.get("AGENT_URL", "").rstrip("/")
 AGENT_SECRET = os.environ.get("AGENT_SECRET", "")
 
-# Cloud generation runs on RunPod and bills the owner, so it is gated on the home
-# agent being up: the agent is the owner's on/off switch for letting other people
-# spend credits. Set CLOUD_REQUIRES_AGENT=0 to leave Cloud always open.
-CLOUD_REQUIRES_AGENT = os.environ.get("CLOUD_REQUIRES_AGENT", "1") not in ("0", "false", "no")
+# Every generation mode is local-only (they all run on the owner's home GPU), so
+# generation as a whole is gated on the home agent being up — the agent is the
+# owner's on/off switch for letting other people use the studio. Browsing, the
+# gallery and everything else stay open. Set GEN_REQUIRES_AGENT=0 to disable.
+GEN_REQUIRES_AGENT = os.environ.get(
+    "GEN_REQUIRES_AGENT", os.environ.get("CLOUD_REQUIRES_AGENT", "1")
+) not in ("0", "false", "no")
 _AGENT_UP_TTL = 10          # seconds; the UI polls status, don't hammer the tunnel
 _agent_up_cache = {"at": 0.0, "up": False}
 
@@ -832,10 +835,9 @@ def health():
                     "cloud": bool(ENDPOINT_ID and API_KEY),
                     "agent_os": agent_os,
                     "agent_up": agent_up,
-                    # UI greys out Cloud generation while the owner's agent is off
-                    "cloud_open": bool(ENDPOINT_ID and API_KEY)
-                                  and (agent_up or not CLOUD_REQUIRES_AGENT),
-                    "cloud_gated": CLOUD_REQUIRES_AGENT})
+                    # UI greys out Develop while the owner's agent is off
+                    "gen_open": agent_up or not GEN_REQUIRES_AGENT,
+                    "gen_gated": GEN_REQUIRES_AGENT})
 
 
 @app.get("/api/cloud/info")
@@ -856,8 +858,8 @@ def cloud_status():
     """Live endpoint health for the warming/health strip (polled in cloud mode)."""
     st = _cloud_status()
     st["agent_up"] = _agent_up()
-    st["gated"] = CLOUD_REQUIRES_AGENT
-    st["open"] = st["agent_up"] or not CLOUD_REQUIRES_AGENT
+    st["gated"] = GEN_REQUIRES_AGENT
+    st["open"] = st["agent_up"] or not GEN_REQUIRES_AGENT
     return jsonify(st)
 
 
@@ -1796,11 +1798,12 @@ def generate():
     body = request.get_json(force=True)
     target = body.get("target", "local")
 
-    # Cloud spends the owner's RunPod credits, so it only runs while the home
-    # agent is up — that's the owner's switch for granting access.
-    if target != "local" and CLOUD_REQUIRES_AGENT and not _agent_up(force=True):
-        return jsonify({"error": "Cloud generation is off right now — the studio "
-                                 "host has to start the session first."}), 503
+    # Generation uses the owner's GPU, so it only runs while the home agent is
+    # up — that's the owner's switch for granting access. Applies to every
+    # target: all modes are local-only, so gating Cloud alone would gate nothing.
+    if GEN_REQUIRES_AGENT and not _agent_up(force=True):
+        return jsonify({"error": "Generation is off right now — the studio host "
+                                 "has to start the session first."}), 503
 
     mode = body.get("mode", "i2i")
     if mode == "i2i":
