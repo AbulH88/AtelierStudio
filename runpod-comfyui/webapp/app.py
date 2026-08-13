@@ -111,8 +111,8 @@ WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # AGENT_URL is unset, i.e. running directly on the same dual-boot box as ComfyUI).
 _IS_WINDOWS = platform.system() == "Windows"
 if _IS_WINDOWS:
-    COMFY_DIR = os.environ.get("COMFY_DIR", "I:/@home/jimi/Documents/ComfyUI_V82")
-    COMFY_LAUNCH = os.environ.get("COMFY_BAT", "Windows_Run_GPU.bat")
+    COMFY_DIR = os.environ.get("COMFY_DIR", "G:/ComfyUI_V82")
+    COMFY_LAUNCH = os.environ.get("COMFY_BAT", "Windows_Run_GPU_cu132.bat")
 else:
     COMFY_DIR = os.environ.get("COMFY_DIR", "/media/hirokgupta/New Volume/ComfyUI_V82")
     COMFY_LAUNCH = os.environ.get("COMFY_SH", "Linux_Run_GPU.sh")
