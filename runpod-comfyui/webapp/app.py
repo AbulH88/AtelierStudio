@@ -233,6 +233,37 @@ def save_users(u):
         _json.dump(u, f, indent=2)
 
 
+# ----------------------------- workflow tab visibility ------------------------
+WORKFLOWS_FILE = os.path.join(HERE, "workflows.json")
+
+# (data-mode id, display label) for every tab in the Studio mode bar
+WORKFLOW_DEFS = [
+    ("i2i", "Wan Image to Image"),
+    ("t2i", "Wan Text To Image"),
+    ("video", "Wan 2.2 Animate (Wow)"),
+    ("scail2motion", "High Quality Motion Control Scail 2 · V1.0"),
+    ("scail2motionv2", "High Quality Motion Control Scail 2 · V2.0"),
+    ("adv", "Instaraw Advance"),
+    ("krea2", "Krea2 Image to Image"),
+    ("krea2new", "Krea2 Image to Image new"),
+    ("krea2hq", "Krea2 Image to Image High Quality"),
+    ("krea2t2ihq", "Krea2 Text to Image High Quality"),
+    ("krea2carousel", "Krea2 Carousel Maker"),
+]
+# krea2new was already hidden in the markup before this setting existed — keep it off by default
+WORKFLOW_DEFAULT_DISABLED = {"krea2new"}
+
+
+def load_workflow_settings():
+    saved = _json.load(open(WORKFLOWS_FILE, encoding="utf-8")) if os.path.exists(WORKFLOWS_FILE) else {}
+    return {wid: saved.get(wid, wid not in WORKFLOW_DEFAULT_DISABLED) for wid, _label in WORKFLOW_DEFS}
+
+
+def save_workflow_settings(settings):
+    with open(WORKFLOWS_FILE, "w", encoding="utf-8") as f:
+        _json.dump(settings, f, indent=2)
+
+
 # endpoints reachable without being logged in
 OPEN_ENDPOINTS = {"login_page", "api_login", "api_signup"}
 
@@ -344,6 +375,24 @@ def api_user_action(name, action):
         return jsonify({"error": "unknown action"}), 400
     save_users(users)
     return jsonify({"ok": True})
+
+
+@app.get("/api/workflows")
+def api_workflows():
+    settings = load_workflow_settings()
+    return jsonify({"workflows": [{"id": wid, "label": label, "enabled": settings[wid]}
+                                   for wid, label in WORKFLOW_DEFS]})
+
+
+@app.post("/api/workflows/<wid>/toggle")
+@admin_required
+def api_workflow_toggle(wid):
+    settings = load_workflow_settings()
+    if wid not in settings:
+        return jsonify({"error": "no such workflow"}), 404
+    settings[wid] = not settings[wid]
+    save_workflow_settings(settings)
+    return jsonify({"ok": True, "enabled": settings[wid]})
 
 
 # Root of your loras folder (used only to LIST checkpoints; paths sent to ComfyUI

@@ -1374,6 +1374,8 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 <div id="pageAdmin" class="page hide">
   <div class="page-head"><h1 class="page-title">Users</h1><span class="hint" id="adminHint"></span></div>
   <div class="users-grid" id="usersGrid"></div>
+  <div class="page-head" style="margin-top:36px"><h1 class="page-title">Workflows</h1><span class="hint" id="workflowsHint"></span></div>
+  <div class="users-grid" id="workflowsGrid"></div>
 </div>
 
 <!-- instagram cookies modal -->
@@ -2687,6 +2689,40 @@ async function openAdmin(){
     const r=await(await fetch(`/api/users/${encodeURIComponent(b.dataset.u)}/${b.dataset.a}`,{method:'POST'})).json();
     if(r.error)alert(r.error); openAdmin();
   });
+  loadWorkflowsAdmin();
+}
+
+async function loadWorkflowsAdmin(){
+  const d=await(await fetch('/api/workflows')).json();
+  if(d.error){$('#workflowsGrid').innerHTML='<p class="hint">'+d.error+'</p>';return;}
+  const onCount=d.workflows.filter(w=>w.enabled).length;
+  $('#workflowsHint').textContent=onCount+' of '+d.workflows.length+' visible';
+  $('#workflowsGrid').innerHTML=d.workflows.map(w=>
+    `<div class="user-row"><span class="un">${w.label}</span>
+      <span class="badge ${w.enabled?'active':'disabled'}">${w.enabled?'visible':'hidden'}</span>
+      <span class="acts"><button data-w="${w.id}">${w.enabled?'Hide':'Show'}</button></span></div>`
+  ).join('');
+  $$('#workflowsGrid .acts button').forEach(b=>b.onclick=async()=>{
+    await fetch(`/api/workflows/${encodeURIComponent(b.dataset.w)}/toggle`,{method:'POST'});
+    loadWorkflowsAdmin();
+    applyWorkflowVisibility();
+  });
+}
+
+async function applyWorkflowVisibility(){
+  try{
+    const d=await(await fetch('/api/workflows')).json();
+    if(d.error)return;
+    let activeHidden=false, firstVisible=null;
+    d.workflows.forEach(w=>{
+      const btn=document.querySelector(`.modes .seg [data-mode="${w.id}"]`);
+      if(!btn)return;
+      btn.classList.toggle('hide',!w.enabled);
+      if(w.enabled&&!firstVisible)firstVisible=w.id;
+      if(!w.enabled&&btn.classList.contains('on'))activeHidden=true;
+    });
+    if(activeHidden&&firstVisible)setMode(firstVisible);
+  }catch(e){}
 }
 
 // ===== Reel library (Cloudflare R2) — Sidebar + Content =====
@@ -3737,6 +3773,7 @@ loadLoras();
 initReelSortChips();
 initGalSortChips();
 loadMe();
+applyWorkflowVisibility();
 loadConfig();
 loadCloudInfo().then(loadHealth);   // info first so the cloud card has cost + manifest on first paint
 setInterval(loadHealth, 20000);
