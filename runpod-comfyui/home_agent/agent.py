@@ -30,7 +30,7 @@ SECRET = os.environ.get("AGENT_SECRET", "")
 COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8189")
 if IS_WINDOWS:
     COMFY_DIR = os.environ.get("COMFY_DIR", r"G:\ComfyUI_V82")
-    COMFY_LAUNCH = os.environ.get("COMFY_BAT", "Windows_Run_GPU_cu132_Auto.bat")
+    COMFY_LAUNCH = os.environ.get("COMFY_BAT", "Windows_Run_GPU_cu132_Agent.bat")
 else:
     COMFY_DIR = os.environ.get("COMFY_DIR", "/media/hirokgupta/New Volume/ComfyUI_V82")
     COMFY_LAUNCH = os.environ.get("COMFY_SH", "Linux_Run_GPU.sh")
