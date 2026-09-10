@@ -1546,6 +1546,7 @@ async function loadHealth(){
   if(S.target!==_lastTarget){ _lastTarget=S.target; onTargetChange(); }
 }
 let _lastTarget=null;
+let WORKFLOW_ENABLED=null;   // Set of admin-enabled workflow ids, null until first /api/workflows load
 
 // Parse a JSON response, but fall back to a readable message when the body is
 // not JSON (e.g. nginx/Cloudflare returns an HTML 502/504 page when the home
@@ -1789,13 +1790,8 @@ function onTargetChange(){
   // Every generation mode now runs on the home 5090 (the new Wan 2.2 Animate motion
   // pipeline is too heavy for the cloud volume, and it was the last cloud-capable
   // mode). So all mode buttons are hidden on Cloud — the Cloud target only surfaces
-  // the endpoint status/GPU card. Modes reappear on Local.
-  const cloudOnly = isCloud();
-  // #mKreaNew (depth-ControlNet) is disabled for now — left out so it stays hidden
-  // in every target (its backend/workflow code is kept intact for easy re-enable).
-  ['#mVid','#mTxt','#mAdv','#mKrea2','#mKreaHQ','#mKreaT2IHQ','#mKreaCarousel','#mMotion','#mScail2','#mScail2V2']
-    .forEach(sel=>$(sel).classList.toggle('hide', cloudOnly));
-  $('#cloudNoModes') && $('#cloudNoModes').classList.toggle('hide', !cloudOnly);
+  // the endpoint status/GPU card. Modes reappear on Local (admin-disabled ones excepted).
+  updateModeBarVisibility();
   if(typeof applyCharList==='function') applyCharList();   // cloud vs local character list
   renderCloudCard();
   if(isCloud()){ pollCloudStatus(); CLOUD.poll=setInterval(pollCloudStatus,7000); }
@@ -2705,23 +2701,35 @@ async function loadWorkflowsAdmin(){
   $$('#workflowsGrid .acts button').forEach(b=>b.onclick=async()=>{
     await fetch(`/api/workflows/${encodeURIComponent(b.dataset.w)}/toggle`,{method:'POST'});
     loadWorkflowsAdmin();
-    applyWorkflowVisibility();
+    loadWorkflowVisibility();
   });
 }
 
-async function applyWorkflowVisibility(){
+// Combines admin-enabled state (WORKFLOW_ENABLED) with the Local/Cloud target
+// (all modes are Local-only, see onTargetChange) into the mode bar's hide state.
+// Synchronous + cache-based so it can be called from onTargetChange without
+// waiting on a fetch and clobbering whatever loadWorkflowVisibility last set.
+function updateModeBarVisibility(){
+  const cloudOnly=isCloud();
+  let activeHidden=false, firstVisible=null;
+  document.querySelectorAll('.modes .seg [data-mode]').forEach(btn=>{
+    const id=btn.dataset.mode;
+    const adminOk=!WORKFLOW_ENABLED||WORKFLOW_ENABLED.has(id);
+    const hidden=cloudOnly||!adminOk;
+    btn.classList.toggle('hide',hidden);
+    if(!hidden&&!firstVisible)firstVisible=id;
+    if(hidden&&btn.classList.contains('on'))activeHidden=true;
+  });
+  $('#cloudNoModes') && $('#cloudNoModes').classList.toggle('hide', !cloudOnly);
+  if(activeHidden&&firstVisible)setMode(firstVisible);
+}
+
+async function loadWorkflowVisibility(){
   try{
     const d=await(await fetch('/api/workflows')).json();
     if(d.error)return;
-    let activeHidden=false, firstVisible=null;
-    d.workflows.forEach(w=>{
-      const btn=document.querySelector(`.modes .seg [data-mode="${w.id}"]`);
-      if(!btn)return;
-      btn.classList.toggle('hide',!w.enabled);
-      if(w.enabled&&!firstVisible)firstVisible=w.id;
-      if(!w.enabled&&btn.classList.contains('on'))activeHidden=true;
-    });
-    if(activeHidden&&firstVisible)setMode(firstVisible);
+    WORKFLOW_ENABLED=new Set(d.workflows.filter(w=>w.enabled).map(w=>w.id));
+    updateModeBarVisibility();
   }catch(e){}
 }
 
@@ -3773,7 +3781,7 @@ loadLoras();
 initReelSortChips();
 initGalSortChips();
 loadMe();
-applyWorkflowVisibility();
+loadWorkflowVisibility();
 loadConfig();
 loadCloudInfo().then(loadHealth);   // info first so the cloud card has cost + manifest on first paint
 setInterval(loadHealth, 20000);
