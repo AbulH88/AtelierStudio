@@ -112,7 +112,7 @@ WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _IS_WINDOWS = platform.system() == "Windows"
 if _IS_WINDOWS:
     COMFY_DIR = os.environ.get("COMFY_DIR", "G:/ComfyUI_V82")
-    COMFY_LAUNCH = os.environ.get("COMFY_BAT", "Windows_Run_GPU_cu132.bat")
+    COMFY_LAUNCH = os.environ.get("COMFY_BAT", "Windows_Run_GPU_cu132_Auto.bat")
 else:
     COMFY_DIR = os.environ.get("COMFY_DIR", "/media/hirokgupta/New Volume/ComfyUI_V82")
     COMFY_LAUNCH = os.environ.get("COMFY_SH", "Linux_Run_GPU.sh")
