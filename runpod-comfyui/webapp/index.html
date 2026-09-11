@@ -908,9 +908,18 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         </div>
         <input type="file" id="ltxImgFile" accept="image/*" class="hide">
         <img id="ltxImgPreview" class="hide" style="width:100%;margin-top:10px;border-radius:10px;max-height:220px;object-fit:contain;background:#000">
-        <div class="inline" style="margin-top:16px">
-          <label>Seconds</label>
-          <input type="number" id="ltxDuration" value="10" min="1" max="30" step="1" style="width:80px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+        <div class="inline" style="margin-top:16px;gap:14px">
+          <div>
+            <label style="display:block;margin-bottom:6px">Resolution</label>
+            <div class="seg" id="ltxRes" style="max-width:160px">
+              <button data-key="4m" data-w="2688" data-h="1504" class="on">4M</button>
+              <button data-key="2m" data-w="1888" data-h="1056">2M</button>
+            </div>
+          </div>
+          <div>
+            <label>Seconds</label>
+            <input type="number" id="ltxDuration" value="10" min="1" max="30" step="1" style="width:80px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+          </div>
         </div>
         <textarea id="ltxPrompt" placeholder="describe the motion and scene — camera movement, action, atmosphere…" style="margin-top:14px"></textarea>
         <p class="hint" style="margin:10px 0 0">Identity comes straight from the uploaded photo. Output is a short mp4 with generated audio.</p>
@@ -1904,7 +1913,7 @@ function setMode(m){
   // .advhide loops on purpose (those would otherwise leave #aspectField shown for
   // the wrong modes).
   const usesAspect = (m==='i2i'||m==='t2i'||m==='krea2'||m==='krea2new');
-  const usesResPreset = (m==='krea2hq'||m==='krea2t2ihq'||m==='krea2carousel'||m==='ltx25i2v');
+  const usesResPreset = (m==='krea2hq'||m==='krea2t2ihq'||m==='krea2carousel');
   $('#aspectField').classList.toggle('hide', !usesAspect);
   if(!usesAspect) $('#customResField').classList.add('hide');   // don't leave the custom-size box dangling
   $('#resPresetField').classList.toggle('hide', !usesResPreset);
@@ -1916,6 +1925,11 @@ function setMode(m){
   if(usesResPreset){
     const o=$('#resPreset').selectedOptions[0];
     if(o) S.aspect={key:o.dataset.key,width:+o.dataset.w,height:+o.dataset.h};
+  }else if(m==='ltx25i2v'){
+    // LTX has its own resolution control (4M/2M, in the pane itself) instead of
+    // the shared aspect/resPreset pickers — see #ltxRes.
+    const b=$('#ltxRes .on');
+    if(b) S.aspect={key:b.dataset.key,width:+b.dataset.w,height:+b.dataset.h};
   }else{
     const b=$('#aspects .on');
     if(b) S.aspect = b.dataset.key==='custom'
@@ -2176,6 +2190,12 @@ async function loadConfig(){
       S.aspect={key:b.dataset.key,width:+b.dataset.w,height:+b.dataset.h};}});
   $('#cw').oninput=$('#ch').oninput=()=>{if(S.aspect.key==='custom')
     S.aspect={key:'custom',width:+$('#cw').value,height:+$('#ch').value};};
+  // LTX 2.5 I2V's own resolution control (16:9, ~4 or ~2 megapixels, multiple of 32
+  // to match the workflow's dropped ResolutionSelector node) — not the shared
+  // aspect/resPreset pickers.
+  $$('#ltxRes button').forEach(b=>b.onclick=()=>{$$('#ltxRes button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    S.aspect={key:b.dataset.key,width:+b.dataset.w,height:+b.dataset.h};});
   // Krea2 HQ resolution presets — grouped <select>, mirrors the source workflow's
   // in-graph dropdown (now computed app-side, see RES_PRESETS in app.py)
   const resGroups={};
