@@ -56,6 +56,18 @@ VIDEO = {"load_video": "275", "ref_image": "299", "prompt": "356",
          "output_raw": "285", "output_final": "369"}
 VIDEO_UPSCALE_CHAIN = ["367", "368", "369", "371", "372", "373", "375"]
 
+# LTX 2.5 image-to-video (workflow_ltx25i2v.json). First-frame photo + prompt ->
+# a short mp4 with audio, no driving video and no character LoRA (identity comes
+# straight from the uploaded photo). Width/height are computed app-side from the
+# same resolution-preset list Krea2 HQ uses (the workflow's own in-graph
+# ResolutionSelector node was dropped from the template in favor of that, same
+# pattern as krea2hq) and fed straight into the two PrimitiveInt nodes it used to
+# read from. Two-stage pipeline (half-res base pass -> 2x latent upsample -> full-res
+# refine pass) is baked into the graph as exported; only the seeds are randomized.
+LTX25I2V = {"load_image": "45", "prompt": "8", "duration": "4",
+            "width": "5", "height": "6", "seed_base": "44", "seed_refine": "41",
+            "output": "39"}
+
 # INSTARAW advanced (workflow_adv.json) — LOCAL ONLY. One graph does t2i + image-guided
 # "i2i" via the 576 toggle. Generation is ALWAYS txt2img on the empty latent (407); there
 # is no real img2img (verified) — uploaded images only steer the in-workflow LLM prompt
@@ -698,6 +710,23 @@ def _build_video(graph, inp, seed, video_name, ref_name):
     return graph
 
 
+def _build_ltx25i2v(graph, inp, seed, image_name):
+    """Inject the dynamic inputs into the LTX 2.5 I2V graph: first-frame photo,
+    prompt, duration, width/height (from the app's resolution-preset list), and
+    both sampling-stage seeds. Everything else (negative prompt, fps, the two-stage
+    sampling pipeline) stays as the workflow defines it."""
+    nm = LTX25I2V
+    graph[nm["load_image"]]["inputs"]["image"] = image_name
+    graph[nm["prompt"]]["inputs"]["value"] = inp.get("prompt", "") or ""
+    if inp.get("duration"):
+        graph[nm["duration"]]["inputs"]["value"] = max(1, int(inp["duration"]))
+    graph[nm["width"]]["inputs"]["value"] = int(inp.get("width") or 1920)
+    graph[nm["height"]]["inputs"]["value"] = int(inp.get("height") or 1088)
+    graph[nm["seed_base"]]["inputs"]["noise_seed"] = seed
+    graph[nm["seed_refine"]]["inputs"]["noise_seed"] = seed
+    return graph
+
+
 def _set_stack_slot(node, slot, path, strength=0.6):
     """Set one slot of an rgthree 'Lora Loader Stack' (lora_01..04 / strength_01..04).
     Empty path -> 'None' (the pack's no-op sentinel)."""
@@ -805,6 +834,20 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
         vids = run_video(base, graph,
                          out_node=[VIDEO["output_raw"], VIDEO["output_final"]],
                          client_id=client_id)
+        if not vids:
+            return {"error": "No video produced — check ComfyUI node errors / model paths."}
+        return {"videos": vids, "seed": seed}
+
+    # LTX 2.5 image-to-video: first-frame photo + prompt -> one mp4 with audio (no
+    # batching, no driving video, no character LoRA — identity comes from the photo).
+    if mode == "ltx25i2v":
+        image_name = upload_image(base, base64.b64decode(inp["image_b64"]))
+        with open(wf_path, encoding="utf-8") as f:
+            graph = json.load(f)
+        _normalize_model_paths(graph)
+        graph = _build_ltx25i2v(graph, inp, seed, image_name)
+        vids = run_video(base, graph, out_node=LTX25I2V["output"],
+                         client_id=client_id, timeout=1800)
         if not vids:
             return {"error": "No video produced — check ComfyUI node errors / model paths."}
         return {"videos": vids, "seed": seed}

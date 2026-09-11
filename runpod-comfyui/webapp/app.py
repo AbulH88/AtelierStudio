@@ -241,6 +241,7 @@ WORKFLOW_DEFS = [
     ("i2i", "Wan Image to Image"),
     ("t2i", "Wan Text To Image"),
     ("video", "Wan 2.2 Animate (Wow)"),
+    ("ltx25i2v", "LTX 2.5 I2V"),
     ("scail2motion", "High Quality Motion Control Scail 2 · V1.0"),
     ("scail2motionv2", "High Quality Motion Control Scail 2 · V2.0"),
     ("adv", "Instaraw Advance"),
@@ -1396,6 +1397,9 @@ def _build_input(body):
         inp["frame_cap"] = int(body.get("frame_cap", 81))
         inp["fps"] = int(body.get("fps", 30))
         inp["upscale"] = bool(body.get("upscale", False))   # RTX super-res + RIFE tail
+    elif inp["mode"] == "ltx25i2v":   # LTX 2.5 image-to-video: first-frame photo + prompt -> mp4
+        inp["image_b64"] = body.get("image_b64", "")
+        inp["duration"] = int(body.get("duration", 10))
     elif inp["mode"] in ("scail2motion", "scail2motionv2"):   # SCAIL-2 V1/V2.0: same shape as "video"
         inp["video_b64"] = body.get("video_b64", "")
         inp["video_filename"] = body.get("video_filename", "driving.mp4")
@@ -1839,7 +1843,7 @@ def _run_gen_job(job_id, target, inp, body):
 
         if not out or "error" in out:
             raise RuntimeError((out or {}).get("error", "No output from worker."))
-        if inp["mode"] in ("video", "scail2motion", "scail2motionv2"):  # Wan Animate / SCAIL-2 -> mp4(s)
+        if inp["mode"] in ("video", "ltx25i2v", "scail2motion", "scail2motionv2"):  # -> mp4(s)
             # May be 1 (raw only) or 2 (raw + RTX-upscaled) videos. Carry the driving
             # audio onto each, persist each to R2 under gallery/ (same prefix images
             # use) so motion results show up in the Gallery tab too — /api/gallery/list

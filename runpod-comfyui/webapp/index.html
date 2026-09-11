@@ -705,6 +705,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     <button id="mVid" class="on" data-mode="i2i"><span class="k">i</span>Wan Image to Image</button>
     <button id="mTxt" data-mode="t2i"><span class="k">t</span>Wan Text To Image</button>
     <button id="mMotion" data-mode="video"><span class="k">m</span>Wan 2.2 Animate (Wow)</button>
+    <button id="mLtx25i2v" data-mode="ltx25i2v"><span class="k">l</span>LTX 2.5 I2V</button>
     <button id="mScail2" data-mode="scail2motion"><span class="k">s</span>🏃 High Quality Motion Control Scail 2 · V1.0</button>
     <button id="mScail2V2" data-mode="scail2motionv2"><span class="k">2</span>🏃 High Quality Motion Control Scail 2 · V2.0</button>
     <button id="mAdv" data-mode="adv"><span class="k">a</span>⚡ Instaraw Advance</button>
@@ -894,6 +895,25 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <button id="mDescribeBtn" class="go ghost" style="width:auto;margin-top:14px;padding:8px 16px;font-size:13px" type="button">🪄 Describe ref photo with AI</button>
         <textarea id="mPrompt" placeholder="optional: describe the look (clothing, setting). Or hit 'Describe ref photo' to auto-fill from the reference image. Identity comes from the reference photo." style="margin-top:10px"></textarea>
         <p class="hint" style="margin:10px 0 0">The reference photo drives the character's identity (CLIP-Vision + Animate Embeds); the driving video supplies the motion. A character LoRA is <b>optional</b> (pick one in the rail →, or leave it as “No character”).</p>
+      </div>
+    </section>
+
+    <!-- LTX 2.5 image-to-video workspace -->
+    <section class="card d1 hide" id="paneLtx25i2v">
+      <div class="hd"><span class="step">1</span><h2>First frame → Video</h2><span class="sub">ltx 2.5 i2v · local</span></div>
+      <div class="bd">
+        <div class="lab" style="margin-bottom:6px">First frame <span style="color:var(--faint)">(the starting photo)</span></div>
+        <div class="drop" id="ltxImgDrop" style="padding:22px">
+          <div class="ic">🖼</div><p><b>Drop a photo</b> or click</p>
+        </div>
+        <input type="file" id="ltxImgFile" accept="image/*" class="hide">
+        <img id="ltxImgPreview" class="hide" style="width:100%;margin-top:10px;border-radius:10px;max-height:220px;object-fit:contain;background:#000">
+        <div class="inline" style="margin-top:16px">
+          <label>Seconds</label>
+          <input type="number" id="ltxDuration" value="10" min="1" max="30" step="1" style="width:80px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+        </div>
+        <textarea id="ltxPrompt" placeholder="describe the motion and scene — camera movement, action, atmosphere…" style="margin-top:14px"></textarea>
+        <p class="hint" style="margin:10px 0 0">Identity comes straight from the uploaded photo. Output is a short mp4 with generated audio.</p>
       </div>
     </section>
 
@@ -1495,7 +1515,7 @@ function _charList(){
 // off-by-one.
 function _charListUI(){
   const list=_charList().slice();
-  if(S.mode==='video'||S.mode==='scail2motion'||S.mode==='scail2motionv2') list.unshift({label:'— No character (identity from photo) —', variants:[{label:'none', path:''}]});
+  if(S.mode==='video'||S.mode==='scail2motion'||S.mode==='scail2motionv2'||S.mode==='ltx25i2v') list.unshift({label:'— No character (identity from photo) —', variants:[{label:'none', path:''}]});
   return list;
 }
 function applyCharList(){
@@ -1825,6 +1845,7 @@ function setMode(m){
   S.mode=m;
   $('#mVid').classList.toggle('on',m==='i2i');$('#mTxt').classList.toggle('on',m==='t2i');
   $('#mMotion').classList.toggle('on',m==='video');
+  $('#mLtx25i2v').classList.toggle('on',m==='ltx25i2v');
   $('#mAdv').classList.toggle('on',m==='adv');
   $('#mKrea2').classList.toggle('on',m==='krea2');
   $('#mKreaNew').classList.toggle('on',m==='krea2new');
@@ -1850,6 +1871,7 @@ function setMode(m){
     m==='scail2motion' ? 'scail 2 v1.0 · sam3 tracking · local · 5090' :
     m==='scail2motionv2' ? 'scail 2 v2.0 · sam3 tracking · local · 5090' :
     'wan 2.2 animate · local · 5090';
+  $('#paneLtx25i2v').classList.toggle('hide',m!=='ltx25i2v');
   $('#paneAdv').classList.toggle('hide',m!=='adv');
   // Steps + Denoise only apply to I2I; T2I uses its fixed schedule; video uses its own
   $('#denoiseField').classList.toggle('hide',m!=='i2i');
@@ -1869,8 +1891,8 @@ function setMode(m){
   // Lightning + the helper-LoRA / lightning controls are image-only, and every krea2
   // mode (plus both motion modes) has no user-tunable Lightning node — each motion
   // mode has its own locked technique-LoRA stack instead.
-  $$('.imgonly').forEach(el=>el.classList.toggle('hide', motionPane));
-  $$('.stdlora').forEach(el=>el.classList.toggle('hide', m==='adv'||m==='krea2'||m==='krea2new'||m==='krea2hq'||m==='krea2t2ihq'||m==='krea2carousel'||motionPane));
+  $$('.imgonly').forEach(el=>el.classList.toggle('hide', motionPane||m==='ltx25i2v'));
+  $$('.stdlora').forEach(el=>el.classList.toggle('hide', m==='adv'||m==='krea2'||m==='krea2new'||m==='krea2hq'||m==='krea2t2ihq'||m==='krea2carousel'||motionPane||m==='ltx25i2v'));
   $$('.advlora').forEach(el=>el.classList.toggle('hide', m!=='adv'));   // two LoRA groups shown only in adv
   // adv has its own aspect + describe in the studio -> hide the rail's (keep Trigger Word)
   $$('.advhide').forEach(el=>el.classList.toggle('hide', m==='adv'));
@@ -1882,7 +1904,7 @@ function setMode(m){
   // .advhide loops on purpose (those would otherwise leave #aspectField shown for
   // the wrong modes).
   const usesAspect = (m==='i2i'||m==='t2i'||m==='krea2'||m==='krea2new');
-  const usesResPreset = (m==='krea2hq'||m==='krea2t2ihq'||m==='krea2carousel');
+  const usesResPreset = (m==='krea2hq'||m==='krea2t2ihq'||m==='krea2carousel'||m==='ltx25i2v');
   $('#aspectField').classList.toggle('hide', !usesAspect);
   if(!usesAspect) $('#customResField').classList.add('hide');   // don't leave the custom-size box dangling
   $('#resPresetField').classList.toggle('hide', !usesResPreset);
@@ -1890,7 +1912,7 @@ function setMode(m){
   // scail2motion: sized off the ref photo, and its WanSCAILInfinity node doesn't even
   // respond to the generic cfg/sampler_name/scheduler broadcast). The override panel
   // doesn't apply to either, so hide it.
-  $('#samplerOverrideSection').classList.toggle('hide', motionPane);
+  $('#samplerOverrideSection').classList.toggle('hide', motionPane||m==='ltx25i2v');
   if(usesResPreset){
     const o=$('#resPreset').selectedOptions[0];
     if(o) S.aspect={key:o.dataset.key,width:+o.dataset.w,height:+o.dataset.h};
@@ -1906,6 +1928,7 @@ function setMode(m){
   if(typeof renderCloudCard==='function') renderCloudCard();
 }
 $('#mVid').onclick=()=>setMode('i2i');$('#mTxt').onclick=()=>setMode('t2i');$('#mMotion').onclick=()=>setMode('video');
+$('#mLtx25i2v').onclick=()=>setMode('ltx25i2v');
 $('#mAdv').onclick=()=>setMode('adv');$('#mKrea2').onclick=()=>setMode('krea2');
 $('#mKreaNew').onclick=()=>setMode('krea2new');
 $('#mKreaHQ').onclick=()=>setMode('krea2hq');
@@ -2086,6 +2109,9 @@ _mWireDrop('#mDropRef','#mRefFile',f=>{ S.motionRef=f;
   $('#mDropRef').querySelector('p').innerHTML='<b>'+f.name+'</b> ready'; refreshGo(); });
 function _fileToB64(file){ return new Promise((res,rej)=>{ const r=new FileReader();
   r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(file); }); }
+_mWireDrop('#ltxImgDrop','#ltxImgFile',f=>{ S.ltxImg=f;
+  const im=$('#ltxImgPreview'); im.src=URL.createObjectURL(f); im.classList.remove('hide');
+  $('#ltxImgDrop').querySelector('p').innerHTML='<b>'+f.name+'</b> ready'; refreshGo(); });
 $('#mDescribeBtn').onclick=async()=>{
   if(!S.motionRef){ alert('Upload a reference photo first.'); return; }
   const btn=$('#mDescribeBtn'),old=btn.textContent; btn.disabled=true; btn.textContent='🪄 describing…';
@@ -2568,6 +2594,7 @@ $('#video').onchange=()=>{if($('#video').files[0])$('#drop').querySelector('p').
 function refreshGo(){
   let ok;
   if(S.mode==='video'||S.mode==='scail2motion'||S.mode==='scail2motionv2') ok = !!(S.motionVid && S.motionRef);   // need driving video + ref photo
+  else if(S.mode==='ltx25i2v') ok = !!(S.ltxImg && $('#ltxPrompt').value.trim().length>3);   // need first-frame photo + prompt
   else if(S.mode==='adv') ok = !!($('#variant').value && ($('#advScene').value.trim().length>3 || (S.advPrompts&&S.advPrompts.length)));
   else if(S.mode==='i2i' || S.mode==='krea2' || S.mode==='krea2new' || S.mode==='krea2hq') ok = !!S.frame;
   // krea2t2ihq/krea2carousel: ready with either a typed prompt OR an attached
@@ -2585,6 +2612,7 @@ function refreshGo(){
 }
 $('#prompt').oninput=refreshGo;
 $('#krea2t2ihqPrompt').oninput=refreshGo;
+$('#ltxPrompt').oninput=refreshGo;
 
 // Krea2 T2I HQ — optional "describe from image" upload (image never touches
 // ComfyUI, it's used only to auto-generate the prompt server-side when blank)
@@ -3033,6 +3061,12 @@ $('#go').onclick=async()=>{
     body.frame_cap=_mFrames();          // seconds × fps, auto-computed
     body.prompt=$('#mPrompt').value.trim();
     body.upscale=$('#mUpscaleSw').classList.contains('on');
+  }
+  else if(S.mode==='ltx25i2v'){
+    try{ body.image_b64=await _fileToB64(S.ltxImg); }
+    catch(e){ $('#genErr').textContent='Could not read the photo.'; return; }
+    body.prompt=$('#ltxPrompt').value.trim();
+    body.duration=+$('#ltxDuration').value||10;
   }
   else if(S.mode==='adv'){   // INSTARAW advanced — AI prompts if generated, else the raw scene
     body.ref_b64=S.advRefB64||'';
