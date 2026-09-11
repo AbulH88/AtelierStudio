@@ -912,8 +912,15 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
           <div>
             <label style="display:block;margin-bottom:6px">Resolution</label>
             <div class="seg" id="ltxRes" style="max-width:160px">
-              <button data-key="4m" data-w="2688" data-h="1504" class="on">4M</button>
-              <button data-key="2m" data-w="1888" data-h="1056">2M</button>
+              <button data-key="4m" class="on">4M</button>
+              <button data-key="2m">2M</button>
+            </div>
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:6px">Orientation</label>
+            <div class="seg" id="ltxOrient" style="max-width:220px">
+              <button data-key="landscape" class="on">Landscape</button>
+              <button data-key="portrait">Portrait</button>
             </div>
           </div>
           <div>
@@ -1926,10 +1933,9 @@ function setMode(m){
     const o=$('#resPreset').selectedOptions[0];
     if(o) S.aspect={key:o.dataset.key,width:+o.dataset.w,height:+o.dataset.h};
   }else if(m==='ltx25i2v'){
-    // LTX has its own resolution control (4M/2M, in the pane itself) instead of
-    // the shared aspect/resPreset pickers — see #ltxRes.
-    const b=$('#ltxRes .on');
-    if(b) S.aspect={key:b.dataset.key,width:+b.dataset.w,height:+b.dataset.h};
+    // LTX has its own resolution control (4M/2M × Landscape/Portrait, in the pane
+    // itself) instead of the shared aspect/resPreset pickers — see #ltxRes/#ltxOrient.
+    if(typeof _ltxUpdateAspect==='function') _ltxUpdateAspect();
   }else{
     const b=$('#aspects .on');
     if(b) S.aspect = b.dataset.key==='custom'
@@ -2190,12 +2196,21 @@ async function loadConfig(){
       S.aspect={key:b.dataset.key,width:+b.dataset.w,height:+b.dataset.h};}});
   $('#cw').oninput=$('#ch').oninput=()=>{if(S.aspect.key==='custom')
     S.aspect={key:'custom',width:+$('#cw').value,height:+$('#ch').value};};
-  // LTX 2.5 I2V's own resolution control (16:9, ~4 or ~2 megapixels, multiple of 32
-  // to match the workflow's dropped ResolutionSelector node) — not the shared
-  // aspect/resPreset pickers.
+  // LTX 2.5 I2V's own resolution control (~4 or ~2 megapixels × landscape/portrait,
+  // multiple of 32 to match the workflow's dropped ResolutionSelector node) — not
+  // the shared aspect/resPreset pickers. Base dims are landscape (16:9); portrait
+  // is just the transpose, which stays a multiple of 32 on both sides too.
+  const LTX_RES={'4m':{w:2688,h:1504},'2m':{w:1888,h:1056}};
+  window._ltxUpdateAspect=()=>{
+    const resKey=$('#ltxRes .on').dataset.key, orient=$('#ltxOrient .on').dataset.key;
+    const base=LTX_RES[resKey];
+    const portrait=orient==='portrait';
+    S.aspect={key:resKey+'_'+orient, width:portrait?base.h:base.w, height:portrait?base.w:base.h};
+  };
   $$('#ltxRes button').forEach(b=>b.onclick=()=>{$$('#ltxRes button').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on');
-    S.aspect={key:b.dataset.key,width:+b.dataset.w,height:+b.dataset.h};});
+    b.classList.add('on'); _ltxUpdateAspect();});
+  $$('#ltxOrient button').forEach(b=>b.onclick=()=>{$$('#ltxOrient button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); _ltxUpdateAspect();});
   // Krea2 HQ resolution presets — grouped <select>, mirrors the source workflow's
   // in-graph dropdown (now computed app-side, see RES_PRESETS in app.py)
   const resGroups={};
