@@ -20,13 +20,12 @@ Complete the approved Atelier Studio interaction design: accurate high-contrast 
 - Image, Video, and Advanced headings include matching down chevrons.
 - The selected workflow icon inherits the gold active color.
 
-## Collapsible Workflow Rail
+## Collapsible Workflow Sections
 
-- The Image group heading chevron toggles the entire workflow rail.
-- Collapsed state leaves a slim vertical rail of group/workflow icons so workflows remain reachable.
-- Expanded state restores labels and original width.
-- The center workspace fills the released width.
-- State persists in `localStorage`.
+- The workflow rail always remains full width with its heading and labels intact.
+- Image, Video, and Advanced each have an independent chevron that folds only that group's workflow rows.
+- No icon-only rail state is used.
+- Each group's state persists independently in `localStorage`.
 
 ## Prompt Image Description
 
@@ -36,19 +35,19 @@ Complete the approved Atelier Studio interaction design: accurate high-contrast 
 - Describe uses the existing Krea2 image-description endpoint and writes the returned description into the active prompt.
 - Upload and description errors appear inline without clearing an existing prompt.
 
-## Collapsible Settings Rail
+## Collapsible Settings Sections
 
-- A chevron in the Settings heading collapses the complete right rail.
-- Collapsed state leaves a narrow vertical Settings tab that can reopen the rail.
-- The center workspace fills the released width.
-- Reopening restores the rail's previous scroll position.
-- State persists in `localStorage`.
+- The Settings rail always remains full width and never becomes a vertical tab.
+- Controls are grouped into Workflow, Character & LoRAs, Output, and Advanced sections.
+- Each section has an independent chevron that folds only that section's controls.
+- The Develop action remains visible regardless of section state.
+- Each section's state persists independently in `localStorage`.
 
 ## Verification
 
 - Confirm the icon assignment, size, weight, default cream, and active gold states.
-- Confirm each rail opens and closes independently and persists after reload.
-- Confirm the workspace resizes correctly for all four rail-state combinations.
+- Confirm each left and right section opens and closes independently and persists after reload.
+- Confirm both rails remain full width in every section state.
 - Confirm prompt image upload, thumbnail, removal, AI description, and inline errors.
 - Confirm workflow selection and generation logic remain unchanged.
 - Run JavaScript syntax validation and the complete Python test suite before deployment.
