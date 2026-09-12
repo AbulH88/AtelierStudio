@@ -764,11 +764,12 @@ select,textarea,.seedrow input[type=number]{border-radius:3px}.go{border-radius:
 .character-row{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:8px}.field-plus{border:1px solid var(--line2);background:transparent;color:var(--txt);font-size:22px;cursor:pointer}.variation-stepper{display:none;grid-template-columns:42px 1fr 42px;height:42px;border:1px solid var(--line2)}.variation-stepper button{border:0;background:transparent;color:var(--txt);font-size:21px}.variation-stepper span{display:grid;place-items:center;border-left:1px solid var(--line);border-right:1px solid var(--line);font:13px var(--mono)}
 .prompt-tags{display:none;gap:7px;margin-top:9px;flex-wrap:wrap}.prompt-tags button{border:1px solid var(--line2);border-radius:16px;background:transparent;color:var(--mut);padding:6px 11px;font-size:11px}
 .sparkle{font-size:22px;margin-right:9px}
-.admin-overlay{position:fixed!important;inset:0!important;z-index:80!important;display:flex!important;align-items:flex-end!important;justify-content:flex-start!important;padding:0 0 22px 16px!important;background:rgba(4,4,3,.25)!important;backdrop-filter:blur(2px)}
-.admin-overlay.hide{display:none!important}.admin-dialog{position:relative;width:520px;max-height:54vh;overflow:auto;padding:17px;background:rgba(22,21,19,.98);border:1px solid var(--line2);box-shadow:0 22px 70px #000;border-radius:7px}
-.admin-dialog .page-head{margin:0 0 10px}.admin-dialog .page-title{font-size:24px}.admin-close{position:absolute;right:14px;top:11px;border:0;background:none;color:var(--txt);font:25px var(--serif);cursor:pointer}
-.admin-users{margin:0 0 12px;color:var(--mut);font-size:12px}.admin-users summary{cursor:pointer}.admin-workflow-head{margin-top:12px!important}.admin-workflow-head h2{font:19px var(--serif);margin:0}
-.admin-saved{margin-top:12px;color:var(--good);font-size:11px}.admin-dialog .wf-admin{grid-template-columns:1fr 1fr;gap:9px}.admin-dialog .wf-card{padding:9px}
+.admin-overlay{position:static!important;max-width:none!important;margin:0!important;box-sizing:border-box;min-height:calc(100vh - 64px);padding:42px 36px 80px!important;background:radial-gradient(900px 500px at 70% 0,rgba(231,195,141,.045),transparent 70%)!important}
+.admin-overlay.hide{display:none!important}.admin-dialog{width:min(1180px,100%);margin:0 auto;padding:0;background:transparent;border:0;box-shadow:none;border-radius:0;overflow:visible}
+.admin-dialog .page-head{margin:0 0 22px}.admin-dialog .page-title{font:400 44px/1.05 var(--serif);margin:0}.admin-close{display:none}
+.admin-users{margin:0 0 38px;color:var(--mut);font-size:13px;border:1px solid var(--line);background:rgba(20,19,17,.72)}.admin-users summary{cursor:pointer;padding:16px 18px;font:20px var(--serif);color:var(--txt);border-bottom:1px solid transparent}.admin-users[open] summary{border-bottom-color:var(--line)}.admin-users .users-grid{padding:14px 18px 18px}
+.admin-workflow-head{margin:0 0 18px!important;padding-bottom:12px;border-bottom:1px solid var(--line)}.admin-workflow-head h2{font:30px var(--serif);margin:0}
+.admin-saved{margin-top:18px;color:var(--good);font-size:12px}.admin-dialog .wf-admin{grid-template-columns:1fr 1fr;gap:20px}.admin-dialog .wf-card{padding:16px}
 body[data-mode="krea2carousel"] .generation-results{border:0;background:transparent}
 body[data-mode="krea2carousel"] .generation-results>.hd{display:none}
 body[data-mode="krea2carousel"] .generation-results>.bd{padding:0;min-height:360px}
@@ -808,7 +809,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
   main{margin-left:0;grid-template-columns:1fr;padding:18px 12px 55px}.studio-intro h1{font-size:31px}
   #cloudWrap{margin-left:0!important}
   .results{grid-template-columns:repeat(2,minmax(120px,1fr))}.rail{position:static;max-height:none;border:1px solid var(--line)}
-  .empty-sheet{grid-template-columns:repeat(2,1fr)}.admin-dialog{width:calc(100vw - 32px);max-height:75vh}.admin-dialog .wf-admin{grid-template-columns:1fr}
+  .empty-sheet{grid-template-columns:repeat(2,1fr)}.admin-overlay{padding:25px 14px 60px!important}.admin-dialog .wf-admin{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -1576,9 +1577,8 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
 <!-- admin page -->
 <div id="pageAdmin" class="page admin-overlay hide">
   <div class="admin-dialog">
-    <button class="admin-close" id="adminClose" type="button">×</button>
-    <div class="page-head"><h1 class="page-title">Admin</h1><span class="hint" id="adminHint">Manage Atelier Studio access.</span></div>
-    <details class="admin-users"><summary>Users</summary><div class="users-grid" id="usersGrid"></div></details>
+    <div class="page-head"><div><div class="studio-eyebrow">ATELIER CONTROL ROOM</div><h1 class="page-title">Administration</h1><p class="hint">Manage users and decide which workflows appear in the Studio.</p></div><span class="hint" id="adminHint"></span></div>
+    <details class="admin-users" open><summary>Users</summary><div class="users-grid" id="usersGrid"></div></details>
     <div class="page-head admin-workflow-head"><h2>Workflows</h2><span class="hint" id="workflowsHint"></span></div>
     <div class="wf-admin" id="workflowsGrid"></div>
     <div class="admin-saved">● &nbsp; All changes saved</div>
@@ -2924,22 +2924,18 @@ function loadFrames(session, frames){
 
 // ===== page navigation =====
 function showPage(p){
-  if(p==='admin'){
-    $('#pageAdmin').classList.remove('hide'); openAdmin(); return;
-  }
-  $('#pageAdmin').classList.add('hide');
   $('#pageStudio').classList.toggle('hide',p!=='studio');
   $('#pageReels').classList.toggle('hide',p!=='reels');
   $('#pageGallery').classList.toggle('hide',p!=='gallery');
   $('#pageNotes').classList.toggle('hide',p!=='notes');
+  $('#pageAdmin').classList.toggle('hide',p!=='admin');
   $$('#nav .navitem').forEach(b=>b.classList.toggle('on',b.dataset.page===p));
   if(p==='reels')openReels();
   if(p==='gallery')openGallery();
   if(p==='notes')openNotes();
+  if(p==='admin')openAdmin();
 }
 $$('#nav .navitem').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
-$('#adminClose').onclick=()=>{$('#pageAdmin').classList.add('hide');$('#navAdmin').classList.remove('on');};
-$('#pageAdmin').onclick=e=>{if(e.target===$('#pageAdmin'))$('#adminClose').click();};
 
 // ===== auth =====
 let IS_ADMIN=false;
