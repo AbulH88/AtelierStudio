@@ -577,17 +577,28 @@ def build_characters():
 
 
 def build_krea2_characters():
-    """Character picker for Krea2 mode: same auto-discovery convention as
-    build_characters(), scoped to the Krea2 LoRA root instead of wan/MyLoras."""
-    try:
-        return _auto_characters(_comfy_loras(), parent=KREA2_LORA_ROOT)
-    except Exception:
-        pass
-    try:
-        return _auto_characters_fs(parent=KREA2_LORA_ROOT)
-    except Exception:
-        pass
-    return []
+    """Krea2 character picker, sourced only from Keara2/Shared.
+
+    Each immediate folder in Shared is one character; the LoRA files beneath it
+    are that character's selectable checkpoints.  This deliberately reuses the
+    resilient Shared-LoRA inventory so the picker still works on the VPS when
+    the home ComfyUI tunnel is temporarily unavailable.
+    """
+    prefix = "keara2/shared/"
+    groups = {}
+    for item in build_krea2_helper_loras():
+        path = item["path"].replace("\\", "/")
+        if not path.lower().startswith(prefix):
+            continue
+        rest = path[len(prefix):]
+        folder, _, filename = rest.partition("/")
+        if not filename:  # loose file in Shared: expose it under Shared itself
+            folder, filename = "Shared", folder
+        label = os.path.splitext(filename)[0]
+        groups.setdefault(folder, []).append({"label": label, "path": path})
+    return [{"key": _auto_char_key(folder), "label": folder,
+             "variants": sorted(variants, key=lambda v: (bool(_STEP.search(v["label"])), v["label"]))}
+            for folder, variants in sorted(groups.items(), key=lambda entry: entry[0].lower())]
 
 
 KREA2_MODEL_DEFAULTS = {

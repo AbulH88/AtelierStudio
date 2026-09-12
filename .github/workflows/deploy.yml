@@ -57,6 +57,7 @@ jobs:
             workflow_krea2carousel.json workflow_scail2motion.json workflow_scail2motionv2.json \
             workflow_ltx25i2v.json \
             webapp/app.py webapp/r2_store.py webapp/index.html webapp/login.html \
+            webapp/.krea2_models.json webapp/.krea2_helpers.json \
           | ssh -i ~/.ssh/deploy_key -p "$PORT" \
               -o StrictHostKeyChecking=accept-new \
               "$USER@$HOST" \

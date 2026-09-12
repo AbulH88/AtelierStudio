@@ -716,8 +716,8 @@ header::before{display:none}
 .userchip{border-color:var(--line2);background:transparent;color:var(--txt)}
 .atelier-tools{margin-left:auto;display:flex;align-items:center;height:100%;gap:18px;color:var(--txt)}
 .search-icon{font-size:25px;padding-right:18px;border-right:1px solid var(--line)}.avatar{display:grid;place-items:center;width:37px;height:37px;border:1px solid var(--amber-dim);border-radius:50%;font:18px var(--serif);color:var(--amber)}
-.chevron{font-size:18px}.motto{height:28px;display:flex;align-items:center;padding-left:22px;border-left:1px solid var(--line);font:8px var(--mono);letter-spacing:4px;color:var(--faint);white-space:nowrap}
-.compute,.status,.spendchip,.userchip,#logoutBtn{display:none!important}
+.account-menu{position:relative;display:flex;align-items:center}.account-trigger{display:flex;align-items:center;gap:12px;padding:0;border:0;background:transparent;color:var(--txt);cursor:pointer}.account-trigger:hover .avatar,.account-trigger:focus-visible .avatar{border-color:var(--amber);box-shadow:0 0 0 3px rgba(231,195,141,.12)}.chevron{font-size:18px;transition:transform .18s}.account-menu.open .chevron{transform:rotate(180deg)}.account-popover{position:absolute;top:calc(100% + 14px);right:-10px;z-index:50;min-width:190px;padding:9px;background:var(--panel);border:1px solid var(--line2);box-shadow:0 18px 38px rgba(0,0,0,.38)}.account-popover.hide{display:none}.account-name{padding:8px 10px 10px;font:11px var(--mono);color:var(--mut);border-bottom:1px solid var(--line)}.account-popover #logoutBtn{display:block!important;width:100%;margin-top:7px;padding:9px 10px;border:1px solid rgba(225,109,114,.35);background:rgba(225,109,114,.08);color:var(--rose);font:13px var(--sans);text-align:left;cursor:pointer}.account-popover #logoutBtn:hover{background:rgba(225,109,114,.16)}.motto{height:28px;display:flex;align-items:center;padding-left:22px;border-left:1px solid var(--line);font:8px var(--mono);letter-spacing:4px;color:var(--faint);white-space:nowrap}
+.compute,.status,.spendchip,.userchip{display:none!important}
 
 #pageStudio{min-height:calc(100vh - 64px)}
 .modes{position:fixed;z-index:6;left:0;top:64px;bottom:0;width:310px;display:block;padding:23px 18px 30px 32px;
@@ -845,7 +845,19 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
     <button class="navitem" data-page="notes">Notes</button>
     <button class="navitem hide" data-page="admin" id="navAdmin">Admin</button>
   </nav>
-  <div class="atelier-tools"><span class="search-icon">⌕</span><span class="avatar">A</span><span class="chevron">⌄</span><span class="motto">IDEAS TO WORLDS</span></div>
+  <div class="atelier-tools">
+    <span class="search-icon">⌕</span>
+    <div class="account-menu" id="accountMenu">
+      <button class="account-trigger" id="accountMenuBtn" type="button" aria-label="Open account menu" aria-expanded="false">
+        <span class="avatar">A</span><span class="chevron">⌄</span>
+      </button>
+      <div class="account-popover hide" id="accountPopover">
+        <div class="account-name" id="accountName">Signed in</div>
+        <button id="logoutBtn" type="button">Log out</button>
+      </div>
+    </div>
+    <span class="motto">IDEAS TO WORLDS</span>
+  </div>
   <div class="compute" id="compute">
     <button data-t="local" class="on"><span class="cl"></span>Local</button>
     <button data-t="cloud" class="hide"><span class="cl"></span>Cloud</button>
@@ -855,7 +867,6 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
   <div class="status"><span class="led" id="led"></span><span id="statusText">connecting…</span></div>
   <span class="spendchip hide" id="spendChip" title="estimated cloud spend this session"></span>
   <span class="userchip" id="userChip"></span>
-  <button class="startbtn" id="logoutBtn" style="display:none">Logout</button>
 </header>
 
 <div id="pageStudio">
@@ -2667,10 +2678,21 @@ async function refreshKrea2Helpers(el){
   const prev=el?el.textContent:null;
   if(el){ el.textContent='↻ …'; el.style.pointerEvents='none'; }
   try{
+    const currentVariant=$('#variant')?$('#variant').value:'';
     const c=await(await fetch('/api/config?t='+Date.now())).json();
     KREA2_HELPER_OPTIONS_HTML='<option value="">— select a LoRA —</option>'+
       (c.krea2_helpers||[]).map(it=>`<option value="${it.path}">${it.label}</option>`).join('');
     document.querySelectorAll('#krea2hqHelpers select.lora-pick').forEach(sel=>{ const v=sel.value; sel.innerHTML=KREA2_HELPER_OPTIONS_HTML; sel.value=v; });
+    if(c.krea2_characters){
+      S.krea2Chars=c.krea2_characters;
+      applyCharList();
+      const list=_charListUI();
+      for(let i=0;i<list.length;i++){
+        if((list[i].variants||[]).some(v=>v.path===currentVariant)){
+          $('#character').value=i; fillVariants(); $('#variant').value=currentVariant; break;
+        }
+      }
+    }
   }catch(e){ console.error('refresh krea2 helpers failed', e); }
   if(el){ el.textContent=prev||'↻ refresh'; el.style.pointerEvents=''; }
 }
@@ -3017,14 +3039,28 @@ async function loadMe(){
     if(d.user){
       IS_ADMIN = d.role==='admin';
       $('#userChip').textContent=d.user+(IS_ADMIN?' · admin':'');
-      $('#logoutBtn').style.display='';
+      $('#accountName').textContent=d.user+(IS_ADMIN?' · admin':'');
       $('#navAdmin').classList.toggle('hide', !IS_ADMIN);
       $('#newFolderBtn').style.display = IS_ADMIN ? '' : 'none';  // only admins create folders
       $('#igBtn').classList.toggle('hide', !IS_ADMIN);            // only admins manage IG login
     }
   }catch(e){}
 }
-$('#logoutBtn').onclick=async()=>{ await fetch('/api/logout',{method:'POST'}); location.href='/login'; };
+function setAccountMenu(open){
+  $('#accountMenu').classList.toggle('open',open);
+  $('#accountPopover').classList.toggle('hide',!open);
+  $('#accountMenuBtn').setAttribute('aria-expanded',String(open));
+}
+$('#accountMenuBtn').onclick=e=>{e.stopPropagation();setAccountMenu(!$('#accountMenu').classList.contains('open'));};
+document.addEventListener('click',e=>{if(!$('#accountMenu').contains(e.target))setAccountMenu(false);});
+$('#logoutBtn').onclick=async()=>{
+  const btn=$('#logoutBtn'); btn.disabled=true; btn.textContent='Logging out…';
+  try{
+    const response=await fetch('/api/logout',{method:'POST'});
+    if(!response.ok)throw new Error('Logout failed');
+    location.assign('/login');
+  }catch(e){btn.disabled=false;btn.textContent='Log out';alert('Could not log out. Please try again.');}
+};
 
 async function openAdmin(){
   const d=await(await fetch('/api/users')).json();
