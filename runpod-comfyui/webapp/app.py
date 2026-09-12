@@ -577,14 +577,13 @@ def build_characters():
 
 
 def build_krea2_characters():
-    """Krea2 character picker, sourced only from Keara2/Shared.
+    """Krea2 character picker from the live Keara2 LoRA root.
 
-    Each immediate folder in Shared is one character; the LoRA files beneath it
-    are that character's selectable checkpoints.  This deliberately reuses the
-    resilient Shared-LoRA inventory so the picker still works on the VPS when
-    the home ComfyUI tunnel is temporarily unavailable.
+    Each immediate Keara2 folder is one character and its files are selectable
+    checkpoints.  These are the exact paths that ComfyUI reports, so a UI choice
+    can be sent straight to the workflow without a stale-folder remap.
     """
-    prefix = "keara2/shared/"
+    prefix = KREA2_LORA_ROOT.lower() + "/"
     groups = {}
     for item in build_krea2_helper_loras():
         path = item["path"].replace("\\", "/")
@@ -592,8 +591,8 @@ def build_krea2_characters():
             continue
         rest = path[len(prefix):]
         folder, _, filename = rest.partition("/")
-        if not filename:  # loose file in Shared: expose it under Shared itself
-            folder, filename = "Shared", folder
+        if not filename:  # loose file in Keara2: expose it under the root itself
+            folder, filename = KREA2_LORA_ROOT, folder
         label = os.path.splitext(filename)[0]
         groups.setdefault(folder, []).append({"label": label, "path": path})
     return [{"key": _auto_char_key(folder), "label": folder,
@@ -666,16 +665,17 @@ KREA2CAROUSEL_DEFAULT_HELPERS = []
 
 
 def build_krea2_helper_loras():
-    """LoRAs available to every Krea2 workflow, exclusively from Keara2/Shared."""
+    """LoRAs available to Krea2 workflows from ComfyUI's live Keara2 root."""
     items = []
-    prefix = "keara2/shared/"
+    prefix = KREA2_LORA_ROOT.lower() + "/"
     try:
         items = [l.replace("\\", "/") for l in _comfy_loras()
-                 if l.replace("\\", "/").lower().startswith(prefix)]
+                 if (l.replace("\\", "/").lower().startswith(prefix)
+                     and l.lower().endswith(".safetensors"))]
     except Exception:
         items = []
     if not items:
-        base = os.path.join(LORAS_DIR, "Keara2", "Shared")
+        base = os.path.join(LORAS_DIR, KREA2_LORA_ROOT)
         if os.path.isdir(base):
             for root, _, files in os.walk(base):
                 for fn in files:
@@ -690,7 +690,11 @@ def build_krea2_helper_loras():
             pass
     elif os.path.exists(cache):
         try:
-            items = _json.load(open(cache, encoding="utf-8"))
+            # Do not revive the former /Shared cache: those paths are not
+            # registered in the current ComfyUI instance and would fail at run time.
+            items = [p for p in _json.load(open(cache, encoding="utf-8"))
+                     if (p.replace("\\", "/").lower().startswith(prefix)
+                         and "/shared/" not in p.replace("\\", "/").lower())]
         except Exception:
             items = []
     items = sorted(set(items))
@@ -1445,7 +1449,7 @@ def _build_input(body):
             inp["helper_loras"] = [
                 {"path": l.get("path", ""), "strength": float(l.get("strength", 0.6))}
                 for l in body.get("helper_loras", [])
-                if str(l.get("path", "")).replace("\\", "/").lower().startswith("keara2/shared/")
+                if str(l.get("path", "")).replace("\\", "/").lower().startswith("keara2/")
             ]
     if inp["mode"] == "i2i":
         session, frame_name = body["session"], body["frame"]
