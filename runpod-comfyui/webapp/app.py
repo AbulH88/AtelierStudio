@@ -607,35 +607,37 @@ def build_krea2_models():
     are fallbacks. Workflow defaults are always included.
     """
     prefix = "kera2/"
-    items = []
+    items = set()
     try:
-        items = [p.replace("\\", "/") for p in _comfy_unets()
-                 if p.replace("\\", "/").lower().startswith(prefix)]
+        items.update(p.replace("\\", "/") for p in _comfy_unets()
+                     if p.replace("\\", "/").lower().startswith(prefix))
     except Exception:
         pass
-    if not items:
-        base = os.path.join(DIFFUSION_MODELS_DIR, "Kera2")
-        if os.path.isdir(base):
-            for root, _, files in os.walk(base):
-                for fn in files:
-                    if fn.lower().endswith((".safetensors", ".gguf")):
-                        full = os.path.join(root, fn)
-                        items.append("Kera2/" + os.path.relpath(full, base).replace("\\", "/"))
+    base = os.path.join(DIFFUSION_MODELS_DIR, "Kera2")
+    if os.path.isdir(base):
+        for root, _, files in os.walk(base):
+            for fn in files:
+                if fn.lower().endswith((".safetensors", ".gguf")):
+                    full = os.path.join(root, fn)
+                    items.add("Kera2/" + os.path.relpath(full, base).replace("\\", "/"))
     cache = os.path.join(HERE, ".krea2_models.json")
+    # Merge the last known inventory even when the live tunnel returns a partial
+    # list. The VPS cannot read the Windows G: drive directly, so this cache is
+    # also its durable offline inventory.
+    if os.path.exists(cache):
+        try:
+            items.update(_json.load(open(cache, encoding="utf-8")))
+        except Exception:
+            pass
     if items:
         try:
             with open(cache, "w", encoding="utf-8") as f:
-                _json.dump(sorted(set(items)), f)
+                _json.dump(sorted(items, key=str.lower), f)
         except Exception:
             pass
-    elif os.path.exists(cache):
-        try:
-            items = _json.load(open(cache, encoding="utf-8"))
-        except Exception:
-            items = []
-    items.extend(KREA2_MODEL_DEFAULTS.values())
+    items.update(KREA2_MODEL_DEFAULTS.values())
     return [{"path": p, "label": os.path.splitext(p.split("/")[-1])[0]}
-            for p in sorted(set(items), key=str.lower)]
+            for p in sorted(items, key=str.lower)]
 
 
 # The realism/technique "helper" LoRAs baked into the krea2hq Power Lora Loader
