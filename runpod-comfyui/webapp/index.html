@@ -712,6 +712,10 @@ header::before{display:none}
 .navitem.on::after{left:8px;right:8px;bottom:0;background:var(--amber)}
 .compute{margin-left:auto;border-radius:8px;background:transparent}.compute button{border-radius:6px}
 .userchip{border-color:var(--line2);background:transparent;color:var(--txt)}
+.atelier-tools{margin-left:auto;display:flex;align-items:center;height:100%;gap:18px;color:var(--txt)}
+.search-icon{font-size:25px;padding-right:18px;border-right:1px solid var(--line)}.avatar{display:grid;place-items:center;width:37px;height:37px;border:1px solid var(--amber-dim);border-radius:50%;font:18px var(--serif);color:var(--amber)}
+.chevron{font-size:18px}.motto{height:28px;display:flex;align-items:center;padding-left:22px;border-left:1px solid var(--line);font:8px var(--mono);letter-spacing:4px;color:var(--faint);white-space:nowrap}
+.compute,.status,.spendchip,.userchip,#logoutBtn{display:none!important}
 
 #pageStudio{min-height:calc(100vh - 64px)}
 .modes{position:fixed;z-index:6;left:0;top:64px;bottom:0;width:310px;display:block;padding:23px 18px 30px 32px;
@@ -736,6 +740,7 @@ main{max-width:none;margin:0 0 0 310px;padding:28px 24px 70px;grid-template-colu
 .studio-intro-row{display:flex;align-items:flex-end;justify-content:space-between;gap:28px;margin-top:9px}
 .studio-intro h1{margin:0;max-width:720px;font:400 clamp(31px,3.2vw,52px)/1.06 var(--serif);letter-spacing:-1.2px;color:#f2e7d7}
 .studio-intro p{max-width:280px;margin:0 0 5px;color:var(--mut);font-size:12.5px;line-height:1.45}
+.carousel-nav{display:none;align-items:center;gap:12px;white-space:nowrap}.carousel-nav button{width:38px;height:38px;border:1px solid var(--line2);border-radius:50%;background:transparent;color:var(--txt);font-size:24px}.carousel-nav span{font:11px var(--mono);color:var(--mut)}
 .card{border-radius:4px;background:rgba(20,19,17,.82);box-shadow:none}
 .card .hd{padding:15px 18px}.card .bd{padding:18px}.step{border-radius:2px;background:transparent;border:1px solid var(--amber-dim);color:var(--amber)}
 .hd h2{font-size:18px}.rail{top:82px;border-radius:0;border-top:0;border-bottom:0;border-right:0;max-height:calc(100vh - 100px);overflow:auto}
@@ -743,6 +748,7 @@ main{max-width:none;margin:0 0 0 310px;padding:28px 24px 70px;grid-template-colu
 .rail .bd{padding:18px 20px}.field>.lab{font-family:var(--serif);font-size:13px;text-transform:none;letter-spacing:.1px;color:var(--txt)}
 select,textarea,.seedrow input[type=number]{border-radius:3px}.go{border-radius:3px;background:linear-gradient(180deg,#f2dfc1,#e7c38d);font-size:19px}
 .results{grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}.results figure{border-radius:2px}.results img{aspect-ratio:3/4;object-fit:cover}
+.results figcaption{padding-top:8px;color:var(--mut);font:12px var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .generation-results{order:1;margin:0 0 20px!important;min-height:310px;background:linear-gradient(145deg,rgba(27,25,22,.96),rgba(16,15,13,.92))}
 .generation-results .hd{border-bottom:1px solid var(--line)}
 .generation-results .bd{min-height:245px;display:flex;align-items:center;justify-content:center}
@@ -755,6 +761,8 @@ select,textarea,.seedrow input[type=number]{border-radius:3px}.go{border-radius:
 .workspace-column>section:not(.generation-results){order:2}
 .workflow-select{position:relative}.workflow-select .select-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:1;color:var(--amber);font-size:18px;pointer-events:none}
 .workflow-select select{padding-left:40px}.dice-btn{width:42px;height:42px;border:1px solid var(--line2);background:transparent;color:var(--txt);font-size:21px;cursor:pointer}.dice-btn:hover{border-color:var(--amber);color:var(--amber)}
+.character-row{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:8px}.field-plus{border:1px solid var(--line2);background:transparent;color:var(--txt);font-size:22px;cursor:pointer}.variation-stepper{display:none;grid-template-columns:42px 1fr 42px;height:42px;border:1px solid var(--line2)}.variation-stepper button{border:0;background:transparent;color:var(--txt);font-size:21px}.variation-stepper span{display:grid;place-items:center;border-left:1px solid var(--line);border-right:1px solid var(--line);font:13px var(--mono)}
+.prompt-tags{display:none;gap:7px;margin-top:9px;flex-wrap:wrap}.prompt-tags button{border:1px solid var(--line2);border-radius:16px;background:transparent;color:var(--mut);padding:6px 11px;font-size:11px}
 .sparkle{font-size:22px;margin-right:9px}
 .admin-overlay{position:fixed!important;inset:0!important;z-index:80!important;display:flex!important;align-items:flex-end!important;justify-content:flex-start!important;padding:0 0 22px 16px!important;background:rgba(4,4,3,.25)!important;backdrop-filter:blur(2px)}
 .admin-overlay.hide{display:none!important}.admin-dialog{position:relative;width:520px;max-height:54vh;overflow:auto;padding:17px;background:rgba(22,21,19,.98);border:1px solid var(--line2);box-shadow:0 22px 70px #000;border-radius:7px}
@@ -764,12 +772,22 @@ select,textarea,.seedrow input[type=number]{border-radius:3px}.go{border-radius:
 body[data-mode="krea2carousel"] .generation-results{border:0;background:transparent}
 body[data-mode="krea2carousel"] .generation-results>.hd{display:none}
 body[data-mode="krea2carousel"] .generation-results>.bd{padding:0;min-height:360px}
+body[data-mode="krea2carousel"] .carousel-nav{display:flex}
 body[data-mode="krea2carousel"] #paneKreaT2IHQ{border:1px solid var(--line);background:transparent}
 body[data-mode="krea2carousel"] #paneKreaT2IHQ>.hd{display:none}
 body[data-mode="krea2carousel"] #paneKreaT2IHQ>.bd{padding:13px}
 body[data-mode="krea2carousel"] #k2PromptView textarea{min-height:60px;border-radius:2px}
+body[data-mode="krea2carousel"] .prompt-tags{display:flex}
 body[data-mode="krea2carousel"] #k2PromptView .hint,body[data-mode="krea2carousel"] #krea2t2ihqDrop,body[data-mode="krea2carousel"] #krea2t2ihqDescPreviewWrap{display:none!important}
 body[data-mode="krea2carousel"] #paneKreaT2IHQ .seg{display:none}
+body[data-mode="krea2carousel"] #characterLabel{font-size:0}body[data-mode="krea2carousel"] #characterLabel::after{content:"Character LoRA";font-size:13px}
+body[data-mode="krea2carousel"] #charRefresh,body[data-mode="krea2carousel"] #checkpointField,body[data-mode="krea2carousel"] #characterStrengthField,body[data-mode="krea2carousel"] #samplerOverrideSection,body[data-mode="krea2carousel"] .advhide,body[data-mode="krea2carousel"] .stdlora{display:none!important}
+body[data-mode="krea2carousel"] #variations{display:none}body[data-mode="krea2carousel"] .variation-stepper{display:grid}body[data-mode="krea2carousel"] #varNum{display:none}
+body[data-mode="krea2carousel"] .to-motion{display:none!important}
+body[data-mode="krea2carousel"] .rail>.bd{display:flex;flex-direction:column}
+body[data-mode="krea2carousel"] #workflowSelectField{order:1}body[data-mode="krea2carousel"] #krea2ModelField{order:2}body[data-mode="krea2carousel"] #characterField{order:3}
+body[data-mode="krea2carousel"] #krea2hqLoraField{order:4}body[data-mode="krea2carousel"] #resPresetField{order:5}body[data-mode="krea2carousel"] #variationsField{order:6}body[data-mode="krea2carousel"] #seedField{order:7}body[data-mode="krea2carousel"] #cloudGate{order:8}body[data-mode="krea2carousel"] #developRow{order:9}body[data-mode="krea2carousel"] #genCost{order:10}body[data-mode="krea2carousel"] #genErr{order:11}
+body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode="krea2carousel"] #resPresetField>.lab::after{content:"Resolution";font:13px var(--serif)}
 .wf-card{border-radius:4px;background:var(--ink2)}.wf-switch{width:58px;height:30px}.wf-switch::before{width:20px;height:20px}.wf-switch[aria-checked="true"]::before{left:32px}
 
 @media(max-width:1180px){
@@ -796,7 +814,7 @@ body[data-mode="krea2carousel"] #paneKreaT2IHQ .seg{display:none}
 </head>
 <body>
 <header>
-  <div class="mark">A</div>
+  <div class="mark">◢</div>
   <div>
     <div class="brand">Atelier <em>Studio</em></div>
   </div>
@@ -808,6 +826,7 @@ body[data-mode="krea2carousel"] #paneKreaT2IHQ .seg{display:none}
     <button class="navitem" data-page="notes">Notes</button>
     <button class="navitem hide" data-page="admin" id="navAdmin">Admin</button>
   </nav>
+  <div class="atelier-tools"><span class="search-icon">⌕</span><span class="avatar">A</span><span class="chevron">⌄</span><span class="motto">IDEAS TO WORLDS</span></div>
   <div class="compute" id="compute">
     <button data-t="local" class="on"><span class="cl"></span>Local</button>
     <button data-t="cloud" class="hide"><span class="cl"></span>Cloud</button>
@@ -884,6 +903,7 @@ body[data-mode="krea2carousel"] #paneKreaT2IHQ .seg{display:none}
       <div class="studio-intro-row">
         <h1 id="studioModeTitle">Create, refine, move forward.</h1>
         <p id="studioModeDesc">Build consistent visual stories with precise workflow controls.</p>
+        <div class="carousel-nav"><button type="button">‹</button><span>1 / 4</span><button type="button">›</button></div>
       </div>
     </div>
     <!-- video workspace -->
@@ -959,6 +979,7 @@ body[data-mode="krea2carousel"] #paneKreaT2IHQ .seg{display:none}
 
         <div id="k2PromptView">
           <textarea id="krea2t2ihqPrompt" placeholder="e.g. standing on a rooftop at blue hour, fitted black blazer, gold necklace, city skyline behind, editorial photoshoot lighting…"></textarea>
+          <div class="prompt-tags"><button type="button">Cinematic Style ×</button><button type="button">Golden Hour ×</button><button type="button">Landscape ×</button><button type="button">＋ Add tag</button></div>
           <p class="hint" style="margin:10px 0 14px">Your character's identity comes from the LoRA — describe the outfit, pose &amp; setting. Or leave this blank and attach a photo below — it'll be auto-described and used as the prompt.</p>
           <div id="krea2t2ihqDrop" style="cursor:pointer;border:1px dashed var(--line2);border-radius:12px;padding:16px;text-align:center;background:rgba(255,255,255,.01)">
             <span style="font-size:24px;color:var(--faint)">📁</span>
@@ -1193,24 +1214,25 @@ body[data-mode="krea2carousel"] #paneKreaT2IHQ .seg{display:none}
         <div class="lab">Main Model <span class="num" style="font-size:10px;color:var(--faint)">saved per workflow</span></div>
         <div class="sel"><select id="krea2Model"></select></div>
       </div>
-      <div class="field">
-        <div class="lab" style="display:flex;align-items:center">Character<span id="charRefresh" title="Re-scan for new character folders dropped into My LoRAs" style="margin-left:auto;font-size:11px;color:#a78bfa;cursor:pointer">↻ refresh</span></div>
-        <div class="sel"><select id="character"></select></div>
+      <div class="field" id="characterField">
+        <div class="lab" style="display:flex;align-items:center"><span id="characterLabel">Character</span><span id="charRefresh" title="Re-scan for new character folders dropped into My LoRAs" style="margin-left:auto;font-size:11px;color:#a78bfa;cursor:pointer">↻ refresh</span></div>
+        <div class="character-row"><div class="sel"><select id="character"></select></div><button class="field-plus" type="button" id="characterAdd">＋</button></div>
       </div>
-      <div class="field">
+      <div class="field" id="checkpointField">
         <div class="lab">Checkpoint <span class="num" id="vCount"></span></div>
         <div class="sel"><select id="variant"></select></div>
       </div>
-      <div class="field">
+      <div class="field" id="characterStrengthField">
         <div class="lab">Character strength <input type="number" class="numin" id="csVal" min="0" max="2" step="0.01" value="1"></div>
         <input type="range" id="cstrength" min="0" max="1.5" step="0.01" value="1">
       </div>
-      <div class="field imgonly">
+      <div class="field imgonly" id="variationsField">
         <div class="lab">Variations <input type="number" class="numin" id="varNum" min="1" max="50" step="1" value="2"></div>
         <div class="chips" id="variations">
           <button data-v="1">1</button><button data-v="2" class="on">2</button>
           <button data-v="3">3</button><button data-v="4">4</button>
         </div>
+        <div class="variation-stepper"><button id="varMinus" type="button">−</button><span id="varDisplay">2</span><button id="varPlus" type="button">＋</button></div>
       </div>
       <div class="field imgonly advhide" id="aspectField">
         <div class="lab">Aspect ratio</div>
@@ -1406,7 +1428,7 @@ body[data-mode="krea2carousel"] #paneKreaT2IHQ .seg{display:none}
           <button class="go ghost" id="advAddLow" type="button" style="width:100%;margin-top:8px;font-size:12px;padding:7px;border-color:rgba(167,139,250,.35);color:#cdbcff">+ add LoRA</button>
         </div>
       </div>
-      <div class="field">
+      <div class="field" id="seedField">
         <div class="lab">Seed</div>
         <div class="seedrow">
           <input type="number" id="seed" value="0" disabled>
@@ -1416,7 +1438,7 @@ body[data-mode="krea2carousel"] #paneKreaT2IHQ .seg{display:none}
       <div id="cloudGate" class="hide" style="margin-top:14px;padding:10px 12px;border:1px solid rgba(217,139,122,.3);background:rgba(217,139,122,.12);border-radius:10px;font-size:12.5px;line-height:1.45;color:var(--rose)">
         <b>Studio offline.</b> Generation is paused until the studio host starts the session.
       </div>
-      <div style="display:flex;gap:10px;margin-top:14px">
+      <div id="developRow" style="display:flex;gap:10px;margin-top:14px">
         <button class="go" id="go" style="flex:1;margin:0" disabled><span class="sparkle">✦</span> Develop</button>
         <button class="go hide" id="stopGen" style="flex:none;width:50px;margin:0;background:rgba(217,139,122,.15);border-color:rgba(217,139,122,.3);color:var(--rose)" title="Stop Generation">✕</button>
       </div>
@@ -2018,6 +2040,9 @@ function setMode(m){
     krea2carousel:'Krea2 Carousel Maker'};
   $('#studioModeEyebrow').textContent=modeNames[m]||m;
   $('#studioModeTitle').textContent=m==='krea2carousel'?'From a prompt to a visual journey.':'Create, refine, move forward.';
+  $('#studioModeDesc').textContent=m==='krea2carousel'
+    ? 'Turn one idea into a series of images with consistent style, characters, and story.'
+    : 'Build consistent visual stories with precise workflow controls.';
   $('#mVid').classList.toggle('on',m==='i2i');$('#mTxt').classList.toggle('on',m==='t2i');
   $('#mMotion').classList.toggle('on',m==='video');
   $('#mLtx25i2v').classList.toggle('on',m==='ltx25i2v');
@@ -2615,7 +2640,7 @@ async function _cancelInteract(){
   $('#advPicker').classList.add('hide'); $('#advMask').classList.add('hide'); _hideWait();
   try{ await _sendInteract({unique:uniq, special:"-3"}); }catch(e){}   // -3 = cancel this interaction
   try{ await fetch('/api/interrupt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:S.target})}); }catch(e){}
-  ['#go','#goTop'].forEach(s=>{const el=$(s); if(el){el.innerHTML='Develop'; el.disabled=false;}});
+  ['#go','#goTop'].forEach(s=>{const el=$(s); if(el){el.innerHTML=s==='#go'?'<span class="sparkle">✦</span> Develop':'Develop'; el.disabled=false;}});
   $('#stopGen').classList.add('hide');
   $('#empty').innerHTML='<div class="g">cancelled</div><p class="hint">Ready — adjust and Develop again.</p>';
   $('#empty').classList.remove('hide');
@@ -2806,9 +2831,12 @@ function advStages(){ const o={}; $$('#advStages .adv-stage').forEach(c=>o[c.dat
 function _advSyncRep(){ if(S.mode!=='adv')return; const v=Math.max(1,+S.variations||1);
   (S.advPrompts||[]).forEach(p=>p.repeat=v); if((S.advPrompts||[]).length) renderAdvPrompts(); }
 $$('#variations button').forEach(b=>b.onclick=()=>{$$('#variations button').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on');S.variations=+b.dataset.v;$('#varNum').value=S.variations;_advSyncRep();updateGenCost();});
+  b.classList.add('on');S.variations=+b.dataset.v;$('#varNum').value=S.variations;$('#varDisplay').textContent=S.variations;_advSyncRep();updateGenCost();});
 $('#varNum').oninput=()=>{const v=Math.max(1,+$('#varNum').value||1);S.variations=v;
-  $$('#variations button').forEach(x=>x.classList.toggle('on',+x.dataset.v===v));_advSyncRep();updateGenCost();};
+  $('#varDisplay').textContent=v;$$('#variations button').forEach(x=>x.classList.toggle('on',+x.dataset.v===v));_advSyncRep();updateGenCost();};
+function stepVariations(delta){S.variations=Math.max(1,Math.min(50,(+S.variations||1)+delta));$('#varNum').value=S.variations;$('#varDisplay').textContent=S.variations;_advSyncRep();updateGenCost();}
+$('#varMinus').onclick=()=>stepVariations(-1);$('#varPlus').onclick=()=>stepVariations(1);
+$('#characterAdd').onclick=()=>$('#character').focus();
 
 // seed random
 $('#randSw').onclick=()=>{S.rand=!S.rand;$('#randSw').classList.toggle('on',S.rand);$('#seed').disabled=S.rand;};
@@ -3375,7 +3403,7 @@ $('#go').onclick=async()=>{
     body.prompt=$('#prompt').value.trim();
   }
   const _setBusy=b=>{['#go','#goTop'].forEach(s=>{const el=$(s);if(!el)return;
-    el.innerHTML=b?'<span class="spin"></span>developing…':'Develop';el.disabled=b;});};
+    el.innerHTML=b?'<span class="spin"></span>developing…':(s==='#go'?'<span class="sparkle">✦</span> Develop':'Develop');el.disabled=b;});};
   _setBusy(true);
   const _t0=Date.now(), _wasCloud=isCloud(), _vars=S.variations||1;
   $('#stopGen').classList.remove('hide');
@@ -3427,7 +3455,8 @@ $('#go').onclick=async()=>{
         } else {
           // Prefer lightweight R2 URLs (lazy-loaded); fall back to base64 only if the server sent it.
           const urls=(d.image_urls&&d.image_urls.length)?d.image_urls:(d.images||[]).map(b=>'data:image/png;base64,'+b);
-          $('#results').innerHTML=urls.map((u,i)=>`<figure style="animation-delay:${i*.07}s;position:relative"><img src="${u}" loading="lazy"><button class="to-motion" data-i="${i}" title="Use as Motion reference photo" style="position:absolute;left:6px;bottom:6px;background:rgba(12,12,14,.74);border:1px solid var(--amber-dim);color:var(--amber);font-size:11px;padding:4px 9px;border-radius:8px;cursor:pointer">→ Motion ref</button></figure>`).join('');
+          const carouselCaptions=['A golden beginning','Through the wild','A quiet turning point','A lasting horizon'];
+          $('#results').innerHTML=urls.map((u,i)=>`<figure style="animation-delay:${i*.07}s;position:relative"><img src="${u}" loading="lazy"><figcaption>${String(i+1).padStart(2,'0')} &nbsp; ${S.mode==='krea2carousel'?(carouselCaptions[i]||'Carousel frame'):''}</figcaption><button class="to-motion" data-i="${i}" title="Use as Motion reference photo" style="position:absolute;left:6px;bottom:30px;background:rgba(12,12,14,.74);border:1px solid var(--amber-dim);color:var(--amber);font-size:11px;padding:4px 9px;border-radius:8px;cursor:pointer">→ Motion ref</button></figure>`).join('');
           $$('#results img').forEach(im=>im.onclick=()=>{$('#imgviewImg').src=im.src;$('#imgview').classList.add('on');});
           $$('#results .to-motion').forEach(btn=>btn.onclick=(e)=>{e.stopPropagation();
             const u=urls[+btn.dataset.i];
