@@ -707,7 +707,7 @@ body{background-color:var(--ink);background-image:radial-gradient(1000px 620px a
 header{height:64px;padding:0 24px;gap:18px;background:rgba(13,12,11,.94);border-color:#3b3731}
 header::before{display:none}
 .mark{width:42px;height:42px;border-radius:0;background:none;color:var(--txt);font-size:31px;font-weight:500}
-.ui-icon{width:21px;height:21px;display:inline-block;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.ui-icon{width:21px;height:21px;display:inline-block;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .mark .ui-icon{width:38px;height:38px;stroke-width:1.5}.mode-group-title .ui-icon{width:23px;height:23px}.modes .seg button .k .ui-icon{width:20px;height:20px}
 .brand{font-size:27px;color:var(--txt);background:none;letter-spacing:.2px}.brand em{font-style:normal}
 .tagline{display:none}.nav{margin-left:24px;gap:12px}.navitem{font-family:var(--serif);font-size:15px;border-radius:0;padding:20px 9px}
@@ -722,7 +722,9 @@ header::before{display:none}
 #pageStudio{min-height:calc(100vh - 64px)}
 .modes{position:fixed;z-index:6;left:0;top:64px;bottom:0;width:310px;display:block;padding:23px 18px 30px 32px;
   overflow:auto;border-right:1px solid var(--line);background:rgba(15,14,12,.97)}
-.workflow-kicker{font:10px var(--mono);letter-spacing:4px;text-transform:uppercase;color:var(--mut);padding:0 0 10px;border-bottom:1px solid var(--line)}
+.workflow-kicker{display:flex;align-items:center;justify-content:space-between;font:10px var(--mono);letter-spacing:4px;text-transform:uppercase;color:var(--mut);padding:0 0 10px;border-bottom:1px solid var(--line)}
+.rail-collapse,.modes-collapse,.group-toggle{border:0;background:transparent;color:var(--txt);cursor:pointer;font-size:20px;line-height:1;padding:4px;transition:transform .2s,color .2s}.group-toggle{margin-left:auto;font-size:18px}.group-collapsed .group-toggle{transform:rotate(-90deg)}.mode-group.group-collapsed>button{display:none!important}
+.rail-collapse .ui-icon,.modes-collapse .ui-icon,.group-toggle .ui-icon{width:17px;height:17px;stroke-width:2}
 .modes>.seg{display:block;width:100%;padding:0;background:none;border:0;border-radius:0}
 .mode-group{padding:15px 0;border-bottom:1px solid var(--line)}
 .mode-group-title{display:flex;align-items:center;gap:10px;margin-bottom:6px;font:500 17px var(--serif);color:var(--txt)}
@@ -732,6 +734,9 @@ header::before{display:none}
 .modes .seg button:hover{color:var(--txt);background:rgba(255,255,255,.035)}
 .modes .seg button.on{color:var(--txt);background:linear-gradient(90deg,rgba(231,195,141,.18),rgba(231,195,141,.04));box-shadow:none}
 .modes .seg button.on::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--amber)}
+body.left-rail-collapsed .modes{width:72px;padding-left:12px;padding-right:12px}body.left-rail-collapsed main{margin-left:72px}body.left-rail-collapsed #cloudWrap{margin-left:72px!important}
+body.left-rail-collapsed .workflow-kicker span,body.left-rail-collapsed .mode-group-title{font-size:0}body.left-rail-collapsed .workflow-kicker{justify-content:center}body.left-rail-collapsed .modes-collapse{transform:rotate(180deg)}
+body.left-rail-collapsed .mode-group-title{justify-content:center}body.left-rail-collapsed .group-toggle{display:none}body.left-rail-collapsed .modes .seg button{font-size:0;padding:10px 8px;text-align:center}body.left-rail-collapsed .modes .seg button .k{margin:0;width:100%}
 #cloudNoModes{line-height:1.5}
 #cloudWrap{margin-left:310px!important;max-width:none!important;padding:24px!important}
 
@@ -747,6 +752,8 @@ main{max-width:none;margin:0 0 0 310px;padding:28px 24px 70px;grid-template-colu
 .card .hd{padding:15px 18px}.card .bd{padding:18px}.step{border-radius:2px;background:transparent;border:1px solid var(--amber-dim);color:var(--amber)}
 .hd h2{font-size:18px}.rail{top:82px;border-radius:0;border-top:0;border-bottom:0;border-right:0;max-height:calc(100vh - 100px);overflow:auto}
 .rail>.hd{position:sticky;top:0;z-index:2;background:var(--panel)}.rail>.hd h2{font-size:22px}
+.rail>.hd{display:flex;align-items:center}.rail-collapse{margin-left:auto}
+body.right-rail-collapsed main{grid-template-columns:minmax(520px,1fr) 58px}body.right-rail-collapsed .rail>.bd{display:none!important}body.right-rail-collapsed .rail>.hd{height:100%;padding:18px 10px;align-items:flex-start;flex-direction:column}body.right-rail-collapsed .rail>.hd h2{writing-mode:vertical-rl;font-size:15px;letter-spacing:2px;margin:10px auto}body.right-rail-collapsed .rail-collapse{margin:0 auto;transform:rotate(180deg)}
 .rail .bd{padding:18px 20px}.field>.lab{font-family:var(--serif);font-size:13px;text-transform:none;letter-spacing:.1px;color:var(--txt)}
 select,textarea,.seedrow input[type=number]{border-radius:3px}.go{border-radius:3px;background:linear-gradient(180deg,#f2dfc1,#e7c38d);font-size:19px}
 .results{grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}.results figure{border-radius:2px}.results img{aspect-ratio:3/4;object-fit:cover}
@@ -765,6 +772,8 @@ select,textarea,.seedrow input[type=number]{border-radius:3px}.go{border-radius:
 .workflow-select select{padding-left:40px}.dice-btn{width:42px;height:42px;border:1px solid var(--line2);background:transparent;color:var(--txt);font-size:21px;cursor:pointer}.dice-btn:hover{border-color:var(--amber);color:var(--amber)}
 .character-row{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:8px}.field-plus{border:1px solid var(--line2);background:transparent;color:var(--txt);font-size:22px;cursor:pointer}.variation-stepper{display:none;grid-template-columns:42px 1fr 42px;height:42px;border:1px solid var(--line2)}.variation-stepper button{border:0;background:transparent;color:var(--txt);font-size:21px}.variation-stepper span{display:grid;place-items:center;border-left:1px solid var(--line);border-right:1px solid var(--line);font:13px var(--mono)}
 .prompt-tags{display:none;gap:7px;margin-top:9px;flex-wrap:wrap}.prompt-tags button{border:1px solid var(--line2);border-radius:16px;background:transparent;color:var(--mut);padding:6px 11px;font-size:11px}
+.prompt-editor-row{display:grid;grid-template-columns:minmax(0,1fr) 48px;gap:8px;align-items:stretch}.prompt-image-btn{border:1px solid var(--line2);background:transparent;color:var(--txt);cursor:pointer}.prompt-image-btn:hover{border-color:var(--amber);color:var(--amber)}.prompt-image-btn .ui-icon{width:23px;height:23px}.prompt-image-error{font-size:11px;color:var(--rose);margin-top:7px}
+body[data-mode="krea2carousel"] #krea2t2ihqDescPreviewWrap{display:flex;align-items:center;gap:10px;padding:9px;border:1px solid var(--line);text-align:left!important}body[data-mode="krea2carousel"] #krea2t2ihqDescPreviewWrap.hide{display:none!important}body[data-mode="krea2carousel"] #krea2t2ihqDescPreview{width:58px;height:58px;object-fit:cover;margin:0!important}body[data-mode="krea2carousel"] #krea2t2ihqDescBtn,body[data-mode="krea2carousel"] #krea2t2ihqDescClear{margin:0!important}
 .sparkle{font-size:22px;margin-right:9px}
 .admin-overlay{position:static!important;max-width:none!important;margin:0!important;box-sizing:border-box;min-height:calc(100vh - 64px);padding:42px 36px 80px!important;background:radial-gradient(900px 500px at 70% 0,rgba(231,195,141,.045),transparent 70%)!important}
 .admin-overlay.hide{display:none!important}.admin-dialog{width:min(1180px,100%);margin:0 auto;padding:0;background:transparent;border:0;box-shadow:none;border-radius:0;overflow:visible}
@@ -782,13 +791,16 @@ body[data-mode="krea2carousel"] #paneKreaT2IHQ>.hd{display:none}
 body[data-mode="krea2carousel"] #paneKreaT2IHQ>.bd{padding:13px}
 body[data-mode="krea2carousel"] #k2PromptView textarea{min-height:60px;border-radius:2px}
 body[data-mode="krea2carousel"] .prompt-tags{display:flex}
-body[data-mode="krea2carousel"] #k2PromptView .hint,body[data-mode="krea2carousel"] #krea2t2ihqDrop,body[data-mode="krea2carousel"] #krea2t2ihqDescPreviewWrap{display:none!important}
+body[data-mode="krea2carousel"] #k2PromptView .hint,body[data-mode="krea2carousel"] #krea2t2ihqDrop{display:none!important}
 body[data-mode="krea2carousel"] #paneKreaT2IHQ .seg{display:none}
 body[data-mode="krea2carousel"] #characterLabel{font-size:0}body[data-mode="krea2carousel"] #characterLabel::after{content:"Character LoRA";font-size:13px}
 body[data-mode="krea2carousel"] #charRefresh,body[data-mode="krea2carousel"] #checkpointField,body[data-mode="krea2carousel"] #characterStrengthField,body[data-mode="krea2carousel"] #samplerOverrideSection,body[data-mode="krea2carousel"] .advhide,body[data-mode="krea2carousel"] .stdlora{display:none!important}
 body[data-mode="krea2carousel"] #variations{display:none}body[data-mode="krea2carousel"] .variation-stepper{display:grid}body[data-mode="krea2carousel"] #varNum{display:none}
 body[data-mode="krea2carousel"] .to-motion{display:none!important}
 body[data-mode="krea2carousel"] .rail>.bd{display:flex;flex-direction:column}
+body[data-mode="krea2carousel"] .rail>.bd>*{display:none!important}
+body[data-mode="krea2carousel"] .rail>.bd>#workflowSelectField,body[data-mode="krea2carousel"] .rail>.bd>#krea2ModelField,body[data-mode="krea2carousel"] .rail>.bd>#characterField,body[data-mode="krea2carousel"] .rail>.bd>#krea2hqLoraField,body[data-mode="krea2carousel"] .rail>.bd>#resPresetField,body[data-mode="krea2carousel"] .rail>.bd>#variationsField,body[data-mode="krea2carousel"] .rail>.bd>#seedField{display:block!important}
+body[data-mode="krea2carousel"] .rail>.bd>#developRow{display:flex!important}body[data-mode="krea2carousel"] .rail>.bd>#cloudGate:not(.hide),body[data-mode="krea2carousel"] .rail>.bd>#genCost:not(.hide),body[data-mode="krea2carousel"] .rail>.bd>#genErr{display:block!important}
 body[data-mode="krea2carousel"] #workflowSelectField{order:1}body[data-mode="krea2carousel"] #krea2ModelField{order:2}body[data-mode="krea2carousel"] #characterField{order:3}
 body[data-mode="krea2carousel"] #krea2hqLoraField{order:4}body[data-mode="krea2carousel"] #resPresetField{order:5}body[data-mode="krea2carousel"] #variationsField{order:6}body[data-mode="krea2carousel"] #seedField{order:7}body[data-mode="krea2carousel"] #cloudGate{order:8}body[data-mode="krea2carousel"] #developRow{order:9}body[data-mode="krea2carousel"] #genCost{order:10}body[data-mode="krea2carousel"] #genErr{order:11}
 body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode="krea2carousel"] #resPresetField>.lab::after{content:"Resolution";font:13px var(--serif)}
@@ -826,6 +838,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
   <symbol id="ic-play" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 8 6 4-6 4Z"/></symbol>
   <symbol id="ic-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9 7 7m10 10 2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/><circle cx="12" cy="12" r="8"/></symbol>
   <symbol id="ic-lens" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1.5"/><circle cx="14.5" cy="9.5" r="2.5"/><path d="m5 18 4-4 3 3 2-2 5 4"/></symbol>
+  <symbol id="ic-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
 </svg>
 <header>
   <div class="mark"><svg class="ui-icon"><use href="#ic-atelier"/></svg></div>
@@ -855,9 +868,9 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
 
 <div id="pageStudio">
 <div class="modes">
-  <div class="workflow-kicker">Workflows</div>
+  <div class="workflow-kicker"><span>Workflows</span><button class="modes-collapse" id="modesCollapse" type="button" title="Collapse workflow sidebar"><svg class="ui-icon" style="transform:rotate(90deg)"><use href="#ic-chevron"/></svg></button></div>
   <div class="seg">
-    <div class="mode-group"><div class="mode-group-title"><svg class="ui-icon"><use href="#ic-image"/></svg> Image</div>
+    <div class="mode-group" data-group="image"><div class="mode-group-title"><svg class="ui-icon"><use href="#ic-image"/></svg> Image <button class="group-toggle" type="button" aria-label="Collapse Image workflows"><svg class="ui-icon"><use href="#ic-chevron"/></svg></button></div>
     <button id="mVid" class="on" data-mode="i2i"><span class="k"><svg class="ui-icon"><use href="#ic-image"/></svg></span>Wan Image to Image</button>
     <button id="mTxt" data-mode="t2i"><span class="k"><svg class="ui-icon"><use href="#ic-text"/></svg></span>Wan Text To Image</button>
     <button id="mKrea2" data-mode="krea2"><span class="k"><svg class="ui-icon"><use href="#ic-image"/></svg></span>Krea2 Image to Image</button>
@@ -866,11 +879,11 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
     <button id="mKreaT2IHQ" data-mode="krea2t2ihq"><span class="k"><svg class="ui-icon"><use href="#ic-text"/></svg></span>Krea2 Text to Image High Quality</button>
     <button id="mKreaCarousel" data-mode="krea2carousel"><span class="k"><svg class="ui-icon"><use href="#ic-carousel"/></svg></span>Krea2 Carousel Maker</button>
     </div>
-    <div class="mode-group"><div class="mode-group-title"><svg class="ui-icon"><use href="#ic-film"/></svg> Video</div>
+    <div class="mode-group" data-group="video"><div class="mode-group-title"><svg class="ui-icon"><use href="#ic-film"/></svg> Video <button class="group-toggle" type="button" aria-label="Collapse Video workflows"><svg class="ui-icon"><use href="#ic-chevron"/></svg></button></div>
     <button id="mMotion" data-mode="video"><span class="k"><svg class="ui-icon"><use href="#ic-play"/></svg></span>Wan 2.2 Animate (Wow)</button>
     <button id="mLtx25i2v" data-mode="ltx25i2v"><span class="k"><svg class="ui-icon"><use href="#ic-film"/></svg></span>LTX 2.5 I2V</button>
     </div>
-    <div class="mode-group"><div class="mode-group-title"><svg class="ui-icon"><use href="#ic-gear"/></svg> Advanced</div>
+    <div class="mode-group" data-group="advanced"><div class="mode-group-title"><svg class="ui-icon"><use href="#ic-gear"/></svg> Advanced <button class="group-toggle" type="button" aria-label="Collapse Advanced workflows"><svg class="ui-icon"><use href="#ic-chevron"/></svg></button></div>
     <button id="mScail2" data-mode="scail2motion"><span class="k"><svg class="ui-icon"><use href="#ic-image"/></svg></span>High Quality Motion Control Scail 2 · V1.0</button>
     <button id="mScail2V2" data-mode="scail2motionv2"><span class="k"><svg class="ui-icon"><use href="#ic-image"/></svg></span>High Quality Motion Control Scail 2 · V2.0</button>
     <button id="mAdv" data-mode="adv"><span class="k"><svg class="ui-icon"><use href="#ic-lens"/></svg></span>Instaraw Advance</button>
@@ -992,7 +1005,8 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
         </div>
 
         <div id="k2PromptView">
-          <textarea id="krea2t2ihqPrompt" placeholder="e.g. standing on a rooftop at blue hour, fitted black blazer, gold necklace, city skyline behind, editorial photoshoot lighting…"></textarea>
+          <div class="prompt-editor-row"><textarea id="krea2t2ihqPrompt" placeholder="e.g. standing on a rooftop at blue hour, fitted black blazer, gold necklace, city skyline behind, editorial photoshoot lighting…"></textarea><button class="prompt-image-btn" id="promptImageBtn" type="button" title="Add image to describe"><svg class="ui-icon"><use href="#ic-image"/></svg></button></div>
+          <div class="prompt-image-error" id="promptImageErr"></div>
           <div class="prompt-tags"><button type="button">Cinematic Style ×</button><button type="button">Golden Hour ×</button><button type="button">Landscape ×</button><button type="button">＋ Add tag</button></div>
           <p class="hint" style="margin:10px 0 14px">Your character's identity comes from the LoRA — describe the outfit, pose &amp; setting. Or leave this blank and attach a photo below — it'll be auto-described and used as the prompt.</p>
           <div id="krea2t2ihqDrop" style="cursor:pointer;border:1px dashed var(--line2);border-radius:12px;padding:16px;text-align:center;background:rgba(255,255,255,.01)">
@@ -1217,7 +1231,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
 
   <!-- RIGHT: control rail -->
   <aside class="card d2 rail">
-    <div class="hd"><h2>Settings</h2></div>
+    <div class="hd"><h2>Settings</h2><button class="rail-collapse" id="railCollapse" type="button" title="Collapse Settings"><svg class="ui-icon" style="transform:rotate(-90deg)"><use href="#ic-chevron"/></svg></button></div>
     <div class="bd">
       <div class="field" id="workflowSelectField">
         <div class="lab">Workflow</div>
@@ -2157,6 +2171,27 @@ $('#mKreaCarousel').onclick=()=>setMode('krea2carousel');
 $('#mScail2').onclick=()=>setMode('scail2motion');
 $('#mScail2V2').onclick=()=>setMode('scail2motionv2');
 
+// Studio rails and workflow groups remember their state per browser.
+const LEFT_RAIL_KEY='atelier_left_rail_collapsed', RIGHT_RAIL_KEY='atelier_right_rail_collapsed';
+let railScrollTop=0;
+function applyRailState(){
+  document.body.classList.toggle('left-rail-collapsed',localStorage.getItem(LEFT_RAIL_KEY)==='1');
+  document.body.classList.toggle('right-rail-collapsed',localStorage.getItem(RIGHT_RAIL_KEY)==='1');
+}
+$('#modesCollapse').onclick=()=>{const next=!document.body.classList.contains('left-rail-collapsed');localStorage.setItem(LEFT_RAIL_KEY,next?'1':'0');applyRailState();};
+$('#railCollapse').onclick=()=>{
+  const next=!document.body.classList.contains('right-rail-collapsed'), rail=$('.rail');
+  if(next)railScrollTop=rail.scrollTop;
+  localStorage.setItem(RIGHT_RAIL_KEY,next?'1':'0');applyRailState();
+  if(!next)requestAnimationFrame(()=>{rail.scrollTop=railScrollTop;});
+};
+$$('.mode-group').forEach(group=>{
+  const key='atelier_group_'+group.dataset.group+'_collapsed';
+  group.classList.toggle('group-collapsed',localStorage.getItem(key)==='1');
+  group.querySelector('.group-toggle').onclick=e=>{e.stopPropagation();const next=!group.classList.contains('group-collapsed');group.classList.toggle('group-collapsed',next);localStorage.setItem(key,next?'1':'0');};
+});
+applyRailState();
+
 function syncWorkflowSelect(){
   const sel=$('#workflowSelect'); if(!sel)return;
   const buttons=[...document.querySelectorAll('.modes button[data-mode]')].filter(b=>!b.classList.contains('hide'));
@@ -2892,19 +2927,22 @@ $('#ltxPrompt').oninput=refreshGo;
 // ComfyUI, it's used only to auto-generate the prompt server-side when blank)
 S.krea2t2ihqDescB64=null;
 $('#krea2t2ihqDrop').onclick=()=>$('#krea2t2ihqDescFile').click();
+$('#promptImageBtn').onclick=()=>$('#krea2t2ihqDescFile').click();
 $('#krea2t2ihqDescFile').onchange=async(e)=>{
   const f=e.target.files[0]; if(!f) return;
+  $('#promptImageErr').textContent='';
   try{
     S.krea2t2ihqDescB64=await _fileToB64(f);
     $('#krea2t2ihqDescPreview').src='data:image/png;base64,'+S.krea2t2ihqDescB64;
     $('#krea2t2ihqDescPreviewWrap').classList.remove('hide');
-  }catch(err){ alert('Could not read that image.'); }
+  }catch(err){ $('#promptImageErr').textContent='Could not read that image.'; }
   refreshGo();
 };
 $('#krea2t2ihqDescClear').onclick=()=>{
   S.krea2t2ihqDescB64=null;
   $('#krea2t2ihqDescFile').value='';
   $('#krea2t2ihqDescPreviewWrap').classList.add('hide');
+  $('#promptImageErr').textContent='';
   refreshGo();
 };
 $('#goTop').onclick=()=>{ if(!$('#go').disabled) $('#go').click(); };
@@ -3988,9 +4026,10 @@ $('#t2iDescribeBtn').onclick = async (e) => {
 
 $('#krea2t2ihqDescBtn').onclick = async (e) => {
   e.preventDefault();
+  $('#promptImageErr').textContent='';
   const fileInput = $('#krea2t2ihqDescFile');
   if (!fileInput.files || !fileInput.files[0]) {
-    alert("Attach a photo first.");
+    $('#promptImageErr').textContent="Attach a photo first.";
     return;
   }
   const btn = $('#krea2t2ihqDescBtn');
@@ -4006,13 +4045,13 @@ $('#krea2t2ihqDescBtn').onclick = async (e) => {
     const r = await fetch('/api/describe', { method: 'POST', body: formData });
     const d = await safeJson(r);
     if (d.error) {
-      alert("AI Description failed: " + d.error);
+      $('#promptImageErr').textContent="AI Description failed: " + d.error;
     } else if (d.prompt) {
       $('#krea2t2ihqPrompt').value = d.prompt;
       refreshGo();
     }
   } catch (err) {
-    alert("AI Description failed: " + err);
+    $('#promptImageErr').textContent="AI Description failed: " + err;
   } finally {
     btn.disabled = false;
     btn.textContent = oldText;
