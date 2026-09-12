@@ -727,9 +727,10 @@ header::before{display:none}
 .group-toggle .ui-icon,.settings-section-toggle .ui-icon{width:17px;height:17px;stroke-width:2}
 .modes>.seg{display:block;width:100%;padding:0;background:none;border:0;border-radius:0}
 .mode-group{padding:15px 0;border-bottom:1px solid var(--line)}
-.mode-group-title{display:flex;align-items:center;gap:10px;margin-bottom:6px;font:500 17px var(--serif);color:var(--txt)}
+.mode-group-title{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;margin-bottom:6px;font:500 17px var(--serif);color:var(--txt)}
 .mode-group-title span{width:20px;color:var(--mut);font:14px var(--sans)}
 .modes .seg button{position:relative;display:block;width:100%;padding:9px 12px 9px 18px;border-radius:2px;text-align:left;font-size:13px;color:var(--mut);line-height:1.3}
+.modes .seg .mode-group-title>.group-toggle{display:grid;place-items:center;flex:0 0 28px;width:28px!important;height:28px;margin-left:auto;padding:5px!important;text-align:center;background:transparent}
 .modes .seg button .k{display:inline-flex;width:22px;margin-right:8px;align-items:center;justify-content:center;vertical-align:middle}
 .modes .seg button:hover{color:var(--txt);background:rgba(255,255,255,.035)}
 .modes .seg button.on{color:var(--txt);background:linear-gradient(90deg,rgba(231,195,141,.18),rgba(231,195,141,.04));box-shadow:none}
