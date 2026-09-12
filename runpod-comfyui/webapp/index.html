@@ -738,7 +738,7 @@ header::before{display:none}
 #cloudNoModes{line-height:1.5}
 #cloudWrap{margin-left:310px!important;max-width:none!important;padding:24px!important}
 
-main{max-width:none;margin:0 0 0 310px;padding:28px 24px 70px;grid-template-columns:minmax(520px,1fr) 340px;gap:24px}
+main{max-width:none;margin:0 0 0 310px;padding:28px 24px 70px;grid-template-columns:minmax(520px,1fr) var(--settings-rail-width,360px);gap:24px}
 .workspace-column{min-width:0;display:flex;flex-direction:column}
 .studio-intro{padding:2px 2px 24px;border-bottom:1px solid var(--line);margin-bottom:22px}
 .studio-eyebrow{font:10px var(--mono);letter-spacing:4px;text-transform:uppercase;color:var(--amber)}
@@ -749,6 +749,7 @@ main{max-width:none;margin:0 0 0 310px;padding:28px 24px 70px;grid-template-colu
 .card{border-radius:4px;background:rgba(20,19,17,.82);box-shadow:none}
 .card .hd{padding:15px 18px}.card .bd{padding:18px}.step{border-radius:2px;background:transparent;border:1px solid var(--amber-dim);color:var(--amber)}
 .hd h2{font-size:18px}.rail{top:82px;border-radius:0;border-top:0;border-bottom:0;border-right:0;max-height:calc(100vh - 100px);overflow:auto}
+.settings-resizer{position:absolute;z-index:8;left:-8px;top:0;bottom:0;width:15px;cursor:ew-resize;touch-action:none}.settings-resizer::after{content:"";position:absolute;left:6px;top:50%;width:3px;height:42px;transform:translateY(-50%);background:var(--line2);opacity:.45;transition:.16s}.settings-resizer:hover::after,.settings-resizer:focus-visible::after,body.settings-resizing .settings-resizer::after{background:var(--amber);opacity:1;height:64px}.settings-resizer:focus-visible{outline:none}body.settings-resizing{cursor:ew-resize!important;user-select:none!important}body.settings-resizing *{cursor:ew-resize!important}
 .rail>.hd{position:sticky;top:0;z-index:2;background:var(--panel)}.rail>.hd h2{font-size:22px}
 .rail>.hd{display:flex;align-items:center}
 .settings-section{border-bottom:1px solid var(--line);padding:0 0 5px;margin:0 0 12px}.settings-section-head{width:100%;display:flex;align-items:center;padding:9px 0 12px;border:0;background:transparent;color:var(--txt);font:17px var(--serif);cursor:pointer;text-align:left}.settings-section-toggle{margin-left:auto}.settings-section.is-collapsed .settings-section-toggle{transform:rotate(-90deg)}.settings-section.is-collapsed .settings-section-body{display:none}.settings-section-body>.field:last-child{margin-bottom:10px}
@@ -802,7 +803,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
   header{padding:0 12px}.brand{font-size:21px}.mark{width:30px;font-size:25px}.nav{margin-left:5px;gap:1px}.navitem{font-size:13px;padding:21px 6px}
   .compute,.status,.userchip{display:none}
   .modes{width:220px;padding:20px 12px 26px 18px}
-  main{margin-left:220px;padding:20px 14px 55px;grid-template-columns:minmax(330px,1fr) 250px;gap:14px}
+  main{margin-left:220px;padding:20px 14px 55px;grid-template-columns:minmax(330px,1fr) minmax(300px,var(--settings-rail-width,360px));gap:14px}
   #cloudWrap{margin-left:220px!important}
   .studio-intro{padding-bottom:18px;margin-bottom:16px}.studio-intro-row{display:block}.studio-intro h1{font-size:34px}.studio-intro p{margin-top:9px;max-width:500px}
   .rail .bd{padding:14px}.results{grid-template-columns:repeat(2,minmax(110px,1fr))}
@@ -818,6 +819,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
   .results{grid-template-columns:repeat(2,minmax(120px,1fr))}.rail{position:static;max-height:none;border:1px solid var(--line)}
   .empty-sheet{grid-template-columns:repeat(2,1fr)}.admin-overlay{padding:25px 14px 60px!important}.admin-dialog .wf-admin{grid-template-columns:1fr}
 }
+@media(max-width:920px){.settings-resizer{display:none}}
 </style>
 </head>
 <body>
@@ -1234,6 +1236,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
 
   <!-- RIGHT: control rail -->
   <aside class="card d2 rail">
+    <div class="settings-resizer" id="settingsResizer" role="separator" aria-label="Resize Settings panel" aria-orientation="vertical" aria-valuemin="300" aria-valuemax="620" tabindex="0" title="Drag to resize · double-click to reset"></div>
     <div class="hd"><h2>Settings</h2></div>
     <div class="bd">
       <div class="field" id="workflowSelectField">
@@ -2221,6 +2224,55 @@ function buildSettingsSections(){
       setCollapsed(collapsed);
       localStorage.setItem(storageKey,collapsed?'1':'0');
     };
+  });
+}
+
+// Desktop Settings rail width is user-adjustable so long model and checkpoint
+// names remain readable. The grid owns the width; the rail only supplies the handle.
+function initSettingsResize(){
+  const key='atelier_settings_rail_width', defaultWidth=360, minWidth=300, maxWidth=620;
+  const main=document.querySelector('#pageStudio main'), handle=$('#settingsResizer');
+  if(!main||!handle)return;
+  const setWidth=width=>{
+    const value=Math.round(Math.max(minWidth,Math.min(maxWidth,width)));
+    main.style.setProperty('--settings-rail-width',value+'px');
+    handle.setAttribute('aria-valuenow',String(value));
+  };
+  const saved=Number(localStorage.getItem(key));
+  if(Number.isFinite(saved)&&saved>=minWidth&&saved<=maxWidth)setWidth(saved);
+  else setWidth(defaultWidth);
+  let startX=0,startWidth=defaultWidth;
+  handle.addEventListener('pointerdown',event=>{
+    if(window.innerWidth<=920)return;
+    startX=event.clientX;
+    startWidth=parseFloat(getComputedStyle(main).getPropertyValue('--settings-rail-width'))||defaultWidth;
+    handle.setPointerCapture(event.pointerId);
+    document.body.classList.add('settings-resizing');
+    event.preventDefault();
+  });
+  handle.addEventListener('pointermove',event=>{
+    if(!handle.hasPointerCapture(event.pointerId))return;
+    const available=Math.max(minWidth,Math.min(maxWidth,main.getBoundingClientRect().width-360));
+    const width=Math.max(minWidth,Math.min(available,startWidth+(startX-event.clientX)));
+    setWidth(width);
+  });
+  const finish=event=>{
+    if(!handle.hasPointerCapture(event.pointerId))return;
+    const width=parseFloat(getComputedStyle(main).getPropertyValue('--settings-rail-width'))||defaultWidth;
+    localStorage.setItem(key,String(Math.round(width)));
+    handle.releasePointerCapture(event.pointerId);
+    document.body.classList.remove('settings-resizing');
+  };
+  handle.addEventListener('pointerup',finish);
+  handle.addEventListener('pointercancel',finish);
+  handle.addEventListener('dblclick',()=>{setWidth(defaultWidth);localStorage.removeItem(key);});
+  handle.addEventListener('keydown',event=>{
+    if(window.innerWidth<=920)return;
+    if(!['ArrowLeft','ArrowRight','Home'].includes(event.key))return;
+    event.preventDefault();
+    const current=parseFloat(getComputedStyle(main).getPropertyValue('--settings-rail-width'))||defaultWidth;
+    const next=event.key==='Home'?defaultWidth:current+(event.key==='ArrowLeft'?20:-20);
+    setWidth(next);localStorage.setItem(key,getComputedStyle(main).getPropertyValue('--settings-rail-width').trim().replace('px',''));
   });
 }
 
@@ -4223,6 +4275,7 @@ async function loadNotes(){
 }
 
 buildSettingsSections();
+initSettingsResize();
 loadVisionModels();
 loadLoras();
 
