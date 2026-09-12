@@ -723,8 +723,8 @@ header::before{display:none}
 .modes{position:fixed;z-index:6;left:0;top:64px;bottom:0;width:310px;display:block;padding:23px 18px 30px 32px;
   overflow:auto;border-right:1px solid var(--line);background:rgba(15,14,12,.97)}
 .workflow-kicker{display:flex;align-items:center;justify-content:space-between;font:10px var(--mono);letter-spacing:4px;text-transform:uppercase;color:var(--mut);padding:0 0 10px;border-bottom:1px solid var(--line)}
-.rail-collapse,.modes-collapse,.group-toggle{border:0;background:transparent;color:var(--txt);cursor:pointer;font-size:20px;line-height:1;padding:4px;transition:transform .2s,color .2s}.group-toggle{margin-left:auto;font-size:18px}.group-collapsed .group-toggle{transform:rotate(-90deg)}.mode-group.group-collapsed>button{display:none!important}
-.rail-collapse .ui-icon,.modes-collapse .ui-icon,.group-toggle .ui-icon{width:17px;height:17px;stroke-width:2}
+.group-toggle,.settings-section-toggle{border:0;background:transparent;color:var(--txt);cursor:pointer;line-height:1;padding:4px;transition:transform .2s,color .2s}.group-toggle{margin-left:auto;font-size:18px}.group-collapsed .group-toggle{transform:rotate(-90deg)}.mode-group.group-collapsed>button{display:none!important}
+.group-toggle .ui-icon,.settings-section-toggle .ui-icon{width:17px;height:17px;stroke-width:2}
 .modes>.seg{display:block;width:100%;padding:0;background:none;border:0;border-radius:0}
 .mode-group{padding:15px 0;border-bottom:1px solid var(--line)}
 .mode-group-title{display:flex;align-items:center;gap:10px;margin-bottom:6px;font:500 17px var(--serif);color:var(--txt)}
@@ -734,9 +734,6 @@ header::before{display:none}
 .modes .seg button:hover{color:var(--txt);background:rgba(255,255,255,.035)}
 .modes .seg button.on{color:var(--txt);background:linear-gradient(90deg,rgba(231,195,141,.18),rgba(231,195,141,.04));box-shadow:none}
 .modes .seg button.on::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--amber)}
-body.left-rail-collapsed .modes{width:72px;padding-left:12px;padding-right:12px}body.left-rail-collapsed main{margin-left:72px}body.left-rail-collapsed #cloudWrap{margin-left:72px!important}
-body.left-rail-collapsed .workflow-kicker span,body.left-rail-collapsed .mode-group-title{font-size:0}body.left-rail-collapsed .workflow-kicker{justify-content:center}body.left-rail-collapsed .modes-collapse{transform:rotate(180deg)}
-body.left-rail-collapsed .mode-group-title{justify-content:center}body.left-rail-collapsed .group-toggle{display:none}body.left-rail-collapsed .modes .seg button{font-size:0;padding:10px 8px;text-align:center}body.left-rail-collapsed .modes .seg button .k{margin:0;width:100%}
 #cloudNoModes{line-height:1.5}
 #cloudWrap{margin-left:310px!important;max-width:none!important;padding:24px!important}
 
@@ -752,8 +749,8 @@ main{max-width:none;margin:0 0 0 310px;padding:28px 24px 70px;grid-template-colu
 .card .hd{padding:15px 18px}.card .bd{padding:18px}.step{border-radius:2px;background:transparent;border:1px solid var(--amber-dim);color:var(--amber)}
 .hd h2{font-size:18px}.rail{top:82px;border-radius:0;border-top:0;border-bottom:0;border-right:0;max-height:calc(100vh - 100px);overflow:auto}
 .rail>.hd{position:sticky;top:0;z-index:2;background:var(--panel)}.rail>.hd h2{font-size:22px}
-.rail>.hd{display:flex;align-items:center}.rail-collapse{margin-left:auto}
-body.right-rail-collapsed main{grid-template-columns:minmax(520px,1fr) 58px}body.right-rail-collapsed .rail>.bd{display:none!important}body.right-rail-collapsed .rail>.hd{height:100%;padding:18px 10px;align-items:flex-start;flex-direction:column}body.right-rail-collapsed .rail>.hd h2{writing-mode:vertical-rl;font-size:15px;letter-spacing:2px;margin:10px auto}body.right-rail-collapsed .rail-collapse{margin:0 auto;transform:rotate(180deg)}
+.rail>.hd{display:flex;align-items:center}
+.settings-section{border-bottom:1px solid var(--line);padding:0 0 5px;margin:0 0 12px}.settings-section-head{width:100%;display:flex;align-items:center;padding:9px 0 12px;border:0;background:transparent;color:var(--txt);font:17px var(--serif);cursor:pointer;text-align:left}.settings-section-toggle{margin-left:auto}.settings-section.is-collapsed .settings-section-toggle{transform:rotate(-90deg)}.settings-section.is-collapsed .settings-section-body{display:none}.settings-section-body>.field:last-child{margin-bottom:10px}
 .rail .bd{padding:18px 20px}.field>.lab{font-family:var(--serif);font-size:13px;text-transform:none;letter-spacing:.1px;color:var(--txt)}
 select,textarea,.seedrow input[type=number]{border-radius:3px}.go{border-radius:3px;background:linear-gradient(180deg,#f2dfc1,#e7c38d);font-size:19px}
 .results{grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}.results figure{border-radius:2px}.results img{aspect-ratio:3/4;object-fit:cover}
@@ -797,12 +794,6 @@ body[data-mode="krea2carousel"] #characterLabel{font-size:0}body[data-mode="krea
 body[data-mode="krea2carousel"] #charRefresh,body[data-mode="krea2carousel"] #checkpointField,body[data-mode="krea2carousel"] #characterStrengthField,body[data-mode="krea2carousel"] #samplerOverrideSection,body[data-mode="krea2carousel"] .advhide,body[data-mode="krea2carousel"] .stdlora{display:none!important}
 body[data-mode="krea2carousel"] #variations{display:none}body[data-mode="krea2carousel"] .variation-stepper{display:grid}body[data-mode="krea2carousel"] #varNum{display:none}
 body[data-mode="krea2carousel"] .to-motion{display:none!important}
-body[data-mode="krea2carousel"] .rail>.bd{display:flex;flex-direction:column}
-body[data-mode="krea2carousel"] .rail>.bd>*{display:none!important}
-body[data-mode="krea2carousel"] .rail>.bd>#workflowSelectField,body[data-mode="krea2carousel"] .rail>.bd>#krea2ModelField,body[data-mode="krea2carousel"] .rail>.bd>#characterField,body[data-mode="krea2carousel"] .rail>.bd>#krea2hqLoraField,body[data-mode="krea2carousel"] .rail>.bd>#resPresetField,body[data-mode="krea2carousel"] .rail>.bd>#variationsField,body[data-mode="krea2carousel"] .rail>.bd>#seedField{display:block!important}
-body[data-mode="krea2carousel"] .rail>.bd>#developRow{display:flex!important}body[data-mode="krea2carousel"] .rail>.bd>#cloudGate:not(.hide),body[data-mode="krea2carousel"] .rail>.bd>#genCost:not(.hide),body[data-mode="krea2carousel"] .rail>.bd>#genErr{display:block!important}
-body[data-mode="krea2carousel"] #workflowSelectField{order:1}body[data-mode="krea2carousel"] #krea2ModelField{order:2}body[data-mode="krea2carousel"] #characterField{order:3}
-body[data-mode="krea2carousel"] #krea2hqLoraField{order:4}body[data-mode="krea2carousel"] #resPresetField{order:5}body[data-mode="krea2carousel"] #variationsField{order:6}body[data-mode="krea2carousel"] #seedField{order:7}body[data-mode="krea2carousel"] #cloudGate{order:8}body[data-mode="krea2carousel"] #developRow{order:9}body[data-mode="krea2carousel"] #genCost{order:10}body[data-mode="krea2carousel"] #genErr{order:11}
 body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode="krea2carousel"] #resPresetField>.lab::after{content:"Resolution";font:13px var(--serif)}
 .wf-card{border-radius:4px;background:var(--ink2)}.wf-switch{width:58px;height:30px}.wf-switch::before{width:20px;height:20px}.wf-switch[aria-checked="true"]::before{left:32px}
 
@@ -868,7 +859,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
 
 <div id="pageStudio">
 <div class="modes">
-  <div class="workflow-kicker"><span>Workflows</span><button class="modes-collapse" id="modesCollapse" type="button" title="Collapse workflow sidebar"><svg class="ui-icon" style="transform:rotate(90deg)"><use href="#ic-chevron"/></svg></button></div>
+  <div class="workflow-kicker"><span>Workflows</span></div>
   <div class="seg">
     <div class="mode-group" data-group="image"><div class="mode-group-title"><svg class="ui-icon"><use href="#ic-image"/></svg> Image <button class="group-toggle" type="button" aria-label="Collapse Image workflows"><svg class="ui-icon"><use href="#ic-chevron"/></svg></button></div>
     <button id="mVid" class="on" data-mode="i2i"><span class="k"><svg class="ui-icon"><use href="#ic-image"/></svg></span>Wan Image to Image</button>
@@ -1231,7 +1222,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
 
   <!-- RIGHT: control rail -->
   <aside class="card d2 rail">
-    <div class="hd"><h2>Settings</h2><button class="rail-collapse" id="railCollapse" type="button" title="Collapse Settings"><svg class="ui-icon" style="transform:rotate(-90deg)"><use href="#ic-chevron"/></svg></button></div>
+    <div class="hd"><h2>Settings</h2></div>
     <div class="bd">
       <div class="field" id="workflowSelectField">
         <div class="lab">Workflow</div>
@@ -2125,7 +2116,7 @@ function setMode(m){
   $$('.advlora').forEach(el=>el.classList.toggle('hide', m!=='adv'));   // two LoRA groups shown only in adv
   // adv has its own aspect + describe in the studio -> hide the rail's (keep Trigger Word)
   $$('.advhide').forEach(el=>el.classList.toggle('hide', m==='adv'));
-  ['visionModelField','stylePresetField','bodyTypeField','shotTypeField','detailField','explicitField','clothingNoteField','customInstrField'].forEach(id=>{ const el=$('#'+id); if(el)el.classList.toggle('hide', m==='adv'); });
+  ['visionModelField','stylePresetField','bodyTypeField','shotTypeField','detailField','explicitField','clothingNoteField','customInstrField','triggerField'].forEach(id=>{ const el=$('#'+id); if(el)el.classList.toggle('hide', m==='adv'||m==='krea2carousel'); });
   // The generic aspect-ratio picker only applies to modes that size an empty latent
   // from it: i2i, t2i, krea2, krea2new. video sizes from the ref image/driving clip,
   // adv has its own aspect in the studio, and krea2hq/krea2t2ihq/krea2carousel use
@@ -2141,7 +2132,7 @@ function setMode(m){
   // scail2motion: sized off the ref photo, and its WanSCAILInfinity node doesn't even
   // respond to the generic cfg/sampler_name/scheduler broadcast). The override panel
   // doesn't apply to either, so hide it.
-  $('#samplerOverrideSection').classList.toggle('hide', motionPane||m==='ltx25i2v');
+  $('#samplerOverrideSection').classList.toggle('hide', motionPane||m==='ltx25i2v'||m==='krea2carousel');
   if(usesResPreset){
     const o=$('#resPreset').selectedOptions[0];
     if(o) S.aspect={key:o.dataset.key,width:+o.dataset.w,height:+o.dataset.h};
@@ -2171,26 +2162,55 @@ $('#mKreaCarousel').onclick=()=>setMode('krea2carousel');
 $('#mScail2').onclick=()=>setMode('scail2motion');
 $('#mScail2V2').onclick=()=>setMode('scail2motionv2');
 
-// Studio rails and workflow groups remember their state per browser.
-const LEFT_RAIL_KEY='atelier_left_rail_collapsed', RIGHT_RAIL_KEY='atelier_right_rail_collapsed';
-let railScrollTop=0;
-function applyRailState(){
-  document.body.classList.toggle('left-rail-collapsed',localStorage.getItem(LEFT_RAIL_KEY)==='1');
-  document.body.classList.toggle('right-rail-collapsed',localStorage.getItem(RIGHT_RAIL_KEY)==='1');
-}
-$('#modesCollapse').onclick=()=>{const next=!document.body.classList.contains('left-rail-collapsed');localStorage.setItem(LEFT_RAIL_KEY,next?'1':'0');applyRailState();};
-$('#railCollapse').onclick=()=>{
-  const next=!document.body.classList.contains('right-rail-collapsed'), rail=$('.rail');
-  if(next)railScrollTop=rail.scrollTop;
-  localStorage.setItem(RIGHT_RAIL_KEY,next?'1':'0');applyRailState();
-  if(!next)requestAnimationFrame(()=>{rail.scrollTop=railScrollTop;});
-};
+// Workflow groups collapse independently; the sidebar itself always stays open.
 $$('.mode-group').forEach(group=>{
   const key='atelier_group_'+group.dataset.group+'_collapsed';
   group.classList.toggle('group-collapsed',localStorage.getItem(key)==='1');
   group.querySelector('.group-toggle').onclick=e=>{e.stopPropagation();const next=!group.classList.contains('group-collapsed');group.classList.toggle('group-collapsed',next);localStorage.setItem(key,next?'1':'0');};
 });
-applyRailState();
+
+// Settings uses independent sections like the approved Atelier design. Existing
+// controls are moved (not recreated), so all of their current event handlers stay intact.
+function buildSettingsSections(){
+  const railBody=document.querySelector('.rail>.bd');
+  if(!railBody||railBody.dataset.sectioned==='1')return;
+  railBody.dataset.sectioned='1';
+  const byId=ids=>ids.map(id=>document.getElementById(id)).filter(Boolean);
+  const sections=[
+    ['workflow','Workflow',byId(['workflowSelectField','goTop','krea2ModelField'])],
+    ['character','Character & LoRAs',[
+      ...byId(['characterField','checkpointField','characterStrengthField','krea2hqLoraField']),
+      ...document.querySelectorAll('.rail .stdlora,.rail .advlora')
+    ]],
+    ['output','Output',byId(['variationsField','aspectField','resPresetField','customResField','denoiseField','stepsField','krea2ResizeField','krea2Denoise1Field','krea2RefineField','krea2Denoise2Field','krea2hqDenoiseField','seedField'])],
+    ['advanced','Advanced',[
+      ...byId(['samplerOverrideSection','visionModelField','stylePresetField','bodyTypeField','shotTypeField','detailField','explicitField','clothingNoteField','customInstrField','triggerField']),
+      ...document.querySelectorAll('.rail>.bd>.advhide:not([id])')
+    ]]
+  ];
+  const anchor=railBody.firstChild;
+  sections.forEach(([key,title,nodes])=>{
+    const section=document.createElement('section');
+    section.className='settings-section';
+    section.dataset.settingsSection=key;
+    section.innerHTML=`<button class="settings-section-head" type="button" aria-expanded="true"><span>${title}</span><span class="settings-section-toggle"><svg class="ui-icon"><use href="#ic-chevron"/></svg></span></button><div class="settings-section-body"></div>`;
+    railBody.insertBefore(section,anchor);
+    const body=section.querySelector('.settings-section-body');
+    [...new Set(nodes)].forEach(node=>body.appendChild(node));
+    const storageKey='atelier_settings_'+key+'_collapsed';
+    const button=section.querySelector('.settings-section-head');
+    const setCollapsed=collapsed=>{
+      section.classList.toggle('is-collapsed',collapsed);
+      button.setAttribute('aria-expanded',String(!collapsed));
+    };
+    setCollapsed(localStorage.getItem(storageKey)==='1');
+    button.onclick=()=>{
+      const collapsed=!section.classList.contains('is-collapsed');
+      setCollapsed(collapsed);
+      localStorage.setItem(storageKey,collapsed?'1':'0');
+    };
+  });
+}
 
 function syncWorkflowSelect(){
   const sel=$('#workflowSelect'); if(!sel)return;
@@ -4165,6 +4185,7 @@ async function loadNotes(){
   });
 }
 
+buildSettingsSections();
 loadVisionModels();
 loadLoras();
 
