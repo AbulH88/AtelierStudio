@@ -13,7 +13,7 @@
     "_meta": {"title": "CLIP Text Encode (Negative Prompt)"}
   },
   "37": {
-    "inputs": {"unet_name": "WAN\\INT8Convert\\wan2.1_14B_SCAIL_2_int8_convrot.safetensors", "weight_dtype": "default"},
+    "inputs": {"unet_name": "INT8Convert\\wan2.1_14B_SCAIL_2_int8_convrot.safetensors", "weight_dtype": "default"},
     "class_type": "UNETLoader",
     "_meta": {"title": "Load Diffusion Model"}
   },
@@ -47,6 +47,41 @@
     "class_type": "LoadImage",
     "_meta": {"title": "Load Image"}
   },
+  "sc2_source_video": {
+    "inputs": {
+      "video": "h264 yuv420p_00003-audio.mp4",
+      "force_rate": 0,
+      "force_size": "Disabled",
+      "custom_width": 0,
+      "custom_height": 0,
+      "frame_load_cap": 1,
+      "skip_first_frames": 0,
+      "select_every_nth": 1,
+      "format": "None"
+    },
+    "class_type": "VHS_LoadVideo",
+    "_meta": {"title": "Original Driving Video Info"}
+  },
+  "sc2_video_info": {
+    "inputs": {"video_info": ["sc2_source_video", 3]},
+    "class_type": "VHS_VideoInfo",
+    "_meta": {"title": "Driving Video Dimensions"}
+  },
+  "sc2_ref_crop": {
+    "inputs": {
+      "width": ["sc2_video_info", 8],
+      "height": ["sc2_video_info", 9],
+      "upscale_method": "lanczos",
+      "keep_proportion": "crop",
+      "pad_color": "0, 0, 0",
+      "crop_position": "top",
+      "divisible_by": 8,
+      "device": "cpu",
+      "image": ["58", 0]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {"title": "Crop Reference to Driving Video"}
+  },
   "96": {
     "inputs": {
       "lora_name": "wan\\WanLightning\\wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise\\wan21-lightx2v-i2v-14b-480p-cfg-step-distill-rank256-bf16.safetensors",
@@ -61,7 +96,7 @@
       "resize_type": "scale total pixels",
       "resize_type.megapixels": 0.9,
       "scale_method": "nearest-exact",
-      "input": ["58", 0]
+      "input": ["sc2_ref_crop", 0]
     },
     "class_type": "ResizeImageMaskNode",
     "_meta": {"title": "Resize Image/Mask"}

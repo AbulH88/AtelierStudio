@@ -16,15 +16,15 @@ def test_no_leaked_api_key():
     assert "api_key" not in raw.lower()
 
 
-def test_remaining_nodes_present():
-    """Every node from the user's export, unmodified — including the idle 117/134
-    preview/debug nodes and the now-orphaned 172:166 (see test_build_scail2motion.py
-    for why keeping them is harmless)."""
+def test_v2_nodes_present_including_promoted_crop_helpers():
+    """V2 retains the original graph plus the three crop helpers promoted from the
+    successful Resolution Test. Idle 117/134 and orphaned 172:166 remain harmless."""
     graph = _load()
     expected = {"6", "7", "37", "38", "39", "48", "56", "57", "58", "96", "102", "103",
                 "104", "107", "109", "110", "112", "113", "115", "116", "117", "127",
                 "128", "130", "132", "133", "134", "155", "157", "163",
-                "172:160", "172:161", "172:162", "172:164", "172:165", "172:166"}
+                "172:160", "172:161", "172:162", "172:164", "172:165", "172:166",
+                "sc2_source_video", "sc2_video_info", "sc2_ref_crop"}
     assert set(graph.keys()) == expected
 
 
@@ -74,14 +74,18 @@ def test_v2_stays_on_the_int8_convrot_checkpoint():
     scail2motion_file.py) — V2.0 keeps the int8_convrot build it shipped with."""
     graph = _load()
     unet = graph["37"]["inputs"]["unet_name"]
-    assert unet.replace("\\", "/") == "WAN/INT8Convert/wan2.1_14B_SCAIL_2_int8_convrot.safetensors"
+    assert unet.replace("\\", "/") == "INT8Convert/wan2.1_14B_SCAIL_2_int8_convrot.safetensors"
 
 
-def test_reference_photo_sizing_drives_the_driving_video_resize():
-    """No separate resolution picker: the ref photo's resize (102/103) sizes both
-    the video load (113) and the sampler (132) via GetImageSize (104)."""
+def test_reference_photo_is_cropped_to_original_video_then_sized_for_scail():
+    """V2 uses the promoted Wan-style crop before its existing resize chain; a
+    separate raw-video reader prevents a dependency loop with node 113."""
     graph = _load()
-    assert graph["102"]["inputs"]["input"] == ["58", 0]
+    assert graph["sc2_source_video"]["inputs"]["force_size"] == "Disabled"
+    assert graph["sc2_video_info"]["inputs"]["video_info"] == ["sc2_source_video", 3]
+    assert graph["sc2_ref_crop"]["inputs"]["image"] == ["58", 0]
+    assert graph["sc2_ref_crop"]["inputs"]["keep_proportion"] == "crop"
+    assert graph["102"]["inputs"]["input"] == ["sc2_ref_crop", 0]
     assert graph["103"]["inputs"]["input"] == ["102", 0]
     assert graph["104"]["inputs"]["image"] == ["103", 0]
     assert graph["113"]["inputs"]["custom_width"] == ["104", 0]

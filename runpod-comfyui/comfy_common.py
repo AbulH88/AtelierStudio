@@ -875,12 +875,11 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
 
     # SCAIL-2 motion control: same driving-video + ref-photo shape as "video" above,
     # different pipeline (SAM3 tracking + WanSCAILInfinity instead of Wan 2.2 Animate).
-    # "scail2motion" (V1), "scail2motionv2" (V2.0), and the isolated
-    # "scail2motiontest" copy are separate, coexisting workflow files with
-    # identical SCAIL node ids (see the SCAIL2MOTION comment above) —
+    # "scail2motion" (V1) and "scail2motionv2" (the cropped-resolution V2.0)
+    # are separate workflow files with identical SCAIL node ids —
     # wf_path already resolved to the right one from `mode` above, so one branch
     # covers both.
-    if mode in ("scail2motion", "scail2motionv2", "scail2motiontest"):
+    if mode in ("scail2motion", "scail2motionv2"):
         video_name = upload_video(base, base64.b64decode(inp["video_b64"]),
                                   inp.get("video_filename", "driving.mp4"))
         ref_name = upload_image(base, base64.b64decode(inp["ref_b64"]))
