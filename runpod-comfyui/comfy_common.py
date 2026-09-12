@@ -160,10 +160,9 @@ KREA2CAROUSEL = {"positive": "6", "latent": "10", "ksampler": "98",
 # tracking (109/112 on the driving video, 115/116 on the reference photo) feeding a
 # SCAIL2ColoredMask (107) that conditions WanSCAILInfinity's auto-windowed sampler
 # (132) against the Wan 2.1 14B SCAIL-2 int8 checkpoint. The reference photo is
-# resized to a 0.9-megapixel/32-multiple frame size (102/103) and the driving video
-# is resampled to match it (113's custom_width/height come from that resize via
-# GetImageSize/104) — so there's no separate resolution picker, sizing comes
-# entirely from the uploaded photo, same as KREA2NEW needing no picker of its own.
+# resized to a selectable 0.4/0.9/2.1-megapixel, 32-multiple frame size (102/103)
+# and the driving video is resampled to match it (113's custom_width/height come
+# from that resize via GetImageSize/104). The UI defaults to 720p (0.9 MP).
 # Two locked technique LoRAs are always on (96 i2v lightx2v lightning, 130 Pusa v1),
 # chained 37->96->130->128(sage-attn)->127(torch settings)->48(ModelSamplingSD3)->132.
 # An OPTIONAL user character LoRA is inserted after 130 (mirrors VIDEO's optional
@@ -645,6 +644,9 @@ def _build_scail2motion(graph, inp, seed, video_name, ref_name):
     if inp.get("fps"):                       # force_rate the driving video is resampled to
         graph[nm["fps_primitive"]]["inputs"]["value"] = max(1, int(inp["fps"]))
     graph[nm["ref_image"]]["inputs"]["image"] = ref_name
+    resolution_megapixels = {"480p": 0.4, "720p": 0.9, "1080p": 2.1}
+    graph["102"]["inputs"]["resize_type.megapixels"] = resolution_megapixels.get(
+        inp.get("generation_resolution"), resolution_megapixels["720p"])
     graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
     graph[nm["sampler"]]["inputs"]["seed"] = seed
     if inp.get("character_lora_path"):

@@ -1076,6 +1076,15 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
           <button id="mMaxFrames" class="reqsync" type="button" style="padding:7px 11px" title="Set seconds to the whole driving clip">⤢ full clip</button>
           <label style="color:var(--faint)" id="mLenHint">= 90 frames @ 30 fps · longer = heavier</label>
         </div>
+        <div class="inline hide" id="mScailResolutionField" style="margin-top:14px;gap:10px">
+          <label for="mScailResolution">Generation resolution <span style="color:var(--faint)">· before RTX</span></label>
+          <select id="mScailResolution" style="min-width:160px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
+            <option value="480p">480p · faster</option>
+            <option value="720p" selected>720p · recommended</option>
+            <option value="1080p">1080p · slower</option>
+          </select>
+          <span class="hint" style="color:var(--faint);font-size:12px">keeps your reference photo’s aspect ratio</span>
+        </div>
         <div class="inline" style="margin-top:14px;gap:10px">
           <div class="sw" id="mUpscaleSw" title="upscale"></div>
           <label>2× RTX super-res + RIFE upscale</label>
@@ -2099,6 +2108,7 @@ function setMode(m){
   // + ref-photo shape, same fps/frame-length/upscale controls. Only the sub-label
   // (and, server-side, which workflow file mode routes to) differs.
   const motionPane = (m==='video'||m==='scail2motion'||m==='scail2motionv2');
+  $('#mScailResolutionField').classList.toggle('hide', !(m==='scail2motion'||m==='scail2motionv2'));
   $('#paneMotion').classList.toggle('hide',!motionPane);
   if(motionPane) $('#motionPaneSub').textContent =
     m==='scail2motion' ? 'scail 2 v1.0 · sam3 tracking · local · 5090' :
@@ -3524,6 +3534,7 @@ $('#go').onclick=async()=>{
     body.frame_cap=_mFrames();          // seconds × fps, auto-computed
     body.prompt=$('#mPrompt').value.trim();
     body.upscale=$('#mUpscaleSw').classList.contains('on');
+    if(S.mode==='scail2motion'||S.mode==='scail2motionv2') body.generation_resolution=$('#mScailResolution').value;
   }
   else if(S.mode==='ltx25i2v'){
     try{ body.image_b64=await _fileToB64(S.ltxImg); }

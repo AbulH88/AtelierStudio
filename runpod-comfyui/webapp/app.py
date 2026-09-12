@@ -1501,6 +1501,7 @@ def _build_input(body):
         inp["frame_cap"] = int(body.get("frame_cap", 81))
         inp["fps"] = int(body.get("fps", 30))
         inp["upscale"] = bool(body.get("upscale", False))   # 2x RTX super-res + RIFE tail
+        inp["generation_resolution"] = body.get("generation_resolution", "720p")
     elif inp["mode"] == "adv":   # INSTARAW advanced (LOCAL only): t2i + image-guided i2i
         inp["img2img"] = bool(body.get("img2img", False))
         inp["aspect"] = body.get("aspect", "3:4 (Portrait)")
