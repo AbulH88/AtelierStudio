@@ -48,14 +48,22 @@ def test_build_krea2carousel_batch_size_is_the_slide_count():
     assert out["10"]["inputs"]["batch_size"] == 6
 
 
+def test_build_krea2carousel_supports_four_and_five_slide_batches():
+    for count in (4, 5):
+        graph = _load_graph()
+        out = cc._build_krea2carousel(
+            graph, {"prompt": "carousel", "variations": count}, seed=1)
+        assert out["10"]["inputs"]["batch_size"] == count
+
+
 def test_build_krea2carousel_batch_size_floors_at_one():
     graph = _load_graph()
     out = cc._build_krea2carousel(graph, {"prompt": "x", "variations": 0}, seed=1)
     assert out["10"]["inputs"]["batch_size"] == 1
 
 
-def test_build_krea2carousel_keeps_the_turbo_schedule():
-    """8 steps @ cfg 1 is what the turbo fp8 checkpoint needs — not user-tunable,
+def test_build_krea2carousel_keeps_the_workflow_schedule():
+    """8 steps @ cfg 1 is what the attached workflow specifies — not user-tunable,
     and _build must not let a stray `steps` in the input override it."""
     graph = _load_graph()
     out = cc._build_krea2carousel(graph, {"prompt": "x", "steps": 30, "denoise": 0.5}, seed=1)
@@ -79,11 +87,11 @@ def test_build_krea2carousel_no_character_turns_off_slot():
     assert out["28"]["inputs"]["lora_1"]["on"] is False
 
 
-def test_build_krea2carousel_leaves_helper_slots_untouched_when_no_list_sent():
+def test_build_krea2carousel_leaves_disabled_helper_slots_untouched_when_no_list_sent():
     graph = _load_graph()
     out = cc._build_krea2carousel(graph, {"prompt": "x"}, seed=1)
     for slot in ("lora_2", "lora_3", "lora_4"):
-        assert out["28"]["inputs"][slot]["on"] is True
+        assert out["28"]["inputs"][slot]["on"] is False
 
 
 def test_build_krea2carousel_applies_explicit_helper_list():

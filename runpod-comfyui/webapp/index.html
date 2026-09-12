@@ -580,6 +580,34 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 .user-row .acts button:hover{border-color:var(--amber-dim)}
 .user-row .acts .danger{color:var(--rose)}
 
+/* admin workflow visibility — intentionally distinct from user management */
+.wf-admin{display:grid;gap:22px}
+.wf-group{display:grid;gap:9px}
+.wf-group-head{display:flex;align-items:center;gap:9px;padding:0 3px}
+.wf-group-head h2{margin:0;font:600 13px var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+.wf-group-count{font:10px var(--mono);color:var(--faint);border:1px solid var(--line);border-radius:999px;padding:2px 7px}
+.wf-cards{display:grid;gap:9px}
+.wf-card{display:flex;align-items:center;gap:16px;min-height:68px;padding:13px 16px;border:1px solid var(--line);
+  border-left-width:4px;border-radius:12px;background:linear-gradient(180deg,var(--panel),var(--ink2));transition:.18s ease}
+.wf-card.is-enabled{border-left-color:var(--good)}
+.wf-card.is-disabled{border-left-color:var(--rose);opacity:.68}
+.wf-card-main{min-width:0;flex:1}
+.wf-card-name{font:600 14px var(--sans);color:var(--txt)}
+.wf-card-state{margin-top:5px;font:11px var(--mono)}
+.wf-card.is-enabled .wf-card-state{color:var(--good)}
+.wf-card.is-disabled .wf-card-state{color:var(--rose)}
+.wf-card-error{display:none;margin-top:5px;font:11px var(--mono);color:var(--rose)}
+.wf-card.has-error .wf-card-error{display:block}
+.wf-switch{position:relative;flex:none;width:64px;height:34px;padding:0;border:1px solid var(--line2);border-radius:999px;
+  background:#282630;cursor:pointer;transition:.18s ease}
+.wf-switch::before{content:"";position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;
+  background:var(--mut);box-shadow:0 2px 7px rgba(0,0,0,.45);transition:.18s ease}
+.wf-switch[aria-checked="true"]{background:rgba(67,194,138,.18);border-color:var(--good)}
+.wf-switch[aria-checked="true"]::before{left:34px;background:var(--good)}
+.wf-switch:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.wf-switch:disabled{cursor:wait;opacity:.55}
+.wf-empty{padding:12px 16px;border:1px dashed var(--line);border-radius:10px;color:var(--faint);font-size:12px}
+
 /* lightbox */
 .lb{position:fixed;inset:0;z-index:30;background:rgba(6,6,8,.9);backdrop-filter:blur(8px);
   display:none;align-items:center;justify-content:center;flex-direction:column;padding:60px 80px}
@@ -671,6 +699,99 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   border-radius:8px;padding:4px 9px;cursor:pointer;white-space:nowrap}
 .reqsync:hover{border-color:var(--amber-dim);color:var(--amber)}
 .reqsync.done{color:var(--good);border-color:rgba(127,200,160,.4);cursor:default}
+
+/* Editorial Atelier — selected full-studio design */
+:root{--ink:#0d0c0b;--ink2:#12110f;--panel:#161513;--panel2:#1c1a17;--line:#34312c;--line2:#47423b;
+  --txt:#eee5d8;--mut:#a49b8f;--faint:#6f685f;--amber:#e7c38d;--amber-dim:#a98659;--rose:#e16d72;--good:#69d995}
+body{background-color:var(--ink);background-image:radial-gradient(1000px 620px at 62% 15%,rgba(231,195,141,.055),transparent 68%)}
+header{height:64px;padding:0 24px;gap:18px;background:rgba(13,12,11,.94);border-color:#3b3731}
+header::before{display:none}
+.mark{width:42px;height:42px;border-radius:0;background:none;color:var(--txt);font-size:31px;font-weight:500}
+.brand{font-size:27px;color:var(--txt);background:none;letter-spacing:.2px}.brand em{font-style:normal}
+.tagline{display:none}.nav{margin-left:24px;gap:12px}.navitem{font-family:var(--serif);font-size:15px;border-radius:0;padding:20px 9px}
+.navitem.on::after{left:8px;right:8px;bottom:0;background:var(--amber)}
+.compute{margin-left:auto;border-radius:8px;background:transparent}.compute button{border-radius:6px}
+.userchip{border-color:var(--line2);background:transparent;color:var(--txt)}
+
+#pageStudio{min-height:calc(100vh - 64px)}
+.modes{position:fixed;z-index:6;left:0;top:64px;bottom:0;width:310px;display:block;padding:23px 18px 30px 32px;
+  overflow:auto;border-right:1px solid var(--line);background:rgba(15,14,12,.97)}
+.workflow-kicker{font:10px var(--mono);letter-spacing:4px;text-transform:uppercase;color:var(--mut);padding:0 0 10px;border-bottom:1px solid var(--line)}
+.modes>.seg{display:block;width:100%;padding:0;background:none;border:0;border-radius:0}
+.mode-group{padding:15px 0;border-bottom:1px solid var(--line)}
+.mode-group-title{display:flex;align-items:center;gap:10px;margin-bottom:6px;font:500 17px var(--serif);color:var(--txt)}
+.mode-group-title span{width:20px;color:var(--mut);font:14px var(--sans)}
+.modes .seg button{position:relative;display:block;width:100%;padding:9px 12px 9px 18px;border-radius:2px;text-align:left;font-size:13px;color:var(--mut);line-height:1.3}
+.modes .seg button .k{display:inline-block;width:19px;margin-right:7px;text-align:center}
+.modes .seg button:hover{color:var(--txt);background:rgba(255,255,255,.035)}
+.modes .seg button.on{color:var(--txt);background:linear-gradient(90deg,rgba(231,195,141,.18),rgba(231,195,141,.04));box-shadow:none}
+.modes .seg button.on::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--amber)}
+#cloudNoModes{line-height:1.5}
+#cloudWrap{margin-left:310px!important;max-width:none!important;padding:24px!important}
+
+main{max-width:none;margin:0 0 0 310px;padding:28px 24px 70px;grid-template-columns:minmax(520px,1fr) 340px;gap:24px}
+.workspace-column{min-width:0;display:flex;flex-direction:column}
+.studio-intro{padding:2px 2px 24px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.studio-eyebrow{font:10px var(--mono);letter-spacing:4px;text-transform:uppercase;color:var(--amber)}
+.studio-intro-row{display:flex;align-items:flex-end;justify-content:space-between;gap:28px;margin-top:9px}
+.studio-intro h1{margin:0;max-width:720px;font:400 clamp(31px,3.2vw,52px)/1.06 var(--serif);letter-spacing:-1.2px;color:#f2e7d7}
+.studio-intro p{max-width:280px;margin:0 0 5px;color:var(--mut);font-size:12.5px;line-height:1.45}
+.card{border-radius:4px;background:rgba(20,19,17,.82);box-shadow:none}
+.card .hd{padding:15px 18px}.card .bd{padding:18px}.step{border-radius:2px;background:transparent;border:1px solid var(--amber-dim);color:var(--amber)}
+.hd h2{font-size:18px}.rail{top:82px;border-radius:0;border-top:0;border-bottom:0;border-right:0;max-height:calc(100vh - 100px);overflow:auto}
+.rail>.hd{position:sticky;top:0;z-index:2;background:var(--panel)}.rail>.hd h2{font-size:22px}
+.rail .bd{padding:18px 20px}.field>.lab{font-family:var(--serif);font-size:13px;text-transform:none;letter-spacing:.1px;color:var(--txt)}
+select,textarea,.seedrow input[type=number]{border-radius:3px}.go{border-radius:3px;background:linear-gradient(180deg,#f2dfc1,#e7c38d);font-size:19px}
+.results{grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px}.results figure{border-radius:2px}.results img{aspect-ratio:3/4;object-fit:cover}
+.generation-results{order:1;margin:0 0 20px!important;min-height:310px;background:linear-gradient(145deg,rgba(27,25,22,.96),rgba(16,15,13,.92))}
+.generation-results .hd{border-bottom:1px solid var(--line)}
+.generation-results .bd{min-height:245px;display:flex;align-items:center;justify-content:center}
+.generation-results .results{width:100%}
+.generation-results .results:empty{display:none}
+.empty{width:100%}.empty-sheet{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:100%;margin-bottom:18px}
+.empty-sheet span{display:flex;align-items:flex-end;justify-content:flex-start;min-height:310px;padding:10px;border:1px solid var(--line2);color:var(--faint);font:11px var(--mono);background:linear-gradient(145deg,#1a1815,#100f0d)}
+.empty .g{text-align:center}.empty .hint{text-align:center}
+.workspace-column>.studio-intro{order:0}
+.workspace-column>section:not(.generation-results){order:2}
+.workflow-select{position:relative}.workflow-select .select-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:1;color:var(--amber);font-size:18px;pointer-events:none}
+.workflow-select select{padding-left:40px}.dice-btn{width:42px;height:42px;border:1px solid var(--line2);background:transparent;color:var(--txt);font-size:21px;cursor:pointer}.dice-btn:hover{border-color:var(--amber);color:var(--amber)}
+.sparkle{font-size:22px;margin-right:9px}
+.admin-overlay{position:fixed!important;inset:0!important;z-index:80!important;display:flex!important;align-items:flex-end!important;justify-content:flex-start!important;padding:0 0 22px 16px!important;background:rgba(4,4,3,.25)!important;backdrop-filter:blur(2px)}
+.admin-overlay.hide{display:none!important}.admin-dialog{position:relative;width:520px;max-height:54vh;overflow:auto;padding:17px;background:rgba(22,21,19,.98);border:1px solid var(--line2);box-shadow:0 22px 70px #000;border-radius:7px}
+.admin-dialog .page-head{margin:0 0 10px}.admin-dialog .page-title{font-size:24px}.admin-close{position:absolute;right:14px;top:11px;border:0;background:none;color:var(--txt);font:25px var(--serif);cursor:pointer}
+.admin-users{margin:0 0 12px;color:var(--mut);font-size:12px}.admin-users summary{cursor:pointer}.admin-workflow-head{margin-top:12px!important}.admin-workflow-head h2{font:19px var(--serif);margin:0}
+.admin-saved{margin-top:12px;color:var(--good);font-size:11px}.admin-dialog .wf-admin{grid-template-columns:1fr 1fr;gap:9px}.admin-dialog .wf-card{padding:9px}
+body[data-mode="krea2carousel"] .generation-results{border:0;background:transparent}
+body[data-mode="krea2carousel"] .generation-results>.hd{display:none}
+body[data-mode="krea2carousel"] .generation-results>.bd{padding:0;min-height:360px}
+body[data-mode="krea2carousel"] #paneKreaT2IHQ{border:1px solid var(--line);background:transparent}
+body[data-mode="krea2carousel"] #paneKreaT2IHQ>.hd{display:none}
+body[data-mode="krea2carousel"] #paneKreaT2IHQ>.bd{padding:13px}
+body[data-mode="krea2carousel"] #k2PromptView textarea{min-height:60px;border-radius:2px}
+body[data-mode="krea2carousel"] #k2PromptView .hint,body[data-mode="krea2carousel"] #krea2t2ihqDrop,body[data-mode="krea2carousel"] #krea2t2ihqDescPreviewWrap{display:none!important}
+body[data-mode="krea2carousel"] #paneKreaT2IHQ .seg{display:none}
+.wf-card{border-radius:4px;background:var(--ink2)}.wf-switch{width:58px;height:30px}.wf-switch::before{width:20px;height:20px}.wf-switch[aria-checked="true"]::before{left:32px}
+
+@media(max-width:1180px){
+  header{padding:0 12px}.brand{font-size:21px}.mark{width:30px;font-size:25px}.nav{margin-left:5px;gap:1px}.navitem{font-size:13px;padding:21px 6px}
+  .compute,.status,.userchip{display:none}
+  .modes{width:220px;padding:20px 12px 26px 18px}
+  main{margin-left:220px;padding:20px 14px 55px;grid-template-columns:minmax(330px,1fr) 250px;gap:14px}
+  #cloudWrap{margin-left:220px!important}
+  .studio-intro{padding-bottom:18px;margin-bottom:16px}.studio-intro-row{display:block}.studio-intro h1{font-size:34px}.studio-intro p{margin-top:9px;max-width:500px}
+  .rail .bd{padding:14px}.results{grid-template-columns:repeat(2,minmax(110px,1fr))}
+  .empty-sheet{grid-template-columns:repeat(4,1fr);gap:6px}.empty-sheet span{min-height:225px}
+}
+@media(max-width:760px){
+  .mark{display:none}.navitem[data-page="reels"],.navitem[data-page="notes"]{display:none}
+  .modes{position:static;width:auto;height:auto;display:block;padding:12px;border-right:0;border-bottom:1px solid var(--line)}
+  .workflow-kicker{display:none}.modes>.seg{display:flex;overflow-x:auto;gap:8px}.mode-group{display:flex;min-width:max-content;padding:0;border:0;gap:2px}.mode-group-title{display:none}
+  .modes .seg button{width:auto;white-space:nowrap;padding:9px 12px}.modes .seg button.on::before{display:none}
+  main{margin-left:0;grid-template-columns:1fr;padding:18px 12px 55px}.studio-intro h1{font-size:31px}
+  #cloudWrap{margin-left:0!important}
+  .results{grid-template-columns:repeat(2,minmax(120px,1fr))}.rail{position:static;max-height:none;border:1px solid var(--line)}
+  .empty-sheet{grid-template-columns:repeat(2,1fr)}.admin-dialog{width:calc(100vw - 32px);max-height:75vh}.admin-dialog .wf-admin{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -681,7 +802,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   </div>
   <div class="tagline">character forge</div>
   <nav class="nav" id="nav">
-    <button class="navitem on" data-page="studio">Studio</button>
+    <button class="navitem on" data-page="studio">Create</button>
     <button class="navitem" data-page="gallery">Gallery</button>
     <button class="navitem" data-page="reels">Reels</button>
     <button class="navitem" data-page="notes">Notes</button>
@@ -701,19 +822,26 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 
 <div id="pageStudio">
 <div class="modes">
+  <div class="workflow-kicker">Workflows</div>
   <div class="seg">
-    <button id="mVid" class="on" data-mode="i2i"><span class="k">i</span>Wan Image to Image</button>
-    <button id="mTxt" data-mode="t2i"><span class="k">t</span>Wan Text To Image</button>
-    <button id="mMotion" data-mode="video"><span class="k">m</span>Wan 2.2 Animate (Wow)</button>
-    <button id="mLtx25i2v" data-mode="ltx25i2v"><span class="k">l</span>LTX 2.5 I2V</button>
-    <button id="mScail2" data-mode="scail2motion"><span class="k">s</span>🏃 High Quality Motion Control Scail 2 · V1.0</button>
-    <button id="mScail2V2" data-mode="scail2motionv2"><span class="k">2</span>🏃 High Quality Motion Control Scail 2 · V2.0</button>
-    <button id="mAdv" data-mode="adv"><span class="k">a</span>⚡ Instaraw Advance</button>
-    <button id="mKrea2" data-mode="krea2"><span class="k">k</span>Krea2 Image to Image</button>
-    <button id="mKreaNew" data-mode="krea2new" class="hide"><span class="k">n</span>Krea2 Image to Image new</button>
-    <button id="mKreaHQ" data-mode="krea2hq"><span class="k">h</span>Krea2 Image to Image High Quality</button>
-    <button id="mKreaT2IHQ" data-mode="krea2t2ihq"><span class="k">q</span>Krea2 Text to Image High Quality</button>
-    <button id="mKreaCarousel" data-mode="krea2carousel"><span class="k">c</span>🎞 Krea2 Carousel Maker</button>
+    <div class="mode-group"><div class="mode-group-title"><span>▧</span> Image</div>
+    <button id="mVid" class="on" data-mode="i2i"><span class="k">▧</span>Wan Image to Image</button>
+    <button id="mTxt" data-mode="t2i"><span class="k">T</span>Wan Text To Image</button>
+    <button id="mKrea2" data-mode="krea2"><span class="k">▧</span>Krea2 Image to Image</button>
+    <button id="mKreaNew" data-mode="krea2new" class="hide"><span class="k">▧</span>Krea2 Image to Image new</button>
+    <button id="mKreaHQ" data-mode="krea2hq"><span class="k">▧</span>Krea2 Image to Image High Quality</button>
+    <button id="mKreaT2IHQ" data-mode="krea2t2ihq"><span class="k">T</span>Krea2 Text to Image High Quality</button>
+    <button id="mKreaCarousel" data-mode="krea2carousel"><span class="k">△</span>Krea2 Carousel Maker</button>
+    </div>
+    <div class="mode-group"><div class="mode-group-title"><span>▦</span> Video</div>
+    <button id="mMotion" data-mode="video"><span class="k">▷</span>Wan 2.2 Animate (Wow)</button>
+    <button id="mLtx25i2v" data-mode="ltx25i2v"><span class="k">▦</span>LTX 2.5 I2V</button>
+    </div>
+    <div class="mode-group"><div class="mode-group-title"><span>⚙</span> Advanced</div>
+    <button id="mScail2" data-mode="scail2motion"><span class="k">▧</span>High Quality Motion Control Scail 2 · V1.0</button>
+    <button id="mScail2V2" data-mode="scail2motionv2"><span class="k">▧</span>High Quality Motion Control Scail 2 · V2.0</button>
+    <button id="mAdv" data-mode="adv"><span class="k">▣</span>Instaraw Advance</button>
+    </div>
   </div>
   <p id="cloudNoModes" class="hide" style="margin:10px 2px 0;font-size:12.5px;color:var(--faint)">All generation modes now run on <b>Local</b> (the home 5090). Cloud only shows endpoint status — switch to Local to generate.</p>
 </div>
@@ -750,7 +878,14 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 
 <main>
   <!-- LEFT -->
-  <div>
+  <div class="workspace-column">
+    <div class="studio-intro">
+      <div class="studio-eyebrow" id="studioModeEyebrow">Wan Image to Image</div>
+      <div class="studio-intro-row">
+        <h1 id="studioModeTitle">Create, refine, move forward.</h1>
+        <p id="studioModeDesc">Build consistent visual stories with precise workflow controls.</p>
+      </div>
+    </div>
     <!-- video workspace -->
     <section class="card d1" id="paneVideo">
       <div class="hd"><span class="step">1</span><h2>Reference video</h2><span class="sub">ffmpeg · no gpu</span></div>
@@ -1033,21 +1168,31 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
     </section>
 
     <!-- results -->
-    <section class="card d3" style="margin-top:24px">
-      <div class="hd"><span class="step">3</span><h2>Gallery</h2><span class="sub" id="seedTag"></span></div>
+    <section class="card d3 generation-results">
+      <div class="hd"><span class="step">3</span><h2>Contact Sheet</h2><span class="sub" id="seedTag"></span></div>
       <div class="bd">
         <div class="results" id="results"></div>
-        <div class="empty" id="empty"><div class="g">nothing developed yet</div>
-          <p class="hint">Set your options and press Develop.</p></div>
+        <div class="empty" id="empty">
+          <div class="empty-sheet"><span>01</span><span>02</span><span>03</span><span>04</span></div>
+          <div class="g">nothing developed yet</div><p class="hint">Set your options and press Develop.</p>
+        </div>
       </div>
     </section>
   </div>
 
   <!-- RIGHT: control rail -->
   <aside class="card d2 rail">
-    <div class="hd"><span class="step">2</span><h2>Options</h2></div>
+    <div class="hd"><h2>Settings</h2></div>
     <div class="bd">
-      <button class="go" id="goTop" style="width:100%;margin:0 0 16px" disabled>Develop</button>
+      <div class="field" id="workflowSelectField">
+        <div class="lab">Workflow</div>
+        <div class="sel workflow-select"><span class="select-icon">△</span><select id="workflowSelect"></select></div>
+      </div>
+      <button class="go hide" id="goTop" style="width:100%;margin:0 0 16px" disabled>Develop</button>
+      <div class="field hide" id="krea2ModelField">
+        <div class="lab">Main Model <span class="num" style="font-size:10px;color:var(--faint)">saved per workflow</span></div>
+        <div class="sel"><select id="krea2Model"></select></div>
+      </div>
       <div class="field">
         <div class="lab" style="display:flex;align-items:center">Character<span id="charRefresh" title="Re-scan for new character folders dropped into My LoRAs" style="margin-left:auto;font-size:11px;color:#a78bfa;cursor:pointer">↻ refresh</span></div>
         <div class="sel"><select id="character"></select></div>
@@ -1116,9 +1261,9 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <input type="range" id="krea2hqDn" min="0" max="1" step="0.01" value="0.8">
       </div>
       <div class="field hide" id="krea2hqLoraField">
-        <div class="lab" style="display:flex;align-items:center">Helper LoRAs <span class="num" style="font-size:10px;color:var(--faint)">toggle on/off</span><span id="krea2hqRefreshLoras" title="Re-scan Krea2 helper LoRAs" style="margin-left:auto;font-size:11px;color:#a78bfa;cursor:pointer">↻ refresh</span></div>
+        <div class="lab" style="display:flex;align-items:center">Shared LoRAs <span class="num" style="font-size:10px;color:var(--faint)">Keara2/Shared</span><span id="krea2hqRefreshLoras" title="Re-scan Keara2/Shared" style="margin-left:auto;font-size:11px;color:#a78bfa;cursor:pointer">↻ refresh</span></div>
         <div id="krea2hqHelpers"></div>
-        <button class="go ghost" id="krea2hqAddLora" type="button" style="width:100%;margin-top:10px;font-size:13px;padding:9px">+ Add helper LoRA</button>
+        <button class="go ghost" id="krea2hqAddLora" type="button" style="width:100%;margin-top:10px;font-size:13px;padding:9px">+ Add Shared LoRA</button>
       </div>
       <!-- Sampler Override (all modes except video — the Wan pipeline sizes/samples itself) -->
       <div id="samplerOverrideSection">
@@ -1265,14 +1410,14 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
         <div class="lab">Seed</div>
         <div class="seedrow">
           <input type="number" id="seed" value="0" disabled>
-          <div class="sw on" id="randSw" title="random"></div>
+          <button class="dice-btn" id="randDice" type="button" title="Randomize seed">◇</button><div class="sw on hide" id="randSw" title="random"></div>
         </div>
       </div>
       <div id="cloudGate" class="hide" style="margin-top:14px;padding:10px 12px;border:1px solid rgba(217,139,122,.3);background:rgba(217,139,122,.12);border-radius:10px;font-size:12.5px;line-height:1.45;color:var(--rose)">
         <b>Studio offline.</b> Generation is paused until the studio host starts the session.
       </div>
       <div style="display:flex;gap:10px;margin-top:14px">
-        <button class="go" id="go" style="flex:1;margin:0" disabled>Develop</button>
+        <button class="go" id="go" style="flex:1;margin:0" disabled><span class="sparkle">✦</span> Develop</button>
         <button class="go hide" id="stopGen" style="flex:none;width:50px;margin:0;background:rgba(217,139,122,.15);border-color:rgba(217,139,122,.3);color:var(--rose)" title="Stop Generation">✕</button>
       </div>
       <div id="genCost" class="hide" style="margin-top:8px;font-family:var(--mono);font-size:11.5px;text-align:center;color:var(--mut)"></div>
@@ -1407,11 +1552,15 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 </div>
 
 <!-- admin page -->
-<div id="pageAdmin" class="page hide">
-  <div class="page-head"><h1 class="page-title">Users</h1><span class="hint" id="adminHint"></span></div>
-  <div class="users-grid" id="usersGrid"></div>
-  <div class="page-head" style="margin-top:36px"><h1 class="page-title">Workflows</h1><span class="hint" id="workflowsHint"></span></div>
-  <div class="users-grid" id="workflowsGrid"></div>
+<div id="pageAdmin" class="page admin-overlay hide">
+  <div class="admin-dialog">
+    <button class="admin-close" id="adminClose" type="button">×</button>
+    <div class="page-head"><h1 class="page-title">Admin</h1><span class="hint" id="adminHint">Manage Atelier Studio access.</span></div>
+    <details class="admin-users"><summary>Users</summary><div class="users-grid" id="usersGrid"></div></details>
+    <div class="page-head admin-workflow-head"><h2>Workflows</h2><span class="hint" id="workflowsHint"></span></div>
+    <div class="wf-admin" id="workflowsGrid"></div>
+    <div class="admin-saved">● &nbsp; All changes saved</div>
+  </div>
 </div>
 
 <!-- instagram cookies modal -->
@@ -1859,6 +2008,16 @@ $('#mUpscaleSw').onclick=()=>$('#mUpscaleSw').classList.toggle('on');
 // mode switch
 function setMode(m){
   S.mode=m;
+  document.body.dataset.mode=m;
+  const isKrea=['krea2','krea2new','krea2hq','krea2t2ihq','krea2carousel'].includes(m);
+  const modeNames={i2i:'Wan Image to Image',t2i:'Wan Text to Image',video:'Wan 2.2 Animate (Wow)',
+    ltx25i2v:'LTX 2.5 I2V',scail2motion:'High Quality Motion Control Scail 2 · V1.0',
+    scail2motionv2:'High Quality Motion Control Scail 2 · V2.0',adv:'Instaraw Advance',
+    krea2:'Krea2 Image to Image',krea2new:'Krea2 Image to Image new',
+    krea2hq:'Krea2 Image to Image High Quality',krea2t2ihq:'Krea2 Text to Image High Quality',
+    krea2carousel:'Krea2 Carousel Maker'};
+  $('#studioModeEyebrow').textContent=modeNames[m]||m;
+  $('#studioModeTitle').textContent=m==='krea2carousel'?'From a prompt to a visual journey.':'Create, refine, move forward.';
   $('#mVid').classList.toggle('on',m==='i2i');$('#mTxt').classList.toggle('on',m==='t2i');
   $('#mMotion').classList.toggle('on',m==='video');
   $('#mLtx25i2v').classList.toggle('on',m==='ltx25i2v');
@@ -1877,7 +2036,7 @@ function setMode(m){
   const k2Pane = (m==='krea2t2ihq'||m==='krea2carousel');
   $('#paneKreaT2IHQ').classList.toggle('hide',!k2Pane);
   if(k2Pane) $('#k2PaneSub').textContent = m==='krea2carousel'
-    ? 'krea2 carousel · turbo · local' : 'krea2 t2i hq · local';
+    ? 'krea2 carousel · selfora · local' : 'krea2 t2i hq · local';
   // Both scail2motion versions reuse the Motion pane wholesale — same driving-video
   // + ref-photo shape, same fps/frame-length/upscale controls. Only the sub-label
   // (and, server-side, which workflow file mode routes to) differs.
@@ -1902,8 +2061,10 @@ function setMode(m){
   $('#krea2hqDenoiseField').classList.toggle('hide',m!=='krea2hq');
   // Helper LoRAs section is shared: krea2hq, krea2t2ihq and krea2carousel all use
   // the same Power Lora Loader convention (character in slot 1 + realism helpers).
-  $('#krea2hqLoraField').classList.toggle('hide',m!=='krea2hq'&&m!=='krea2t2ihq'&&m!=='krea2carousel');
-  seedKrea2Helpers(m);   // carousel ships its own baked-in helper set, not krea2hq's
+  $('#krea2ModelField').classList.toggle('hide',!isKrea);
+  $('#krea2hqLoraField').classList.toggle('hide',!isKrea);
+  applyKrea2Model(m);
+  seedKrea2Helpers(m);
   // Lightning + the helper-LoRA / lightning controls are image-only, and every krea2
   // mode (plus both motion modes) has no user-tunable Lightning node — each motion
   // mode has its own locked technique-LoRA stack instead.
@@ -1944,6 +2105,7 @@ function setMode(m){
   }
   applyLightningDefault(m);
   applyCharList();
+  syncWorkflowSelect();
   refreshGo();
   if(typeof renderCloudCard==='function') renderCloudCard();
 }
@@ -1956,6 +2118,18 @@ $('#mKreaT2IHQ').onclick=()=>setMode('krea2t2ihq');
 $('#mKreaCarousel').onclick=()=>setMode('krea2carousel');
 $('#mScail2').onclick=()=>setMode('scail2motion');
 $('#mScail2V2').onclick=()=>setMode('scail2motionv2');
+
+function syncWorkflowSelect(){
+  const sel=$('#workflowSelect'); if(!sel)return;
+  const buttons=[...document.querySelectorAll('.modes button[data-mode]')].filter(b=>!b.classList.contains('hide'));
+  const signature=buttons.map(b=>b.dataset.mode).join('|');
+  if(sel.dataset.signature!==signature){
+    sel.innerHTML=buttons.map(b=>`<option value="${b.dataset.mode}">${b.textContent.trim()}</option>`).join('');
+    sel.dataset.signature=signature;
+  }
+  sel.value=S.mode;
+}
+$('#workflowSelect').onchange=e=>setMode(e.target.value);
 // --- Advanced (INSTARAW) panel wiring (increment A: scene -> prompt_batch_data) ---
 $('#advDropRef').onclick=()=>$('#advRefFile').click();
 $('#advRefFile').onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
@@ -2183,6 +2357,13 @@ async function galToMotionRef(url){
 async function loadConfig(){
   const c=await(await fetch('/api/config')).json();
   S.chars=c.characters; S.cloudChars=c.cloud_characters||[]; S.krea2Chars=c.krea2_characters||[];
+  S.krea2Models=c.krea2_models||[]; S.krea2ModelDefaults=c.krea2_model_defaults||{};
+  $('#krea2Model').innerHTML=S.krea2Models.map(m=>`<option value="${_esc(m.path)}">${_esc(m.label)}</option>`).join('');
+  $('#krea2Model').onchange=()=>{
+    let saved={}; try{saved=JSON.parse(localStorage.getItem('atelier_krea2_models')||'{}');}catch(e){}
+    saved[S.mode]=$('#krea2Model').value;
+    try{localStorage.setItem('atelier_krea2_models',JSON.stringify(saved));}catch(e){}
+  };
   $('#character').onchange=fillVariants; applyCharList();
   $('#aspects').innerHTML=c.aspects.map((a,i)=>`<button data-key="${a.key}" data-w="${a.width}" data-h="${a.height}" class="${i===0?'on':''}">
      <span>${a.label.split(' · ')[0]}</span><span class="r">${a.width}×${a.height}</span></button>`).join('')
@@ -2229,6 +2410,7 @@ async function loadConfig(){
   S.k2CarouselHelpers=c.krea2carousel_default_helpers||[];
   S.k2HelperSet=null;
   seedKrea2Helpers(S.mode,true);
+  applyKrea2Model(S.mode);
   // Lightning lightx2v — editable dropdown + strength, defaults per mode
   S.lightning = c.lightning || {options:[], defaults:{}};
   $('#lightningPick').innerHTML = (S.lightning.options||[])
@@ -2255,6 +2437,16 @@ function applyLightningDefault(mode){
 let LORA_OPTIONS_HTML = '<option value="">— select a LoRA —</option>';
 const HELPERS_KEY = 'atelier_helper_loras';
 let KREA2_HELPER_OPTIONS_HTML = '<option value="">— select a LoRA —</option>';
+const KREA2_SHARED_KEY = 'atelier_krea2_shared_loras';
+
+function saveKrea2SharedLoras(){
+  const rows=$$('#krea2hqHelpers .tog').map(r=>({
+    path:r.querySelector('.lora-pick').value,
+    strength:+r.querySelector('.lora-str').value,
+    on:r.querySelector('[data-role=hsw]').classList.contains('on')
+  })).filter(x=>x.path);
+  try{localStorage.setItem(KREA2_SHARED_KEY,JSON.stringify(rows));}catch(e){}
+}
 
 function saveHelperLoras(){
   const slots = $$('#extraLoras .tog').map(r=>({
@@ -2323,8 +2515,10 @@ function addKrea2Helper(path='', strength=0.6, on=true){
   $('#krea2hqHelpers').appendChild(row);
   if(path) row.querySelector('.lora-pick').value=path;
   const sw=row.querySelector('[data-role=hsw]');
-  sw.onclick=()=>sw.classList.toggle('on');
-  row.querySelector('.lora-rm').onclick=()=>row.remove();
+  sw.onclick=()=>{sw.classList.toggle('on');saveKrea2SharedLoras();};
+  row.querySelector('.lora-pick').onchange=saveKrea2SharedLoras;
+  row.querySelector('.lora-str').oninput=saveKrea2SharedLoras;
+  row.querySelector('.lora-rm').onclick=()=>{row.remove();saveKrea2SharedLoras();};
 }
 $('#krea2hqAddLora').onclick=()=>addKrea2Helper('',0.6,true);
 $('#krea2hqRefreshLoras') && ($('#krea2hqRefreshLoras').onclick=()=>refreshKrea2Helpers($('#krea2hqRefreshLoras')));
@@ -2337,12 +2531,12 @@ $('#krea2hqRefreshLoras') && ($('#krea2hqRefreshLoras').onclick=()=>refreshKrea2
 // Within a set the rows are left alone, so edits survive mode flips like
 // krea2hq -> i2i -> krea2hq.
 function seedKrea2Helpers(m,force){
-  const set = (m==='krea2carousel') ? 'carousel' : 'hq';
-  if(!force && S.k2HelperSet===set) return;
-  S.k2HelperSet=set;
+  if(!['krea2','krea2new','krea2hq','krea2t2ihq','krea2carousel'].includes(m))return;
+  if(!force && S.k2HelperSet==='shared') return;
+  S.k2HelperSet='shared';
   $('#krea2hqHelpers').innerHTML='';
-  ((set==='carousel'?S.k2CarouselHelpers:S.k2hqHelpers)||[])
-    .forEach(h=>addKrea2Helper(h.path,h.strength,true));
+  let saved=[]; try{saved=JSON.parse(localStorage.getItem(KREA2_SHARED_KEY)||'[]');}catch(e){}
+  saved.forEach(h=>addKrea2Helper(h.path,h.strength,h.on!==false));
 }
 // Only rows toggled ON with a selected LoRA; [] = every helper off.
 function _krea2hqHelperLoras(){
@@ -2618,6 +2812,10 @@ $('#varNum').oninput=()=>{const v=Math.max(1,+$('#varNum').value||1);S.variation
 
 // seed random
 $('#randSw').onclick=()=>{S.rand=!S.rand;$('#randSw').classList.toggle('on',S.rand);$('#seed').disabled=S.rand;};
+$('#randDice').onclick=()=>{
+  S.rand=true; $('#randSw').classList.add('on'); $('#seed').disabled=true;
+  $('#seed').value=Math.floor(Math.random()*2147483647);
+};
 
 // dropzone
 $('#drop').onclick=()=>$('#video').click();
@@ -2698,18 +2896,22 @@ function loadFrames(session, frames){
 
 // ===== page navigation =====
 function showPage(p){
+  if(p==='admin'){
+    $('#pageAdmin').classList.remove('hide'); openAdmin(); return;
+  }
+  $('#pageAdmin').classList.add('hide');
   $('#pageStudio').classList.toggle('hide',p!=='studio');
   $('#pageReels').classList.toggle('hide',p!=='reels');
   $('#pageGallery').classList.toggle('hide',p!=='gallery');
   $('#pageNotes').classList.toggle('hide',p!=='notes');
-  $('#pageAdmin').classList.toggle('hide',p!=='admin');
   $$('#nav .navitem').forEach(b=>b.classList.toggle('on',b.dataset.page===p));
   if(p==='reels')openReels();
   if(p==='gallery')openGallery();
   if(p==='notes')openNotes();
-  if(p==='admin')openAdmin();
 }
 $$('#nav .navitem').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
+$('#adminClose').onclick=()=>{$('#pageAdmin').classList.add('hide');$('#navAdmin').classList.remove('on');};
+$('#pageAdmin').onclick=e=>{if(e.target===$('#pageAdmin'))$('#adminClose').click();};
 
 // ===== auth =====
 let IS_ADMIN=false;
@@ -2752,20 +2954,52 @@ async function openAdmin(){
 }
 
 async function loadWorkflowsAdmin(){
-  const d=await(await fetch('/api/workflows')).json();
-  if(d.error){$('#workflowsGrid').innerHTML='<p class="hint">'+d.error+'</p>';return;}
-  const onCount=d.workflows.filter(w=>w.enabled).length;
-  $('#workflowsHint').textContent=onCount+' of '+d.workflows.length+' visible';
-  $('#workflowsGrid').innerHTML=d.workflows.map(w=>
-    `<div class="user-row"><span class="un">${w.label}</span>
-      <span class="badge ${w.enabled?'active':'disabled'}">${w.enabled?'visible':'hidden'}</span>
-      <span class="acts"><button data-w="${w.id}">${w.enabled?'Hide':'Show'}</button></span></div>`
-  ).join('');
-  $$('#workflowsGrid .acts button').forEach(b=>b.onclick=async()=>{
-    await fetch(`/api/workflows/${encodeURIComponent(b.dataset.w)}/toggle`,{method:'POST'});
-    loadWorkflowsAdmin();
-    loadWorkflowVisibility();
-  });
+  try{
+    const resp=await fetch('/api/workflows');
+    const d=await resp.json();
+    if(!resp.ok||d.error)throw new Error(d.error||'Could not load workflows.');
+    const enabled=d.workflows.filter(w=>w.enabled), disabled=d.workflows.filter(w=>!w.enabled);
+    $('#workflowsHint').textContent=enabled.length+' of '+d.workflows.length+' enabled';
+    const group=(title,items,isEnabled)=>`<section class="wf-group">
+      <div class="wf-group-head"><h2>${title}</h2><span class="wf-group-count">${items.length}</span></div>
+      <div class="wf-cards">${items.length?items.map(w=>`<div class="wf-card ${isEnabled?'is-enabled':'is-disabled'}" data-wf-card="${_esc(w.id)}">
+        <div class="wf-card-main"><div class="wf-card-name">${_esc(w.label)}</div>
+          <div class="wf-card-state">${isEnabled?'Enabled · shown in Studio':'Disabled · hidden from Studio'}</div>
+          <div class="wf-card-error" role="alert"></div></div>
+        <button class="wf-switch" type="button" role="switch" aria-checked="${isEnabled}" aria-label="${isEnabled?'Disable':'Enable'} ${_esc(w.label)}"
+          data-w="${_esc(w.id)}" data-enabled="${isEnabled}" title="${isEnabled?'Disable this workflow':'Enable this workflow'}"></button>
+      </div>`).join(''):`<div class="wf-empty">No ${title.toLowerCase()}.</div>`}</div>
+    </section>`;
+    $('#workflowsGrid').innerHTML=group('Enabled workflows',enabled,true)+group('Disabled workflows',disabled,false);
+    $$('#workflowsGrid .wf-switch').forEach(b=>b.onclick=()=>setWorkflowAdminState(b));
+  }catch(e){
+    $('#workflowsGrid').innerHTML=`<p class="hint" style="color:var(--rose)">${_esc(e.message||String(e))}</p>`;
+  }
+}
+
+function applyKrea2Model(mode){
+  if(!['krea2','krea2new','krea2hq','krea2t2ihq','krea2carousel'].includes(mode))return;
+  let saved={}; try{saved=JSON.parse(localStorage.getItem('atelier_krea2_models')||'{}');}catch(e){}
+  const wanted=saved[mode]||(S.krea2ModelDefaults||{})[mode]||'';
+  if(wanted&&[...$('#krea2Model').options].some(o=>o.value===wanted))$('#krea2Model').value=wanted;
+}
+
+async function setWorkflowAdminState(button){
+  const card=button.closest('.wf-card'), state=card.querySelector('.wf-card-state');
+  const error=card.querySelector('.wf-card-error'), enabled=button.dataset.enabled==='true';
+  button.disabled=true; card.classList.remove('has-error'); error.textContent=''; state.textContent='Saving…';
+  try{
+    const resp=await fetch(`/api/workflows/${encodeURIComponent(button.dataset.w)}/state`,{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!enabled})});
+    const d=await resp.json().catch(()=>({}));
+    if(!resp.ok||d.error)throw new Error(d.error||`Save failed (${resp.status})`);
+    await loadWorkflowVisibility();
+    await loadWorkflowsAdmin();
+  }catch(e){
+    button.disabled=false;
+    state.textContent=enabled?'Enabled · shown in Studio':'Disabled · hidden from Studio';
+    error.textContent=e.message||String(e); card.classList.add('has-error');
+  }
 }
 
 // Combines admin-enabled state (WORKFLOW_ENABLED) with the Local/Cloud target
@@ -2785,6 +3019,7 @@ function updateModeBarVisibility(){
   });
   $('#cloudNoModes') && $('#cloudNoModes').classList.toggle('hide', !cloudOnly);
   if(activeHidden&&firstVisible)setMode(firstVisible);
+  syncWorkflowSelect();
 }
 
 async function loadWorkflowVisibility(){
@@ -3045,6 +3280,10 @@ $('#go').onclick=async()=>{
     lightning:{path:$('#lightningPick').value,strength:+$('#lightningStr').value},
     trigger:$('#triggerWord').value.trim(),
     ...describeOpts()};
+  if(['krea2','krea2new','krea2hq','krea2t2ihq','krea2carousel'].includes(S.mode)){
+    body.model_name=$('#krea2Model').value;
+    body.helper_loras=_krea2hqHelperLoras();
+  }
   if($('#samplerOverrideSw').classList.contains('on')){
     body.sampler_override={cfg:+$('#ovCfgVal').value, sampler_name:$('#ovSamplerName').value.trim(),
                            scheduler:$('#ovScheduler').value.trim()};

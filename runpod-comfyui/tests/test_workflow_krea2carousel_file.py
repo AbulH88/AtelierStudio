@@ -40,13 +40,13 @@ def test_grok_prompt_branch_and_comparer_dropped():
     assert "ResolutionSelector" not in classes
 
 
-def test_uses_the_full_bf16_checkpoint_not_the_fp8():
-    """The source export shipped the fp8_scaled build; this mode runs the full
-    bf16 weights (24.5GB vs 12.2GB) for quality — same checkpoint krea2t2ihq uses."""
+def test_uses_the_attached_selfora_int8_checkpoint():
+    """The replacement graph must keep the model selected in the user's latest
+    Aiorbust export rather than silently retaining the previous Krea2 bf16 model."""
     graph = _load()
     unet = graph["1"]["inputs"]["unet_name"]
-    assert unet.replace("\\", "/") == "Kera2/krea2_turbo_bf16.safetensors"
-    assert "fp8" not in unet
+    assert unet.replace("\\", "/") == \
+        "Kera2/selforaV21NightFix_selfora21Int8.safetensors"
 
 
 def test_no_load_image_node_pure_t2i():
@@ -73,7 +73,7 @@ def test_character_lora_is_slot_1():
     graph = _load()
     assert "krea2_cristiana" in graph["28"]["inputs"]["lora_1"]["lora"]
     for slot in ("lora_2", "lora_3", "lora_4"):
-        assert "krea2_cristiana" not in graph["28"]["inputs"][slot]["lora"]
+        assert graph["28"]["inputs"][slot]["on"] is False
 
 
 def test_sampler_chain_wired_through_lora_and_model_sampling():
@@ -100,10 +100,13 @@ def test_camera_look_tail_chain_reaches_the_only_save_node():
 def _app_constant(name):
     """Read a list-of-dicts constant out of webapp/app.py without importing it
     (app.py pulls in flask/boto3 and reads env at import time)."""
-    src = open(APP_PATH, encoding="utf-8").read()
-    m = re.search(rf"^{name} = (\[.*?^\])", src, re.S | re.M)
-    assert m, f"{name} not found in app.py"
-    return ast.literal_eval(m.group(1))
+    tree = ast.parse(open(APP_PATH, encoding="utf-8").read())
+    for node in tree.body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id == name):
+            return ast.literal_eval(node.value)
+    raise AssertionError(f"{name} not found in app.py")
 
 
 def test_ui_default_helpers_match_the_workflows_baked_in_slots():
@@ -115,15 +118,14 @@ def test_ui_default_helpers_match_the_workflows_baked_in_slots():
     slots = sorted(k for k in graph["28"]["inputs"] if re.fullmatch(r"lora_\d+", k))
     baked = [{"path": graph["28"]["inputs"][k]["lora"].replace("\\", "/"),
               "strength": graph["28"]["inputs"][k]["strength"]}
-             for k in slots[1:]]          # slot 1 is the character LoRA, not a helper
+             for k in slots[1:] if graph["28"]["inputs"][k]["on"]]
     assert _app_constant("KREA2CAROUSEL_DEFAULT_HELPERS") == baked
 
 
 def test_carousel_defaults_are_not_the_krea2hq_defaults():
     hq = _app_constant("KREA2HQ_DEFAULT_HELPERS")
     carousel = _app_constant("KREA2CAROUSEL_DEFAULT_HELPERS")
-    assert carousel != hq
-    assert not {h["path"] for h in carousel} & {h["path"] for h in hq}
+    assert carousel == hq == []
 
 
 def test_every_link_points_at_a_node_that_exists():

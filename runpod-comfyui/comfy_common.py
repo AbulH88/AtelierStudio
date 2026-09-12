@@ -92,14 +92,14 @@ ADV_STAGES = {"face": "127", "eyes": "501", "hands": "141", "pussy": "147",
 KREA2 = {"load_image": "316", "positive": "314", "resize_size": "324",
          "char": "313", "base_ksampler": "302", "base_save": "346",
          "refine_encode": "334", "refine_ksampler": "335", "refine_decode": "336",
-         "refine_prompt": "339", "refine_save": "345"}
+         "refine_prompt": "339", "refine_save": "345", "model": "310"}
 
 # Krea I2I New (workflow_krea2new.json) — depth-ControlNet guided generation:
 # DepthAnythingV2 map of the source photo drives a Krea2ControlLoRA + Apply
 # chain that conditions a full (denoise 1) KSampler pass from an empty latent.
 # NOT img2img (unlike KREA2 above) — no VAEEncode of the source pixels.
 KREA2NEW = {"load_image": "32", "positive": "6", "latent": "10",
-            "base_ksampler": "2", "char": "38"}
+            "base_ksampler": "2", "char": "38", "model": "15"}
 
 # Krea2 I2I High Quality (workflow_krea2hq.json) — img2img like KREA2, but always
 # runs a fixed two-stage ClownsharKSampler_Beta pipeline (base pass denoise 0.8 ->
@@ -111,7 +111,8 @@ KREA2NEW = {"load_image": "32", "positive": "6", "latent": "10",
 # VAEEncoded source — the img2img strength knob, exposed to the UI). The refine pass
 # (node 1, denoise 0.27) is left static as a fixed quality polish.
 KREA2HQ = {"load_image": "16", "positive": "5", "resize": "13",
-           "noise_aug": "14", "seed_gen": "2", "char": "11", "base_ksampler": "4"}
+           "noise_aug": "14", "seed_gen": "2", "char": "11", "base_ksampler": "4",
+           "model": "8"}
 
 # Krea2 Text to Image High Quality (workflow_krea2t2ihq.json) — the pure-t2i
 # sibling of KREA2HQ: same two-stage ClownsharKSampler_Beta pipeline (base
@@ -123,12 +124,13 @@ KREA2HQ = {"load_image": "16", "positive": "5", "resize": "13",
 # EmptyLatentImageResPreset dropdown was dropped in favor of that, same as
 # KREA2HQ. Unlike KREA2HQ (img2img, one image per generate() call), this mode
 # batches natively via EmptyLatentImage.batch_size, same as T2I.
-KREA2T2IHQ = {"positive": "439", "seed_gen": "433", "latent": "458", "char": "449"}
+KREA2T2IHQ = {"positive": "439", "seed_gen": "433", "latent": "458", "char": "449",
+              "model": "430"}
 
 # Krea2 Carousel Maker (workflow_krea2carousel.json) — pure t2i built to shoot a
 # whole carousel/photo-dump in ONE sampler pass: a single EmptyLatentImage batch
-# (batch_size = the app's Variations = slide count) through the krea2 TURBO fp8
-# model at 8 steps / cfg 1 (ModelSamplingAuraFlow shift 6). Much faster and
+# (batch_size = the app's Variations = slide count) through the Selfora V2.1
+# NightFix INT8 model at 8 steps / cfg 1 (ModelSamplingAuraFlow shift 6). Much faster and
 # lighter than KREA2T2IHQ's two-stage ClownsharKSampler pipeline — the trade is
 # turbo-quality frames instead of a refine pass.
 # What makes it "carousel" rather than plain t2i is the fixed camera-look tail
@@ -136,16 +138,15 @@ KREA2T2IHQ = {"positive": "439", "seed_gen": "433", "latent": "458", "char": "44
 # Camera Look (demosaic blur + jpeg) -> Renoise (ISO grain, seeded) -> CRT
 # Post-Process (levels/sharpen/glow) -> SaveImageNoMetadata. That tail is static,
 # same treatment as KREA2HQ's refine pass — not user-tunable.
-# Character LoRA sits in slot 1 of the same rgthree Power Lora Loader convention
-# as KREA2HQ/KREA2T2IHQ, with the source workflow's 3 realism/helper LoRAs moved
-# into slots 2-4 (the source graph had the character in slot 3).
+# Character LoRA sits in slot 1 of the same rgthree Power Lora Loader convention.
+# Optional shared LoRAs from Keara2/Shared occupy the following slots.
 # Dropped from the source workflow on import: the ResolutionSelector node (the
 # app's res-preset picker sizes the latent instead, same as KREA2HQ/KREA2T2IHQ),
 # the Grok prompt-generator + image-batch-loader branch (needs an API key and its
 # output fed nothing), and the rgthree Image Comparer (a UI-only node whose temp
 # images would otherwise flood the gallery).
 KREA2CAROUSEL = {"positive": "6", "latent": "10", "ksampler": "98",
-                 "char": "28", "renoise": "110"}
+                 "char": "28", "renoise": "110", "model": "1"}
 
 # High Quality Motion Control SCAIL 2 — two coexisting versions, V1
 # (workflow_scail2motion.json) and V2.0 (workflow_scail2motionv2.json), both
@@ -454,6 +455,13 @@ def _apply_sampler_override(graph, inp):
     return graph
 
 
+def _apply_krea2_model(graph, node_id, inp):
+    """Apply the model selected for this Krea2 workflow, if the UI sent one."""
+    path = (inp.get("model_name") or "").strip()
+    if path:
+        graph[node_id]["inputs"]["unet_name"] = path
+
+
 # --- graph builders -----------------------------------------------------------
 def _build_i2i(graph, inp, seed, frame_name):
     nm = I2I
@@ -501,11 +509,13 @@ def _build_krea2(graph, inp, seed, frame_name):
     refine run returns BOTH images). No Lightning/helper-LoRA chain — just
     the single character LoRA node."""
     nm = KREA2
+    _apply_krea2_model(graph, nm["model"], inp)
     graph[nm["load_image"]]["inputs"]["image"] = frame_name
     graph[nm["resize_size"]]["inputs"]["value"] = int(inp.get("resize_size", 1920))
     graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
     graph[nm["base_ksampler"]]["inputs"]["seed"] = seed
     graph[nm["base_ksampler"]]["inputs"]["denoise"] = float(inp.get("denoise", 0.71))
+    _apply_extra_loras(graph, nm["model"], nm["char"], inp.get("helper_loras", []))
     _set_lora(graph, nm["char"], inp.get("character_lora_path"),
               inp.get("character_strength", 1.0))
     if inp.get("refine"):
@@ -528,11 +538,13 @@ def _build_krea2new(graph, inp, seed, frame_name):
     picker (same width/height convention as _build_t2i). Single character
     LoRA, no Lightning/helper-LoRA chain, no refine pass."""
     nm = KREA2NEW
+    _apply_krea2_model(graph, nm["model"], inp)
     graph[nm["load_image"]]["inputs"]["image"] = frame_name
     graph[nm["latent"]]["inputs"]["width"] = int(inp.get("width", 1080))
     graph[nm["latent"]]["inputs"]["height"] = int(inp.get("height", 1920))
     graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
     graph[nm["base_ksampler"]]["inputs"]["seed"] = seed
+    _apply_extra_loras(graph, nm["model"], nm["char"], inp.get("helper_loras", []))
     _set_lora(graph, nm["char"], inp.get("character_lora_path"),
               inp.get("character_strength", 1.0))
     _apply_sampler_override(graph, inp)
@@ -549,6 +561,7 @@ def _build_krea2hq(graph, inp, seed, frame_name):
     (plain width/height ints, same convention as _build_t2i/_build_krea2new) —
     the source workflow's in-graph resolution-preset dropdown node was dropped."""
     nm = KREA2HQ
+    _apply_krea2_model(graph, nm["model"], inp)
     graph[nm["load_image"]]["inputs"]["image"] = frame_name
     graph[nm["resize"]]["inputs"]["width"] = int(inp.get("width", 1080))
     graph[nm["resize"]]["inputs"]["height"] = int(inp.get("height", 1920))
@@ -579,6 +592,7 @@ def _build_krea2t2ihq(graph, inp, seed):
     quality-refine pass). Character + helper LoRAs share the same Power Lora
     Loader convention as KREA2HQ."""
     nm = KREA2T2IHQ
+    _apply_krea2_model(graph, nm["model"], inp)
     graph[nm["latent"]]["inputs"]["width"] = int(inp.get("width", 1080))
     graph[nm["latent"]]["inputs"]["height"] = int(inp.get("height", 1920))
     graph[nm["latent"]]["inputs"]["batch_size"] = max(1, int(inp.get("variations", 1)))
@@ -595,14 +609,15 @@ def _build_krea2t2ihq(graph, inp, seed):
 
 
 def _build_krea2carousel(graph, inp, seed):
-    """Krea2 Carousel Maker: one turbo KSampler pass over an EmptyLatentImage batch
+    """Krea2 Carousel Maker: one KSampler pass over an EmptyLatentImage batch
     (batch_size = variations = how many slides the carousel gets), then the fixed
     camera-look tail every slide shares. No source image, no refine stage — the
-    8-step turbo schedule is the point, so steps/denoise stay as the workflow
+    8-step Selfora schedule is the point, so steps/denoise stay as the workflow
     defines them (unlike _build_i2i, which exposes both).
     The Renoise grain node is seeded from the run seed too, so re-rolling gives a
     different grain pattern instead of the same film noise over new frames."""
     nm = KREA2CAROUSEL
+    _apply_krea2_model(graph, nm["model"], inp)
     graph[nm["latent"]]["inputs"]["width"] = int(inp.get("width", 1080))
     graph[nm["latent"]]["inputs"]["height"] = int(inp.get("height", 1920))
     graph[nm["latent"]]["inputs"]["batch_size"] = max(1, int(inp.get("variations", 1)))

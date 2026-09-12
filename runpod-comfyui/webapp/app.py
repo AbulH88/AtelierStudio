@@ -396,9 +396,31 @@ def api_workflow_toggle(wid):
     return jsonify({"ok": True, "enabled": settings[wid]})
 
 
+@app.post("/api/workflows/<wid>/state")
+@admin_required
+def api_workflow_state(wid):
+    """Persist an explicit workflow visibility state.
+
+    Unlike a toggle, this is idempotent: a delayed retry or double request cannot
+    accidentally reverse the administrator's intended setting.
+    """
+    settings = load_workflow_settings()
+    if wid not in settings:
+        return jsonify({"error": "no such workflow"}), 404
+    body = request.get_json(silent=True) or {}
+    enabled = body.get("enabled")
+    if not isinstance(enabled, bool):
+        return jsonify({"error": "enabled must be true or false"}), 400
+    settings[wid] = enabled
+    save_workflow_settings(settings)
+    return jsonify({"ok": True, "enabled": settings[wid]})
+
+
 # Root of your loras folder (used only to LIST checkpoints; paths sent to ComfyUI
 # stay relative to this, so they work identically local & cloud).
-LORAS_DIR = os.environ.get("LORAS_DIR", "H:/ConfiuiModels/models/loras")
+LORAS_DIR = os.environ.get("LORAS_DIR", "G:/ConfiuiModels/models/loras")
+DIFFUSION_MODELS_DIR = os.environ.get(
+    "DIFFUSION_MODELS_DIR", "G:/ConfiuiModels/models/diffusion_models")
 
 # Each character points at a FOLDER; every .safetensors inside becomes a
 # selectable checkpoint in the 2nd menu.
@@ -459,6 +481,15 @@ def _comfy_loras():
     r.raise_for_status()
     d = r.json()
     return d[list(d.keys())[0]]["input"]["required"]["lora_name"][0]
+
+
+def _comfy_unets():
+    """Live diffusion-model list from the active ComfyUI instance."""
+    r = requests.get(f"{LOCAL_COMFY}/object_info/UNETLoader",
+                     headers=comfy_common.CF_HEADERS, timeout=8)
+    r.raise_for_status()
+    d = r.json()
+    return d[list(d.keys())[0]]["input"]["required"]["unet_name"][0]
 
 
 def _group_characters(loras):
@@ -559,41 +590,79 @@ def build_krea2_characters():
     return []
 
 
+KREA2_MODEL_DEFAULTS = {
+    "krea2": "Kera2/krea2_turbo_bf16.safetensors",
+    "krea2new": "Kera2/krea2_turbo_bf16.safetensors",
+    "krea2hq": "Kera2/krea2_turbo_bf16.safetensors",
+    "krea2t2ihq": "Kera2/krea2_turbo_bf16.safetensors",
+    "krea2carousel": "Kera2/selforaV21NightFix_selfora21Int8.safetensors",
+}
+
+
+def build_krea2_models():
+    """Models shown in the per-workflow Krea2 model picker.
+
+    Only files inside diffusion_models/Kera2 are discovered. Live ComfyUI is the
+    primary source so the VPS sees the home machine; local filesystem and cache
+    are fallbacks. Workflow defaults are always included.
+    """
+    prefix = "kera2/"
+    items = []
+    try:
+        items = [p.replace("\\", "/") for p in _comfy_unets()
+                 if p.replace("\\", "/").lower().startswith(prefix)]
+    except Exception:
+        pass
+    if not items:
+        base = os.path.join(DIFFUSION_MODELS_DIR, "Kera2")
+        if os.path.isdir(base):
+            for root, _, files in os.walk(base):
+                for fn in files:
+                    if fn.lower().endswith((".safetensors", ".gguf")):
+                        full = os.path.join(root, fn)
+                        items.append("Kera2/" + os.path.relpath(full, base).replace("\\", "/"))
+    cache = os.path.join(HERE, ".krea2_models.json")
+    if items:
+        try:
+            with open(cache, "w", encoding="utf-8") as f:
+                _json.dump(sorted(set(items)), f)
+        except Exception:
+            pass
+    elif os.path.exists(cache):
+        try:
+            items = _json.load(open(cache, encoding="utf-8"))
+        except Exception:
+            items = []
+    items.extend(KREA2_MODEL_DEFAULTS.values())
+    return [{"path": p, "label": os.path.splitext(p.split("/")[-1])[0]}
+            for p in sorted(set(items), key=str.lower)]
+
+
 # The realism/technique "helper" LoRAs baked into the krea2hq Power Lora Loader
 # (slots 2/3 of node 11). These are the on-by-default set; the UI can toggle them
 # off, retune strength, or add more from build_krea2_helper_loras(). Paths are the
 # forward-slash form ComfyUI accepts on the local Windows install.
-KREA2HQ_DEFAULT_HELPERS = [
-    {"path": "Keara2/mix/RealisomHelper/RealisticSnapshotKrea2.safetensors", "strength": 0.6},
-    {"path": "Keara2/mix/RealisomHelper/realism_engine_krea2_v3.1.safetensors", "strength": 0.6},
-]
+KREA2HQ_DEFAULT_HELPERS = []
 
 # krea2carousel ships a DIFFERENT baked-in helper set (slots 2-4 of node 28 in
 # workflow_krea2carousel.json). It needs its own list because the UI always sends
 # helper_loras, so seeding the krea2hq set while in carousel mode would silently
 # replace this workflow's own LoRAs with krea2hq's. Must stay in sync with the
 # workflow file, in the same forward-slash form the picker's options use.
-KREA2CAROUSEL_DEFAULT_HELPERS = [
-    {"path": "Keara2/mix/skindetails_krea2_loraholic.safetensors", "strength": 0.5},
-    {"path": "Keara2/mix/RawGirlV2_epoch_10 (1).safetensors", "strength": 0.75},
-    {"path": "Keara2/mix/Krea2_TextFusion_Refusal_Reduction.safetensors", "strength": 1.0},
-]
+KREA2CAROUSEL_DEFAULT_HELPERS = []
 
 
 def build_krea2_helper_loras():
-    """Krea2 helper (non-identity) LoRAs available to the krea2hq picker — every
-    .safetensors under the Keara2 'mix' area (live ComfyUI list, filesystem fallback
-    at home, cached last resort). The fixed defaults are always included so the
-    picker is never empty even when the scan can't reach the models."""
+    """LoRAs available to every Krea2 workflow, exclusively from Keara2/Shared."""
     items = []
+    prefix = "keara2/shared/"
     try:
         items = [l.replace("\\", "/") for l in _comfy_loras()
-                 if l.replace("\\", "/").lower().startswith("keara2/")
-                 and "/mix/" in l.replace("\\", "/").lower()]
+                 if l.replace("\\", "/").lower().startswith(prefix)]
     except Exception:
         items = []
     if not items:
-        base = os.path.join(LORAS_DIR, "Keara2", "mix")
+        base = os.path.join(LORAS_DIR, "Keara2", "Shared")
         if os.path.isdir(base):
             for root, _, files in os.walk(base):
                 for fn in files:
@@ -611,8 +680,6 @@ def build_krea2_helper_loras():
             items = _json.load(open(cache, encoding="utf-8"))
         except Exception:
             items = []
-    for d in KREA2HQ_DEFAULT_HELPERS + KREA2CAROUSEL_DEFAULT_HELPERS:
-        items.append(d["path"])            # always selectable, even if the scan missed them
     items = sorted(set(items))
     return [{"path": p, "label": os.path.splitext(p.split("/")[-1])[0]} for p in items]
 
@@ -835,6 +902,8 @@ def config():
                     "cloud_characters": build_cloud_characters(),
                     "krea2_characters": build_krea2_characters(), "aspects": ASPECTS,
                     "res_presets": RES_PRESETS,
+                    "krea2_models": build_krea2_models(),
+                    "krea2_model_defaults": KREA2_MODEL_DEFAULTS,
                     "krea2_helpers": build_krea2_helper_loras(),
                     "krea2hq_default_helpers": KREA2HQ_DEFAULT_HELPERS,
                     "krea2carousel_default_helpers": KREA2CAROUSEL_DEFAULT_HELPERS,
@@ -1351,6 +1420,20 @@ def _build_input(body):
                                    if k in override and override[k] not in (None, "")}
         if inp["sampler_override"].get("cfg") is not None:
             inp["sampler_override"]["cfg"] = float(inp["sampler_override"]["cfg"])
+    krea_modes = {"krea2", "krea2new", "krea2hq", "krea2t2ihq", "krea2carousel"}
+    if inp["mode"] in krea_modes:
+        model_name = str(body.get("model_name", "")).replace("\\", "/").strip()
+        if model_name:
+            if (not model_name.lower().startswith("kera2/") or ".." in model_name
+                    or not model_name.lower().endswith((".safetensors", ".gguf"))):
+                raise ValueError("Invalid Krea2 model selection.")
+            inp["model_name"] = model_name
+        if "helper_loras" in body:
+            inp["helper_loras"] = [
+                {"path": l.get("path", ""), "strength": float(l.get("strength", 0.6))}
+                for l in body.get("helper_loras", [])
+                if str(l.get("path", "")).replace("\\", "/").lower().startswith("keara2/shared/")
+            ]
     if inp["mode"] == "i2i":
         session, frame_name = body["session"], body["frame"]
         fpath = os.path.join(FRAMES_DIR, session, frame_name)
@@ -1377,9 +1460,6 @@ def _build_input(body):
         with open(fpath, "rb") as f:
             inp["image_b64"] = base64.b64encode(f.read()).decode()
         inp["denoise"] = float(body.get("denoise", 0.8))   # base sampler only; refine is static
-        if "helper_loras" in body:   # only override the baked-in helper slots when the UI sent a list
-            inp["helper_loras"] = [{"path": l.get("path", ""), "strength": float(l.get("strength", 0.6))}
-                                   for l in body.get("helper_loras", []) if l.get("path")]
     elif inp["mode"] in ("krea2t2ihq", "krea2carousel"):
         # Pure t2i — no required image. An optional "describe from image" photo may
         # be attached directly as base64 (single-image uploader, not the frame-picker
@@ -1387,9 +1467,6 @@ def _build_input(body):
         # OpenRouter when the prompt is left blank, never sent to ComfyUI at all.
         if body.get("image_b64"):
             inp["image_b64"] = body["image_b64"]
-        if "helper_loras" in body:
-            inp["helper_loras"] = [{"path": l.get("path", ""), "strength": float(l.get("strength", 0.6))}
-                                   for l in body.get("helper_loras", []) if l.get("path")]
     elif inp["mode"] == "video":   # Wan Animate: driving video + ref photo
         inp["video_b64"] = body.get("video_b64", "")
         inp["video_filename"] = body.get("video_filename", "driving.mp4")
