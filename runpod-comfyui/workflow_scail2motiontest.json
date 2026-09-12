@@ -13,7 +13,7 @@
     "_meta": {"title": "CLIP Text Encode (Negative Prompt)"}
   },
   "37": {
-    "inputs": {"unet_name": "WAN\\INT8Convert\\wan2.1_14B_SCAIL_2_int8_convrot.safetensors", "weight_dtype": "default"},
+    "inputs": {"unet_name": "INT8Convert\\wan2.1_14B_SCAIL_2_int8_convrot.safetensors", "weight_dtype": "default"},
     "class_type": "UNETLoader",
     "_meta": {"title": "Load Diffusion Model"}
   },

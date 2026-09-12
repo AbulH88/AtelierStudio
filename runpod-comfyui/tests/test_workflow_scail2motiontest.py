@@ -26,6 +26,11 @@ def test_test_workflow_uses_wan_style_reference_crop_before_scail_resize():
     assert graph["102"]["inputs"]["input"] == ["sc2_ref_crop", 0]
 
 
+def test_test_workflow_uses_the_installed_scail2_model_path():
+    graph = _load_graph()
+    assert graph["37"]["inputs"]["unet_name"] == "INT8Convert\\wan2.1_14B_SCAIL_2_int8_convrot.safetensors"
+
+
 def test_test_workflow_generation_resolution_presets_and_safe_default():
     for preset, megapixels in (("480p", 0.4), ("720p", 0.9), ("1080p", 2.1), ("bad", 0.9), (None, 0.9)):
         graph = _load_graph()
@@ -34,4 +39,3 @@ def test_test_workflow_generation_resolution_presets_and_safe_default():
             inp["generation_resolution"] = preset
         out = cc._build_scail2motion(graph, inp, seed=1, video_name="v.mp4", ref_name="r.png")
         assert out["102"]["inputs"]["resize_type.megapixels"] == megapixels
-
