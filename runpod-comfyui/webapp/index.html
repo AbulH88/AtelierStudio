@@ -707,6 +707,8 @@ body{background-color:var(--ink);background-image:radial-gradient(1000px 620px a
 header{height:64px;padding:0 24px;gap:18px;background:rgba(13,12,11,.94);border-color:#3b3731}
 header::before{display:none}
 .mark{width:42px;height:42px;border-radius:0;background:none;color:var(--txt);font-size:31px;font-weight:500}
+.ui-icon{width:21px;height:21px;display:inline-block;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.mark .ui-icon{width:38px;height:38px;stroke-width:1.5}.mode-group-title .ui-icon{width:23px;height:23px}.modes .seg button .k .ui-icon{width:20px;height:20px}
 .brand{font-size:27px;color:var(--txt);background:none;letter-spacing:.2px}.brand em{font-style:normal}
 .tagline{display:none}.nav{margin-left:24px;gap:12px}.navitem{font-family:var(--serif);font-size:15px;border-radius:0;padding:20px 9px}
 .navitem.on::after{left:8px;right:8px;bottom:0;background:var(--amber)}
@@ -726,7 +728,7 @@ header::before{display:none}
 .mode-group-title{display:flex;align-items:center;gap:10px;margin-bottom:6px;font:500 17px var(--serif);color:var(--txt)}
 .mode-group-title span{width:20px;color:var(--mut);font:14px var(--sans)}
 .modes .seg button{position:relative;display:block;width:100%;padding:9px 12px 9px 18px;border-radius:2px;text-align:left;font-size:13px;color:var(--mut);line-height:1.3}
-.modes .seg button .k{display:inline-block;width:19px;margin-right:7px;text-align:center}
+.modes .seg button .k{display:inline-flex;width:22px;margin-right:8px;align-items:center;justify-content:center;vertical-align:middle}
 .modes .seg button:hover{color:var(--txt);background:rgba(255,255,255,.035)}
 .modes .seg button.on{color:var(--txt);background:linear-gradient(90deg,rgba(231,195,141,.18),rgba(231,195,141,.04));box-shadow:none}
 .modes .seg button.on::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--amber)}
@@ -770,6 +772,7 @@ select,textarea,.seedrow input[type=number]{border-radius:3px}.go{border-radius:
 .admin-users{margin:0 0 38px;color:var(--mut);font-size:13px;border:1px solid var(--line);background:rgba(20,19,17,.72)}.admin-users summary{cursor:pointer;padding:16px 18px;font:20px var(--serif);color:var(--txt);border-bottom:1px solid transparent}.admin-users[open] summary{border-bottom-color:var(--line)}.admin-users .users-grid{padding:14px 18px 18px}
 .admin-workflow-head{margin:0 0 18px!important;padding-bottom:12px;border-bottom:1px solid var(--line)}.admin-workflow-head h2{font:30px var(--serif);margin:0}
 .admin-saved{margin-top:18px;color:var(--good);font-size:12px}.admin-dialog .wf-admin{grid-template-columns:1fr 1fr;gap:20px}.admin-dialog .wf-card{padding:16px}
+.wf-card-main{display:grid;grid-template-columns:28px 1fr;column-gap:9px}.wf-card-icon{grid-row:1/4;color:var(--mut);padding-top:1px}.wf-card.is-enabled .wf-card-icon{color:var(--txt)}.wf-card-name,.wf-card-state,.wf-card-error{grid-column:2}
 body[data-mode="krea2carousel"] .generation-results{border:0;background:transparent}
 body[data-mode="krea2carousel"] .generation-results>.hd{display:none}
 body[data-mode="krea2carousel"] .generation-results>.bd{padding:0;min-height:360px}
@@ -814,8 +817,18 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true" focusable="false">
+  <symbol id="ic-atelier" viewBox="0 0 24 24"><path d="M3 20 11.8 3 21 20h-4.1l-5.1-10.5L6.9 20Z"/><path d="m9.1 20 3.1-6.3 3 6.3"/></symbol>
+  <symbol id="ic-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5"/><circle cx="8.5" cy="9" r="1.5"/><path d="m4 18 5.2-5 3.2 3 2.4-2.3L20 19"/></symbol>
+  <symbol id="ic-carousel" viewBox="0 0 24 24"><path d="m3 18 5.6-10 4.1 7.1L16 9l5 9Z"/><path d="m10.2 18 2.5-2.9"/></symbol>
+  <symbol id="ic-text" viewBox="0 0 24 24"><path d="M5 5h14M12 5v14M8.5 19h7"/></symbol>
+  <symbol id="ic-film" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M7 3v18M17 3v18M3 8h4m10 0h4M3 16h4m10 0h4"/></symbol>
+  <symbol id="ic-play" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 8 6 4-6 4Z"/></symbol>
+  <symbol id="ic-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9 7 7m10 10 2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/><circle cx="12" cy="12" r="8"/></symbol>
+  <symbol id="ic-lens" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1.5"/><circle cx="14.5" cy="9.5" r="2.5"/><path d="m5 18 4-4 3 3 2-2 5 4"/></symbol>
+</svg>
 <header>
-  <div class="mark">◢</div>
+  <div class="mark"><svg class="ui-icon"><use href="#ic-atelier"/></svg></div>
   <div>
     <div class="brand">Atelier <em>Studio</em></div>
   </div>
@@ -844,23 +857,23 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
 <div class="modes">
   <div class="workflow-kicker">Workflows</div>
   <div class="seg">
-    <div class="mode-group"><div class="mode-group-title"><span>▧</span> Image</div>
-    <button id="mVid" class="on" data-mode="i2i"><span class="k">▧</span>Wan Image to Image</button>
-    <button id="mTxt" data-mode="t2i"><span class="k">T</span>Wan Text To Image</button>
-    <button id="mKrea2" data-mode="krea2"><span class="k">▧</span>Krea2 Image to Image</button>
-    <button id="mKreaNew" data-mode="krea2new" class="hide"><span class="k">▧</span>Krea2 Image to Image new</button>
-    <button id="mKreaHQ" data-mode="krea2hq"><span class="k">▧</span>Krea2 Image to Image High Quality</button>
-    <button id="mKreaT2IHQ" data-mode="krea2t2ihq"><span class="k">T</span>Krea2 Text to Image High Quality</button>
-    <button id="mKreaCarousel" data-mode="krea2carousel"><span class="k">△</span>Krea2 Carousel Maker</button>
+    <div class="mode-group"><div class="mode-group-title"><svg class="ui-icon"><use href="#ic-image"/></svg> Image</div>
+    <button id="mVid" class="on" data-mode="i2i"><span class="k"><svg class="ui-icon"><use href="#ic-image"/></svg></span>Wan Image to Image</button>
+    <button id="mTxt" data-mode="t2i"><span class="k"><svg class="ui-icon"><use href="#ic-text"/></svg></span>Wan Text To Image</button>
+    <button id="mKrea2" data-mode="krea2"><span class="k"><svg class="ui-icon"><use href="#ic-image"/></svg></span>Krea2 Image to Image</button>
+    <button id="mKreaNew" data-mode="krea2new" class="hide"><span class="k"><svg class="ui-icon"><use href="#ic-image"/></svg></span>Krea2 Image to Image new</button>
+    <button id="mKreaHQ" data-mode="krea2hq"><span class="k"><svg class="ui-icon"><use href="#ic-image"/></svg></span>Krea2 Image to Image High Quality</button>
+    <button id="mKreaT2IHQ" data-mode="krea2t2ihq"><span class="k"><svg class="ui-icon"><use href="#ic-text"/></svg></span>Krea2 Text to Image High Quality</button>
+    <button id="mKreaCarousel" data-mode="krea2carousel"><span class="k"><svg class="ui-icon"><use href="#ic-carousel"/></svg></span>Krea2 Carousel Maker</button>
     </div>
-    <div class="mode-group"><div class="mode-group-title"><span>▦</span> Video</div>
-    <button id="mMotion" data-mode="video"><span class="k">▷</span>Wan 2.2 Animate (Wow)</button>
-    <button id="mLtx25i2v" data-mode="ltx25i2v"><span class="k">▦</span>LTX 2.5 I2V</button>
+    <div class="mode-group"><div class="mode-group-title"><svg class="ui-icon"><use href="#ic-film"/></svg> Video</div>
+    <button id="mMotion" data-mode="video"><span class="k"><svg class="ui-icon"><use href="#ic-play"/></svg></span>Wan 2.2 Animate (Wow)</button>
+    <button id="mLtx25i2v" data-mode="ltx25i2v"><span class="k"><svg class="ui-icon"><use href="#ic-film"/></svg></span>LTX 2.5 I2V</button>
     </div>
-    <div class="mode-group"><div class="mode-group-title"><span>⚙</span> Advanced</div>
-    <button id="mScail2" data-mode="scail2motion"><span class="k">▧</span>High Quality Motion Control Scail 2 · V1.0</button>
-    <button id="mScail2V2" data-mode="scail2motionv2"><span class="k">▧</span>High Quality Motion Control Scail 2 · V2.0</button>
-    <button id="mAdv" data-mode="adv"><span class="k">▣</span>Instaraw Advance</button>
+    <div class="mode-group"><div class="mode-group-title"><svg class="ui-icon"><use href="#ic-gear"/></svg> Advanced</div>
+    <button id="mScail2" data-mode="scail2motion"><span class="k"><svg class="ui-icon"><use href="#ic-image"/></svg></span>High Quality Motion Control Scail 2 · V1.0</button>
+    <button id="mScail2V2" data-mode="scail2motionv2"><span class="k"><svg class="ui-icon"><use href="#ic-image"/></svg></span>High Quality Motion Control Scail 2 · V2.0</button>
+    <button id="mAdv" data-mode="adv"><span class="k"><svg class="ui-icon"><use href="#ic-lens"/></svg></span>Instaraw Advance</button>
     </div>
   </div>
   <p id="cloudNoModes" class="hide" style="margin:10px 2px 0;font-size:12.5px;color:var(--faint)">All generation modes now run on <b>Local</b> (the home 5090). Cloud only shows endpoint status — switch to Local to generate.</p>
@@ -2984,10 +2997,15 @@ async function loadWorkflowsAdmin(){
     if(!resp.ok||d.error)throw new Error(d.error||'Could not load workflows.');
     const enabled=d.workflows.filter(w=>w.enabled), disabled=d.workflows.filter(w=>!w.enabled);
     $('#workflowsHint').textContent=enabled.length+' of '+d.workflows.length+' enabled';
+    const workflowIcon=id=>{
+      const icon=id==='krea2carousel'?'ic-carousel':id==='t2i'||id==='krea2t2ihq'?'ic-text':
+        id==='video'?'ic-play':id==='ltx25i2v'?'ic-film':id==='adv'?'ic-lens':'ic-image';
+      return `<span class="wf-card-icon"><svg class="ui-icon" aria-hidden="true"><use href="#${icon}"/></svg></span>`;
+    };
     const group=(title,items,isEnabled)=>`<section class="wf-group">
       <div class="wf-group-head"><h2>${title}</h2><span class="wf-group-count">${items.length}</span></div>
       <div class="wf-cards">${items.length?items.map(w=>`<div class="wf-card ${isEnabled?'is-enabled':'is-disabled'}" data-wf-card="${_esc(w.id)}">
-        <div class="wf-card-main"><div class="wf-card-name">${_esc(w.label)}</div>
+        <div class="wf-card-main">${workflowIcon(w.id)}<div class="wf-card-name">${_esc(w.label)}</div>
           <div class="wf-card-state">${isEnabled?'Enabled · shown in Studio':'Disabled · hidden from Studio'}</div>
           <div class="wf-card-error" role="alert"></div></div>
         <button class="wf-switch" type="button" role="switch" aria-checked="${isEnabled}" aria-label="${isEnabled?'Disable':'Enable'} ${_esc(w.label)}"
