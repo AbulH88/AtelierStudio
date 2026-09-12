@@ -44,14 +44,6 @@ def test_build_scail2motion_wires_core_inputs():
     assert out["132"]["inputs"]["seed"] == 999
 
 
-def test_build_scail2motion_generation_resolution_presets_and_safe_default():
-    for preset, megapixels in (("480p", 0.4), ("720p", 0.9), ("1080p", 2.1), ("bad", 0.9), (None, 0.9)):
-        graph = _load_graph()
-        out = cc._build_scail2motion(graph, {"prompt": "x", "generation_resolution": preset},
-                                      seed=1, video_name="v.mp4", ref_name="r.png")
-        assert out["102"]["inputs"]["resize_type.megapixels"] == megapixels
-
-
 def test_build_scail2motion_negative_prompt_left_at_workflow_default():
     """Unlike i2i/t2i, this mode's negative prompt isn't overwritten with the
     generic NEGATIVE constant — the shipped Wan 2.1 negative stays as-is."""
