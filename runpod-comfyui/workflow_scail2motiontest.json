@@ -47,8 +47,23 @@
     "class_type": "LoadImage",
     "_meta": {"title": "Load Image"}
   },
+  "sc2_source_video": {
+    "inputs": {
+      "video": "h264 yuv420p_00003-audio.mp4",
+      "force_rate": 0,
+      "force_size": "Disabled",
+      "custom_width": 0,
+      "custom_height": 0,
+      "frame_load_cap": 1,
+      "skip_first_frames": 0,
+      "select_every_nth": 1,
+      "format": "None"
+    },
+    "class_type": "VHS_LoadVideo",
+    "_meta": {"title": "Original Driving Video Info"}
+  },
   "sc2_video_info": {
-    "inputs": {"video_info": ["113", 3]},
+    "inputs": {"video_info": ["sc2_source_video", 3]},
     "class_type": "VHS_VideoInfo",
     "_meta": {"title": "Driving Video Dimensions"}
   },

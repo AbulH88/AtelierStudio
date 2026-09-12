@@ -17,7 +17,9 @@ def _load_graph():
 def test_test_workflow_uses_wan_style_reference_crop_before_scail_resize():
     graph = _load_graph()
     crop = graph["sc2_ref_crop"]["inputs"]
-    assert graph["sc2_video_info"]["class_type"] == "VHS_VideoInfo"
+    assert graph["sc2_source_video"]["class_type"] == "VHS_LoadVideo"
+    assert graph["sc2_source_video"]["inputs"]["force_size"] == "Disabled"
+    assert graph["sc2_video_info"]["inputs"]["video_info"] == ["sc2_source_video", 3]
     assert crop["image"] == ["58", 0]
     assert crop["width"] == ["sc2_video_info", 8]
     assert crop["height"] == ["sc2_video_info", 9]

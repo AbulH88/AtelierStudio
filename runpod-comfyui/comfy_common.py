@@ -645,6 +645,8 @@ def _build_scail2motion(graph, inp, seed, video_name, ref_name):
     if inp.get("fps"):                       # force_rate the driving video is resampled to
         graph[nm["fps_primitive"]]["inputs"]["value"] = max(1, int(inp["fps"]))
     graph[nm["ref_image"]]["inputs"]["image"] = ref_name
+    if "sc2_source_video" in graph:  # Resolution Test: raw clip metadata for crop, no size loop.
+        graph["sc2_source_video"]["inputs"]["video"] = video_name
     if "generation_resolution" in inp:
         resolution_megapixels = {"480p": 0.4, "720p": 0.9, "1080p": 2.1}
         graph["102"]["inputs"]["resize_type.megapixels"] = resolution_megapixels.get(
