@@ -8,7 +8,7 @@ Normalize every image in `E:\DataSet\MyNew` for LoRA training and add one matchi
 
 All image files will be renamed sequentially in current alphabetical order:
 
-- `oliviaDD2m_001.<extension>` through `oliviaDD2m_069.<extension>`
+- `oliviaDD2m_001.<extension>` through `oliviaDD2m_078.<extension>`
 - The existing `.png` or `.jpeg` extension is retained.
 - A paired caption file uses the same stem, for example `oliviaDD2m_001.txt`.
 
@@ -20,4 +20,4 @@ Every caption begins with the exact LoRA trigger `oliviaDD2m, `. The remaining c
 
 - Rename through collision-safe temporary names so no image is overwritten.
 - Never replace an existing `.txt` caption; stop if a destination exists.
-- Verify 69 image files and 69 matching `.txt` files after completion.
+- Verify 78 image files and 78 matching `.txt` files after completion.
