@@ -1330,7 +1330,7 @@ def _ensure_thumb(thumb_key):
     Returns the WebP bytes, or None when the original is gone / unreadable.
     Concurrent requests for the same key build once; the losers fall through to
     the normal not-found path and pick it up on the next load."""
-    if not thumb_key.startswith("thumbs/") or not thumb_key.endswith(".webp"):
+    if not thumb_key.startswith(("thumbs/", "thumbs-reels/")) or not thumb_key.endswith(".webp"):
         return None
     if thumb_key.startswith("thumbs/"):
         stem = "gallery/" + thumb_key[len("thumbs/"):-len(".webp")]
