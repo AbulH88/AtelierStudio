@@ -26,7 +26,22 @@ Cloud overrides the published `VHS_LoadVideo` node `113` using its API fields:
 The workflow's final Video Combine output remains 24 fps. This keeps a selected
 five-second segment at five seconds, and prevents accidental full-clip GPU use.
 
+## Job status and estimated time
+
+After Cloud submission, the page immediately shows the RunningHub task ID,
+selected instance, uploaded-file stage, and the live API state: `QUEUED`,
+`RUNNING`, `SUCCESS`, or `FAILED`.
+
+The UI shows elapsed time from submission. RunningHub's query API does not
+provide a reliable percentage or time-remaining field, so Standard jobs display
+an explicitly labelled estimate based on observed Scail 2 Standard runtimes.
+Queued jobs state that they are waiting for RunningHub capacity rather than
+pretending to have a countdown. On completion, the estimate is replaced with
+RunningHub's actual runtime and RH coin usage.
+
 ## Verification
 
 Test the generated `nodeInfoList` for Full clip and a five-second segment that
 starts at two seconds, then manually submit a short Standard test after deploy.
+Verify queued, running, failed, and completed job displays with mocked API
+responses, including explicit estimated versus actual timing text.
