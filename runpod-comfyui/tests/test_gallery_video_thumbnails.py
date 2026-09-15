@@ -39,3 +39,19 @@ def test_missing_video_thumb_is_built_from_the_gallery_video(monkeypatch):
     assert studio._ensure_thumb("thumbs/Joy/video.webp") == b"webp"
     assert requested == ["gallery/Joy/video.png", "gallery/Joy/video.mp4"]
     assert saved == {"thumbs/Joy/video.webp": b"webp"}
+
+
+def test_missing_reel_thumb_is_built_from_the_reel_video(monkeypatch):
+    class Response:
+        status_code = 200
+        content = b"video"
+
+    requested = []
+    saved = {}
+    monkeypatch.setattr(studio.r2_store, "stream", lambda key, _range: requested.append(key) or Response())
+    monkeypatch.setattr(studio.r2_store, "upload_bytes", lambda key, raw: saved.update({key: raw}))
+    monkeypatch.setattr(studio, "_make_video_thumb", lambda raw: b"webp")
+
+    assert studio._ensure_thumb("thumbs-reels/Joy/video.webp") == b"webp"
+    assert requested == ["Joy/video.png", "Joy/video.mp4"]
+    assert saved == {"thumbs-reels/Joy/video.webp": b"webp"}

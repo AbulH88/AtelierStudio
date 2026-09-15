@@ -1246,8 +1246,13 @@ def reels_cookies_clear():
 
 @app.get("/api/reels/list")
 def reels_list():
+    from urllib.parse import quote
     folder = request.args.get("folder", "")
-    return jsonify({"reels": r2_store.list_reels(folder)})
+    reels = r2_store.list_reels(folder)
+    for reel in reels:
+        stem, _ext = os.path.splitext(reel["key"])
+        reel["thumb_url"] = f"/api/reels/media?key={quote('thumbs-reels/' + stem + '.webp', safe='')}"
+    return jsonify({"reels": reels})
 
 
 @app.post("/api/reels/download")
@@ -1273,6 +1278,14 @@ def reels_download():
         local = os.path.join(tmpdir, files[0])
         key = (f"{folder}/" if folder else "") + files[0]
         r2_store.upload(local, key)
+        try:
+            with open(local, "rb") as f:
+                thumb = _make_video_thumb(f.read())
+            if thumb is not None:
+                stem, _ext = os.path.splitext(key)
+                r2_store.upload_bytes(f"thumbs-reels/{stem}.webp", thumb)
+        except Exception:
+            pass
         return jsonify({"ok": True, "key": key, "name": files[0]})
     except Exception as e:
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
@@ -1293,7 +1306,15 @@ def reels_upload():
     name = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(f.filename)) or "video.mp4"
     key = (f"{folder}/" if folder else "") + name
     try:
-        r2_store.upload_bytes(key, f.read())
+        raw = f.read()
+        r2_store.upload_bytes(key, raw)
+        try:
+            thumb = _make_video_thumb(raw)
+            if thumb is not None:
+                stem, _ext = os.path.splitext(key)
+                r2_store.upload_bytes(f"thumbs-reels/{stem}.webp", thumb)
+        except Exception:
+            pass
     except Exception as e:
         return jsonify({"error": f"{type(e).__name__}: {e}"}), 500
     return jsonify({"ok": True, "key": key, "name": name})
@@ -1304,14 +1325,19 @@ _THUMB_BUILDING = set()
 
 
 def _ensure_thumb(thumb_key):
-    """Build a missing thumbnail from its gallery original and store it.
+    """Build a missing Gallery or Reel thumbnail from its private original.
 
     Returns the WebP bytes, or None when the original is gone / unreadable.
     Concurrent requests for the same key build once; the losers fall through to
     the normal not-found path and pick it up on the next load."""
     if not thumb_key.startswith("thumbs/") or not thumb_key.endswith(".webp"):
         return None
-    stem = "gallery/" + thumb_key[len("thumbs/"):-len(".webp")]
+    if thumb_key.startswith("thumbs/"):
+        stem = "gallery/" + thumb_key[len("thumbs/"):-len(".webp")]
+    elif thumb_key.startswith("thumbs-reels/"):
+        stem = thumb_key[len("thumbs-reels/"):-len(".webp")]
+    else:
+        return None
     with _THUMB_BUILD_LOCK:
         if thumb_key in _THUMB_BUILDING:
             return None
@@ -1345,7 +1371,7 @@ def reels_media():
     if not key:
         return jsonify({"error": "no key"}), 400
     up = r2_store.stream(key, request.headers.get("Range"))
-    if up.status_code not in (200, 206) and key.startswith("thumbs/"):
+    if up.status_code not in (200, 206) and key.startswith(("thumbs/", "thumbs-reels/")):
         # Self-heal: any gallery image without a thumbnail yet (everything made
         # before thumbnailing existed) gets one built on first view, then served
         # from R2 forever after. Keeps the grid fast without a bulk migration.
@@ -1369,7 +1395,7 @@ def reels_media():
     # Gallery/thumb keys embed a timestamp+seed and are never overwritten in
     # place, so they're safe to cache "forever" — repeat gallery visits then
     # cost zero network requests instead of re-streaming through the R2 proxy.
-    if key.startswith(("gallery/", "thumbs/")):
+    if key.startswith(("gallery/", "thumbs/", "thumbs-reels/")):
         headers["Cache-Control"] = "public, max-age=31536000, immutable"
     if request.args.get("download"):
         headers["Content-Disposition"] = f'attachment; filename="{key.split("/")[-1]}"'
