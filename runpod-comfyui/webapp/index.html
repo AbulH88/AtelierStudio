@@ -373,6 +373,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 .folder-picker{width:min(360px,100%);padding:20px;background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 18px 60px #000;color:var(--txt)}
 .folder-picker h3{margin:0 0 14px;font-family:var(--serif);font-weight:500}.folder-picker select,.folder-picker input{width:100%;box-sizing:border-box;padding:10px;background:var(--ink2);border:1px solid var(--line);border-radius:8px;color:var(--txt)}
 .folder-picker .picker-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}.folder-picker button{padding:8px 13px;border-radius:8px;cursor:pointer}
+.library-menu{position:fixed;z-index:400;min-width:190px;padding:6px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;box-shadow:0 14px 40px #000}.library-menu button{display:block;width:100%;padding:9px 11px;text-align:left;background:transparent;border:0;border-radius:6px;color:var(--txt);cursor:pointer}.library-menu button:hover{background:rgba(233,184,100,.12)}.library-menu .danger{color:var(--rose);border-top:1px solid var(--line);margin-top:5px;padding-top:10px}
 @media(max-width:680px){.gallery-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
 
 .gal-card .gcheck {
@@ -1585,13 +1586,12 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
       <div class="sb-head">
         <h2>⬗ Reel Library</h2>
         <div class="sb-stats" id="reelStatus"></div>
+        <button id="newFolderBtn">📁 + New Folder</button>
       </div>
       <div class="sb-folders" id="sidebarFolders">
         <!-- JS fills -->
       </div>
-      <div class="sb-bottom">
-        <button id="newFolderBtn">+ New Folder</button>
-      </div>
+      <div class="sb-bottom"><div class="sb-stats">☁ Cloud Storage<br><span id="reelStorage">Loading…</span></div></div>
     </aside>
     <!-- CONTENT -->
     <div class="reels-content">
@@ -1632,7 +1632,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
 <div id="pageGallery" class="hide">
   <div class="reels-layout">
     <aside class="reels-sidebar">
-      <div class="sb-head"><h2>🖼 Gallery</h2><div class="sb-stats" id="galStatus"></div></div>
+      <div class="sb-head"><h2>🖼 Gallery</h2><div class="sb-stats" id="galStatus"></div><button id="newGalleryFolderBtn">📁 + New Folder</button></div>
       <div class="sb-folders" id="galGroups"></div>
     </aside>
     <div class="reels-content">
@@ -3568,6 +3568,22 @@ async function moveLibraryItem(kind, key) {
   } catch (error) { alert(error.message || String(error)); }
 }
 
+function openLibraryMenu(event, kind, item) {
+  document.querySelectorAll('.library-menu').forEach(menu => menu.remove());
+  const menu=document.createElement('div'); menu.className='library-menu';
+  const add=(label, action, danger=false)=>{const button=document.createElement('button');button.textContent=label;if(danger)button.className='danger';button.onclick=async()=>{menu.remove();await action();};menu.append(button);};
+  add('Open / Preview',()=>openReelPlayer(item.url,item.name));
+  add('Move to folder…',()=>moveLibraryItem(kind,item.key));
+  add('Download',async()=>{const d=await(await fetch('/api/reels/save-url?key='+encodeURIComponent(item.key))).json();if(d.url)window.location.href=d.url;});
+  add('Enhance',()=>enhanceFromLibrary(item.url,item.name));
+  if(kind==='gallery'&&!/\.(mp4|mov|webm)$/i.test(item.name)) add('Use as Motion reference',()=>galToMotionRef(item.url));
+  if(kind==='reels') add('Use as Motion video',()=>useReelMotion(item.url,item.name));
+  add('Delete',async()=>{if(!confirm(`Delete ${item.name}?`))return;await fetch(kind==='reels'?'/api/reels/delete':'/api/gallery/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:item.key})});if(kind==='reels')await loadReels();else await loadGallery();},true);
+  menu.style.left=Math.min(event.clientX,innerWidth-210)+'px';menu.style.top=Math.min(event.clientY,innerHeight-280)+'px';document.body.append(menu);
+  setTimeout(()=>document.addEventListener('click',()=>menu.remove(),{once:true}),0);
+}
+document.addEventListener('keydown',event=>{if(event.key==='Escape')document.querySelectorAll('.library-menu').forEach(menu=>menu.remove());});
+
 function renderReelGrid(){
   const q = ($('#reelSearch').value || '').trim().toLowerCase();
   const sort = _reelSortMode;
@@ -3591,15 +3607,13 @@ function renderReelGrid(){
       <div class="re-icon">🔎</div><p>No reels match “${q}”.</p></div>`;
     return;
   }
-  $('#reelGrid').innerHTML = list.map(r => `<div class="reel-card">
+  $('#reelGrid').innerHTML = list.map(r => `<div class="reel-card" data-key="${r.key}" data-url="${r.url}" data-name="${r.name}">
     <img src="${r.thumb_url}" loading="lazy" data-url="${r.url}" data-name="${r.name}" style="cursor:pointer" alt="Reel preview">
     <div class="meta"><div class="nm" title="${r.name}">${r.name}</div><div class="sz">${r.size_mb} MB</div></div>
     <div class="acts"><button class="use" data-key="${r.key}">→ Frame</button>
       <button class="usemotion" data-url="${r.url}" data-name="${r.name}">→ Motion</button></div>
     <div class="acts" style="padding-top:0"><button class="reenhance" data-url="${r.url}" data-name="${r.name}">✦ Enhance locally</button></div>
-    <div class="acts" style="padding-top:0"><button class="save" data-key="${r.key}">↓ Save</button>
-      <button class="move" data-key="${r.key}">↗ Move</button>
-      <button class="del" data-key="${r.key}">✕ Delete</button></div></div>`).join('');
+    </div>`).join('');
   $$('#reelGrid img').forEach(im=>im.onclick=()=>openReelPlayer(im.dataset.url, im.dataset.name));
   $$('#reelGrid .use').forEach(b=>b.onclick=()=>useReel(b.dataset.key));
   $$('#reelGrid .usemotion').forEach(b=>b.onclick=()=>useReelMotion(b.dataset.url, b.dataset.name));
@@ -3607,11 +3621,7 @@ function renderReelGrid(){
   $$('#reelGrid .save').forEach(b=>b.onclick=async()=>{
     const d=await(await fetch('/api/reels/save-url?key='+encodeURIComponent(b.dataset.key))).json();
     if(d.url)window.location.href=d.url;});
-  $$('#reelGrid .move').forEach(b=>b.onclick=async()=>moveLibraryItem('reels', b.dataset.key));
-  $$('#reelGrid .del').forEach(b=>b.onclick=async()=>{
-    if(!confirm('Delete this reel?'))return;
-    await fetch('/api/reels/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:b.dataset.key})});
-    loadReels();});
+  $$('#reelGrid .reel-card').forEach(card=>card.oncontextmenu=e=>{e.preventDefault();openLibraryMenu(e,'reels',card.dataset);});
 }
 
 $('#clearReelSearch').onclick = () => {
@@ -3630,6 +3640,11 @@ $('#newFolderBtn').onclick=async()=>{
   await fetch('/api/reels/folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
   _activeFolder = name.trim();
   await loadReelFolders();
+};
+$('#newGalleryFolderBtn').onclick=async()=>{
+  const name=prompt('New folder name:');if(!name)return;
+  const d=await(await fetch('/api/gallery/folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})})).json();
+  if(d.error){alert(d.error);return;} _galGroup=d.folder; await openGallery();
 };
 $('#reelDlBtn').onclick=async()=>{
   const url=$('#reelUrl').value.trim();$('#reelErr').textContent='';
@@ -4057,11 +4072,9 @@ function renderGallery() {
       : `<img src="${im.thumb_url || im.url}" loading="lazy" data-url="${im.url}" onerror="this.onerror=null;this.src=this.dataset.url;">`;
     // "Use as Motion reference photo" only makes sense for images
     const motionBtn = isVid ? `<button class="genhance" data-url="${im.url}" data-name="${im.name}" title="Enhance locally">✦ Enhance</button>` : `<button class="gmotion" data-url="${im.url}" title="Use as Motion reference photo">→ Motion ref</button>`;
-    return `<div class="gal-card${selClass}" data-key="${im.key}" data-index="${idx}">
+    return `<div class="gal-card${selClass}" data-key="${im.key}" data-url="${im.url}" data-name="${im.name}" data-index="${idx}">
       <div class="gcheck"><input type="checkbox" ${checked} data-key="${im.key}"></div>
       ${media}
-      <button class="gdel" data-key="${im.key}" title="Delete">✕</button>
-      <button class="gmove" data-key="${im.key}" title="Move to folder">↗ Move</button>
       ${motionBtn}
     </div>`;
   }).join('');
@@ -4079,23 +4092,7 @@ function renderGallery() {
     };
   });
   
-  $$('#galGrid .gdel').forEach(b => {
-    b.onclick = async (e) => {
-      e.stopPropagation();
-      if (!confirm('Delete this image?')) return;
-      await fetch('/api/gallery/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: b.dataset.key })
-      });
-      _galSelected.delete(b.dataset.key);
-      await loadGallery();
-    };
-  });
-  $$('#galGrid .gmove').forEach(b => b.onclick = async e => {
-    e.stopPropagation();
-    await moveLibraryItem('gallery', b.dataset.key);
-  });
+  $$('#galGrid .gal-card').forEach(card=>card.oncontextmenu=e=>{e.preventDefault();openLibraryMenu(e,'gallery',card.dataset);});
   
   $$('#galGrid .gcheck input').forEach(cb => {
     cb.onclick = (e) => {
