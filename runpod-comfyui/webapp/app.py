@@ -977,6 +977,92 @@ def health():
                     "gen_gated": GEN_REQUIRES_AGENT})
 
 
+def _enhance_agent(method, path, **kwargs):
+    if not AGENT_URL or not AGENT_SECRET:
+        raise RuntimeError("Local GPU agent is not configured")
+    headers = dict(kwargs.pop("headers", {}))
+    headers["x-agent-secret"] = AGENT_SECRET
+    return requests.request(method, f"{AGENT_URL}{path}", headers=headers,
+                            timeout=kwargs.pop("timeout", 30), **kwargs)
+
+
+ENHANCE_JOB_OWNERS = {}
+
+
+def _enhance_owned(job_id):
+    return re.fullmatch(r"[0-9a-f]{32}", job_id) and ENHANCE_JOB_OWNERS.get(job_id) == session.get("user")
+
+
+@app.get("/api/enhance/capabilities")
+def enhance_capabilities():
+    try:
+        r = _enhance_agent("GET", "/enhance/capabilities", timeout=8)
+        return Response(r.content, status=r.status_code,
+                        content_type=r.headers.get("Content-Type", "application/json"))
+    except Exception as exc:
+        return jsonify({"online": False, "error": str(exc)}), 503
+
+
+@app.post("/api/enhance/jobs")
+def enhance_submit():
+    video = request.files.get("video")
+    if not video:
+        return jsonify({"error": "Choose a video"}), 400
+    try:
+        files = {"video": (video.filename, video.stream, video.mimetype or "video/mp4")}
+        r = _enhance_agent("POST", "/enhance/jobs", files=files,
+                           data={"options": request.form.get("options", "{}")}, timeout=300)
+        if r.status_code in (200, 202):
+            job_id = r.json().get("id")
+            if job_id:
+                ENHANCE_JOB_OWNERS[job_id] = session.get("user")
+        return Response(r.content, status=r.status_code,
+                        content_type=r.headers.get("Content-Type", "application/json"))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.get("/api/enhance/jobs/<job_id>")
+def enhance_job_status(job_id):
+    if not _enhance_owned(job_id):
+        return jsonify({"error": "Job not found"}), 404
+    try:
+        r = _enhance_agent("GET", f"/enhance/jobs/{job_id}", timeout=10)
+        return Response(r.content, status=r.status_code,
+                        content_type=r.headers.get("Content-Type", "application/json"))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.post("/api/enhance/jobs/<job_id>/cancel")
+def enhance_job_cancel(job_id):
+    if not _enhance_owned(job_id):
+        return jsonify({"error": "Job not found"}), 404
+    try:
+        r = _enhance_agent("POST", f"/enhance/jobs/{job_id}/cancel", timeout=15)
+        return Response(r.content, status=r.status_code,
+                        content_type=r.headers.get("Content-Type", "application/json"))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+@app.get("/api/enhance/jobs/<job_id>/result")
+def enhance_job_result(job_id):
+    if not _enhance_owned(job_id):
+        return jsonify({"error": "Job not found"}), 404
+    try:
+        upstream = _enhance_agent("GET", f"/enhance/jobs/{job_id}/result",
+                                  timeout=300, stream=True)
+        if upstream.status_code != 200:
+            return Response(upstream.content, status=upstream.status_code,
+                            content_type=upstream.headers.get("Content-Type", "application/json"))
+        response = Response(upstream.iter_content(1024 * 1024), content_type="video/mp4")
+        response.headers["Content-Disposition"] = f'inline; filename="enhanced-{job_id[:8]}.mp4"'
+        return response
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
 @app.get("/api/cloud/info")
 def cloud_info():
     """Static-ish cloud facts the UI needs once: cost rate, GPU, and the LoRA

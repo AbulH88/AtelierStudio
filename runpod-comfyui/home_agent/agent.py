@@ -20,7 +20,9 @@ import time
 import urllib.parse
 import urllib.request
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
+
+import enhance_service
 
 # Same physical (dual-boot) machine, two OSes — pick the launcher that matches
 # whichever OS this process is actually running under right now.
@@ -188,6 +190,57 @@ def status():
     if not authed():
         return jsonify({"error": "unauthorized"}), 401
     return jsonify({"ok": True, "running": comfy_up(), "os": "windows" if IS_WINDOWS else "linux"})
+
+
+@app.get("/enhance/capabilities")
+def enhance_capabilities():
+    if not authed():
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify(enhance_service.capabilities())
+
+
+@app.post("/enhance/jobs")
+def enhance_submit():
+    if not authed():
+        return jsonify({"error": "unauthorized"}), 401
+    upload = request.files.get("video")
+    if not upload:
+        return jsonify({"error": "Choose a video"}), 400
+    try:
+        options = enhance_service.validate_options(json.loads(request.form.get("options", "{}")))
+        return jsonify(enhance_service.create_job(upload, options)), 202
+    except (ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 409
+
+
+@app.get("/enhance/jobs/<job_id>")
+def enhance_status(job_id):
+    if not authed():
+        return jsonify({"error": "unauthorized"}), 401
+    job = enhance_service.get_job(job_id)
+    return (jsonify(enhance_service.public_job(job)), 200) if job else (jsonify({"error": "not found"}), 404)
+
+
+@app.post("/enhance/jobs/<job_id>/cancel")
+def enhance_cancel(job_id):
+    if not authed():
+        return jsonify({"error": "unauthorized"}), 401
+    return (jsonify({"ok": True}), 200) if enhance_service.cancel_job(job_id) else (jsonify({"error": "not running"}), 409)
+
+
+@app.get("/enhance/jobs/<job_id>/result")
+def enhance_result(job_id):
+    if not authed():
+        return jsonify({"error": "unauthorized"}), 401
+    job = enhance_service.get_job(job_id)
+    path = os.path.realpath(job.get("result", "")) if job else ""
+    folder = os.path.realpath(os.path.dirname(job.get("source", ""))) if job else ""
+    if not job or job.get("status") != "done" or not path or os.path.dirname(path) != folder or not os.path.isfile(path):
+        return jsonify({"error": "result unavailable"}), 404
+    return send_file(path, mimetype="video/mp4", as_attachment=False,
+                     download_name=os.path.basename(path))
 
 
 @app.post("/start")

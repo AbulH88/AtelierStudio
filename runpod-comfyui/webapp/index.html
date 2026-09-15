@@ -305,6 +305,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 .reel-card .save:hover{background:rgba(127,200,160,.14)}
 .reel-card .del{background:rgba(217,139,122,.08);color:var(--rose);border:1px solid rgba(217,139,122,.2)!important}
 .reel-card .del:hover{background:rgba(217,139,122,.14)}
+.reel-card .reenhance{background:rgba(231,195,141,.12);color:var(--amber);border:1px solid rgba(231,195,141,.35)}
 .reels-empty{text-align:center;padding:60px 20px;color:var(--faint)}
 .reels-empty .re-icon{font-size:42px;margin-bottom:12px;opacity:.4}
 .reels-empty p{font-size:14px;color:var(--mut);margin:6px 0 0}
@@ -363,6 +364,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   font-weight:600;cursor:pointer;display:none;border:1px solid rgba(160,140,220,.32);
   background:rgba(160,140,220,.18);color:#cebdf2;backdrop-filter:blur(4px)}
 .gal-card:hover .gmotion{display:block}
+.gal-card .genhance{position:absolute;left:7px;right:7px;bottom:7px;padding:8px;border:1px solid rgba(231,195,141,.5);background:#342b20;color:var(--amber);font:12px var(--sans);cursor:pointer}
 .gal-card .gmotion:hover{background:rgba(160,140,220,.28)}
 @media(max-width:680px){.gallery-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
 
@@ -820,6 +822,10 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
   .empty-sheet{grid-template-columns:repeat(2,1fr)}.admin-overlay{padding:25px 14px 60px!important}.admin-dialog .wf-admin{grid-template-columns:1fr}
 }
 @media(max-width:920px){.settings-resizer{display:none}}
+#pageEnhance{display:grid;grid-template-columns:260px minmax(480px,1fr) 340px;min-height:calc(100vh - 64px);background:#141310;color:var(--txt)}
+#pageEnhance.hide{display:none}.enhance-source,.enhance-settings{background:#1b1a17;padding:35px 25px;border-right:1px solid var(--line)}.enhance-settings{border-left:1px solid var(--line);border-right:0;overflow:auto}.enhance-kicker{font:10px var(--mono);letter-spacing:3px;color:var(--amber);text-transform:uppercase}.enhance-source h2,.enhance-settings h2{font:27px var(--serif);margin:18px 0 16px}.enhance-source p,.enhance-intro,.enhance-foot{color:var(--mut);line-height:1.55}.enhance-source p{font-size:13px;margin-bottom:30px}.enhance-source-button{display:block;width:100%;margin:12px 0;padding:17px 14px;text-align:left;background:#25231f;color:var(--txt);border:1px solid var(--line2);font:14px var(--sans);cursor:pointer}.enhance-source-button:hover{border-color:var(--amber)}.enhance-source-meta{margin-top:30px;overflow-wrap:anywhere;font:12px var(--mono);color:var(--amber)}.enhance-local-note{margin-top:35px;padding-top:23px;border-top:1px solid var(--line);font:12px var(--sans);color:var(--mut);line-height:1.6}
+.enhance-main{padding:46px clamp(25px,4vw,72px)}.enhance-main h1{font:clamp(37px,3.3vw,58px) var(--serif);margin:15px 0 6px}.enhance-main h1 em{font-style:italic;color:var(--amber)}.enhance-intro{margin:0 0 32px}.enhance-pipeline{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:20px;background:#211f1b;border:1px solid var(--line2);font:10px var(--mono);letter-spacing:1px;color:var(--amber)}.enhance-preview{position:relative;display:flex;min-height:430px;margin-top:30px;background:#080807;border:1px solid var(--line2);overflow:hidden}.enhance-preview video{width:50%;height:430px;object-fit:contain;background:#080807}.enhance-preview-labels{position:absolute;top:16px;left:20px;right:20px;z-index:2;display:flex;justify-content:space-between;font:10px var(--mono);letter-spacing:2px;color:var(--amber)}.enhance-divider{position:absolute;top:0;bottom:0;left:50%;width:1px;background:var(--amber);z-index:1}.enhance-preview-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--mut);font:14px var(--sans);background:#080807}.enhance-preview-empty.hide{display:none}.enhance-job{display:flex;align-items:center;gap:14px;margin-top:18px;font:12px var(--mono);color:var(--mut)}.enhance-job progress{flex:1;accent-color:var(--amber)}.enhance-job a,.enhance-job button{padding:10px 14px;border:1px solid var(--amber);background:#302920;color:var(--amber);text-decoration:none;cursor:pointer}.enhance-error{color:var(--rose);font:12px var(--mono)}
+.enhance-gpu{font:12px var(--mono);color:var(--good);padding:14px;background:#232621;border:1px solid #35503b}.enhance-gpu.offline{color:var(--rose);background:#2a211f;border-color:#5c3231}.enhance-section{margin-top:27px;padding-top:25px;border-top:1px solid var(--line)}.enhance-section>label{font:20px var(--serif);display:flex;align-items:center;gap:10px}.enhance-section input{accent-color:var(--amber)}.enhance-field{display:grid;gap:9px;margin-top:20px}.enhance-field span{font:10px var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--mut)}.enhance-field select{width:100%;padding:12px;background:#25231f;border:1px solid var(--line2);color:var(--txt);font:13px var(--sans)}.enhance-run{width:100%;margin-top:32px;padding:18px;border:1px solid var(--amber);background:linear-gradient(110deg,#f8d9a2,#caa36f);color:#221b12;font:17px var(--serif);cursor:pointer}.enhance-run:disabled{opacity:.45;cursor:not-allowed}.enhance-foot{font-size:11px;margin-top:17px}@media(max-width:1100px){#pageEnhance{grid-template-columns:220px minmax(350px,1fr)}.enhance-settings{grid-column:1/-1;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:14px}.enhance-settings h2,.enhance-gpu,.enhance-run,.enhance-foot{grid-column:1/-1}}@media(max-width:700px){#pageEnhance{display:block}.enhance-main{padding:30px 20px}.enhance-preview,.enhance-preview video{min-height:260px;height:260px}.enhance-settings{display:block}}
 </style>
 </head>
 <body>
@@ -844,6 +850,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
     <button class="navitem on" data-page="studio">Create</button>
     <button class="navitem" data-page="gallery">Gallery</button>
     <button class="navitem" data-page="reels">Reels</button>
+    <button class="navitem" data-page="enhance">Enhance</button>
     <button class="navitem" data-page="notes">Notes</button>
     <button class="navitem hide" data-page="admin" id="navAdmin">Admin</button>
   </nav>
@@ -1497,6 +1504,50 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
   </aside>
 </main>
 </div><!-- /pageStudio -->
+
+<div id="pageEnhance" class="hide">
+  <aside class="enhance-source">
+    <div class="enhance-kicker">LOCAL FINISHING ROOM</div><h2>Video Source</h2>
+    <p>Start with a clip from your computer, Gallery, or Reel Library.</p>
+    <button id="enhanceUpload" class="enhance-source-button">↑ &nbsp; Upload video</button>
+    <input id="enhanceInput" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-matroska" hidden>
+    <button id="enhanceGallery" class="enhance-source-button">▣ &nbsp; Choose from Gallery</button>
+    <button id="enhanceReels" class="enhance-source-button">▤ &nbsp; Choose from Reels</button>
+    <div class="enhance-source-meta" id="enhanceSourceMeta">No clip selected</div>
+    <div class="enhance-local-note">⌁ &nbsp; Processing stays on your local NVIDIA GPU. No RunningHub coins.</div>
+  </aside>
+  <section class="enhance-main">
+    <div class="enhance-kicker">ATELIER STUDIO &nbsp; / &nbsp; ENHANCE</div>
+    <h1>Finish your film <em>locally.</em></h1>
+    <p class="enhance-intro">Smooth motion, refine detail, and make the final frame yours.</p>
+    <div class="enhance-pipeline"><span>01 &nbsp; SOURCE</span><span>→</span><span>02 &nbsp; INTERPOLATE</span><span>→</span><span>03 &nbsp; UPSCALE</span><span>→</span><span>04 &nbsp; EXPORT</span></div>
+    <div class="enhance-preview">
+      <div class="enhance-preview-labels"><span>BEFORE</span><span>AFTER</span></div>
+      <video id="enhanceBefore" controls playsinline></video><video id="enhanceAfter" controls playsinline></video>
+      <div class="enhance-divider"></div>
+      <div class="enhance-preview-empty" id="enhanceEmpty">Select a video to preview your source.</div>
+    </div>
+    <div class="enhance-job"><span id="enhanceJobText">Ready when you are.</span><progress id="enhanceProgress" value="0" max="1" class="hide"></progress>
+      <button id="enhanceCancel" class="hide">Cancel</button><a id="enhanceDownload" class="hide" download>↓ Download finished video</a></div>
+    <p id="enhanceError" class="enhance-error"></p>
+  </section>
+  <aside class="enhance-settings">
+    <h2>Enhance Settings</h2><div id="enhanceGpu" class="enhance-gpu">● Checking local GPU…</div>
+    <div class="enhance-section"><label><input id="enhanceInterpolate" type="checkbox" checked> Frame interpolation</label>
+      <div class="enhance-field"><span>Engine</span><select id="enhanceInterpEngine"><option value="rife">RIFE · optical flow</option><option value="dlssg">DLSSG · NVIDIA</option></select></div>
+      <div id="enhanceRifeFields"><div class="enhance-field"><span>RIFE model</span><select id="enhanceRifeModel"></select></div>
+        <div class="enhance-field"><span>Frame multiplier</span><select id="enhanceMultiplier"><option value="2">2×</option><option value="4">4×</option></select></div></div>
+      <div id="enhanceDlssgFields" class="hide"><div class="enhance-field"><span>Output FPS</span><select id="enhanceFps"><option value="50">50 fps</option><option value="60" selected>60 fps</option></select></div></div>
+    </div>
+    <div class="enhance-section"><label><input id="enhanceUpscale" type="checkbox" checked> Video enhancement</label>
+      <div class="enhance-field"><span>Engine</span><select id="enhanceUpscaleEngine"><option value="dlss">DLSS · detail refinement (source size)</option><option value="rtx_vsr">RTX VSR · super resolution</option></select></div>
+      <div id="enhanceScaleField" class="hide enhance-field"><span>Output scale</span><select id="enhanceScale"><option value="1">1×</option><option value="1.5">1.5×</option><option value="2" selected>2×</option><option value="3">3×</option><option value="4">4×</option></select></div>
+      <div id="enhanceQualityField" class="hide enhance-field"><span>RTX VSR quality</span><select id="enhanceQuality"><option value="1">1 · Low</option><option value="2">2 · Medium</option><option value="3" selected>3 · High</option><option value="4">4 · Ultra</option></select></div>
+    </div>
+    <button id="enhanceRun" class="enhance-run" disabled>✦ &nbsp; Enhance video</button>
+    <div class="enhance-foot">Local GPU required. Processing time depends on clip length, resolution, and selected engines.</div>
+  </aside>
+</div>
 
 <!-- reels page -->
 <div id="pageReels" class="hide">
@@ -3092,16 +3143,85 @@ function loadFrames(session, frames){
 function showPage(p){
   $('#pageStudio').classList.toggle('hide',p!=='studio');
   $('#pageReels').classList.toggle('hide',p!=='reels');
+  $('#pageEnhance').classList.toggle('hide',p!=='enhance');
   $('#pageGallery').classList.toggle('hide',p!=='gallery');
   $('#pageNotes').classList.toggle('hide',p!=='notes');
   $('#pageAdmin').classList.toggle('hide',p!=='admin');
   $$('#nav .navitem').forEach(b=>b.classList.toggle('on',b.dataset.page===p));
   if(p==='reels')openReels();
+  if(p==='enhance')loadEnhanceCapabilities();
   if(p==='gallery')openGallery();
   if(p==='notes')openNotes();
   if(p==='admin')openAdmin();
 }
 $$('#nav .navitem').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
+
+// ===== local video enhancement =====
+let enhanceFile=null, enhanceUrl=null, enhanceJobId=null, enhancePoll=null, enhanceAvailable=false;
+function enhanceControls(){
+  $('#enhanceRifeFields').classList.toggle('hide',$('#enhanceInterpEngine').value!=='rife');
+  $('#enhanceDlssgFields').classList.toggle('hide',$('#enhanceInterpEngine').value!=='dlssg');
+  $('#enhanceQualityField').classList.toggle('hide',$('#enhanceUpscaleEngine').value!=='rtx_vsr');
+  $('#enhanceScaleField').classList.toggle('hide',$('#enhanceUpscaleEngine').value!=='rtx_vsr');
+  $('#enhanceRun').disabled=!enhanceFile||!enhanceAvailable||!!enhanceJobId||(!$('#enhanceInterpolate').checked&&!$('#enhanceUpscale').checked);
+}
+['enhanceInterpolate','enhanceInterpEngine','enhanceUpscale','enhanceUpscaleEngine'].forEach(id=>$('#'+id).onchange=enhanceControls);
+async function loadEnhanceCapabilities(){
+  try{
+    const response=await fetch('/api/enhance/capabilities');const d=await response.json();
+    enhanceAvailable=response.ok&&d.online&&(['rife','dlssg','dlss','rtx_vsr'].some(k=>d[k]?.available));
+    $('#enhanceGpu').textContent=enhanceAvailable?'● '+(d.gpu||'Local NVIDIA GPU')+(d.busy?' · busy':' · online'):'● Local GPU unavailable'+(d.error?' · '+d.error:'');
+    $('#enhanceGpu').classList.toggle('offline',!enhanceAvailable);
+    const models=d.rife?.models||[];
+    $('#enhanceRifeModel').innerHTML=models.map(m=>`<option value="${m}">${m.replace('.pth','')}</option>`).join('');
+    if(d.rife?.default)$('#enhanceRifeModel').value=d.rife.default;
+    $$('#enhanceInterpEngine option').forEach(o=>o.disabled=!d[o.value]?.available);
+    $$('#enhanceUpscaleEngine option').forEach(o=>o.disabled=!d[o.value]?.available);
+    if($('#enhanceInterpEngine').selectedOptions[0]?.disabled)$('#enhanceInterpEngine').value=d.rife?.available?'rife':'dlssg';
+    if($('#enhanceUpscaleEngine').selectedOptions[0]?.disabled)$('#enhanceUpscaleEngine').value=d.dlss?.available?'dlss':'rtx_vsr';
+  }catch(e){enhanceAvailable=false;$('#enhanceGpu').textContent='● Local GPU unavailable';$('#enhanceGpu').classList.add('offline');}
+  enhanceControls();
+}
+function selectEnhanceFile(file){
+  if(!file)return;enhanceFile=file;
+  if(enhanceUrl)URL.revokeObjectURL(enhanceUrl);
+  enhanceUrl=URL.createObjectURL(file);
+  $('#enhanceBefore').src=enhanceUrl;$('#enhanceAfter').removeAttribute('src');$('#enhanceAfter').load();
+  $('#enhanceEmpty').classList.add('hide');$('#enhanceSourceMeta').textContent=file.name+' · '+(file.size/1048576).toFixed(1)+' MB';
+  $('#enhanceJobText').textContent='Source selected · ready to enhance';$('#enhanceDownload').classList.add('hide');$('#enhanceError').textContent='';enhanceControls();
+}
+async function enhanceFromLibrary(url,name){
+  showPage('enhance');$('#enhanceJobText').textContent='Loading '+name+'…';
+  try{const r=await fetch(url);if(!r.ok)throw new Error('Could not load this video');const blob=await r.blob();selectEnhanceFile(new File([blob],name||'library.mp4',{type:blob.type||'video/mp4'}));}
+  catch(e){$('#enhanceError').textContent=String(e);$('#enhanceJobText').textContent='Choose another video.';}
+}
+$('#enhanceUpload').onclick=()=>$('#enhanceInput').click();
+$('#enhanceInput').onchange=e=>selectEnhanceFile(e.target.files[0]);
+$('#enhanceGallery').onclick=()=>showPage('gallery');$('#enhanceReels').onclick=()=>showPage('reels');
+$('#enhanceRun').onclick=async()=>{
+  enhanceControls();if($('#enhanceRun').disabled)return;
+  const options={interpolation:$('#enhanceInterpolate').checked?$('#enhanceInterpEngine').value:'off',
+    rife_model:$('#enhanceRifeModel').value||'rife49.pth',multiplier:+$('#enhanceMultiplier').value,fps:$('#enhanceFps').value,
+    upscaler:$('#enhanceUpscale').checked?$('#enhanceUpscaleEngine').value:'off',scale:+$('#enhanceScale').value,quality:+$('#enhanceQuality').value};
+  const body=new FormData();body.append('video',enhanceFile);body.append('options',JSON.stringify(options));
+  $('#enhanceRun').disabled=true;$('#enhanceJobText').textContent='Uploading to your Home Agent…';$('#enhanceError').textContent='';
+  try{const r=await fetch('/api/enhance/jobs',{method:'POST',body});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not start enhancement');
+    enhanceJobId=d.id;$('#enhanceProgress').classList.remove('hide');$('#enhanceCancel').classList.remove('hide');enhanceControls();enhancePoll=setInterval(pollEnhance,2500);pollEnhance();}
+  catch(e){$('#enhanceError').textContent=String(e);$('#enhanceJobText').textContent='Enhancement could not start.';enhanceControls();}
+};
+async function pollEnhance(){
+  if(!enhanceJobId)return;
+  try{const r=await fetch('/api/enhance/jobs/'+enhanceJobId);const d=await r.json();if(!r.ok)throw new Error(d.error||'Job unavailable');
+    $('#enhanceProgress').value=d.progress||0;$('#enhanceJobText').textContent=d.message||d.status;
+    if(['done','failed','cancelled'].includes(d.status)){
+      clearInterval(enhancePoll);$('#enhanceCancel').classList.add('hide');$('#enhanceProgress').classList.add('hide');
+      if(d.status==='done'){const url='/api/enhance/jobs/'+enhanceJobId+'/result';$('#enhanceAfter').src=url;$('#enhanceDownload').href=url;$('#enhanceDownload').classList.remove('hide');}
+      else if(d.status==='failed')$('#enhanceError').textContent=d.error||'Enhancement failed';
+      enhanceJobId=null;enhanceControls();
+    }
+  }catch(e){clearInterval(enhancePoll);$('#enhanceError').textContent=String(e);enhanceJobId=null;enhanceControls();}
+}
+$('#enhanceCancel').onclick=async()=>{if(!enhanceJobId)return;await fetch('/api/enhance/jobs/'+enhanceJobId+'/cancel',{method:'POST'});pollEnhance();};
 
 // ===== auth =====
 let IS_ADMIN=false;
@@ -3342,11 +3462,13 @@ function renderReelGrid(){
     <div class="meta"><div class="nm" title="${r.name}">${r.name}</div><div class="sz">${r.size_mb} MB</div></div>
     <div class="acts"><button class="use" data-key="${r.key}">→ Frame</button>
       <button class="usemotion" data-url="${r.url}" data-name="${r.name}">→ Motion</button></div>
+    <div class="acts" style="padding-top:0"><button class="reenhance" data-url="${r.url}" data-name="${r.name}">✦ Enhance locally</button></div>
     <div class="acts" style="padding-top:0"><button class="save" data-key="${r.key}">↓ Save</button>
       <button class="del" data-key="${r.key}">✕ Delete</button></div></div>`).join('');
   $$('#reelGrid img').forEach(im=>im.onclick=()=>openReelPlayer(im.dataset.url, im.dataset.name));
   $$('#reelGrid .use').forEach(b=>b.onclick=()=>useReel(b.dataset.key));
   $$('#reelGrid .usemotion').forEach(b=>b.onclick=()=>useReelMotion(b.dataset.url, b.dataset.name));
+  $$('#reelGrid .reenhance').forEach(b=>b.onclick=()=>enhanceFromLibrary(b.dataset.url,b.dataset.name));
   $$('#reelGrid .save').forEach(b=>b.onclick=async()=>{
     const d=await(await fetch('/api/reels/save-url?key='+encodeURIComponent(b.dataset.key))).json();
     if(d.url)window.location.href=d.url;});
@@ -3798,7 +3920,7 @@ function renderGallery() {
       ? `<img class="gal-video-thumb" src="${im.thumb_url || ''}" loading="lazy" data-url="${im.url}" data-name="${im.name}" style="cursor:pointer" alt="Video preview">`
       : `<img src="${im.thumb_url || im.url}" loading="lazy" data-url="${im.url}" onerror="this.onerror=null;this.src=this.dataset.url;">`;
     // "Use as Motion reference photo" only makes sense for images
-    const motionBtn = isVid ? '' : `<button class="gmotion" data-url="${im.url}" title="Use as Motion reference photo">→ Motion ref</button>`;
+    const motionBtn = isVid ? `<button class="genhance" data-url="${im.url}" data-name="${im.name}" title="Enhance locally">✦ Enhance</button>` : `<button class="gmotion" data-url="${im.url}" title="Use as Motion reference photo">→ Motion ref</button>`;
     return `<div class="gal-card${selClass}" data-key="${im.key}" data-index="${idx}">
       <div class="gcheck"><input type="checkbox" ${checked} data-key="${im.key}"></div>
       ${media}
@@ -3807,6 +3929,7 @@ function renderGallery() {
     </div>`;
   }).join('');
   $$('#galGrid .gmotion').forEach(b => b.onclick = e => { e.stopPropagation(); galToMotionRef(b.dataset.url); });
+  $$('#galGrid .genhance').forEach(b => b.onclick = e => { e.stopPropagation(); enhanceFromLibrary(b.dataset.url,b.dataset.name); });
 
   $$('#galGrid img').forEach(im => {
     if (im.classList.contains('gal-video-thumb')) {
