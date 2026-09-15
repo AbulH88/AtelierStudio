@@ -16,6 +16,7 @@ Optional env: RUNPOD_ENDPOINT_ID, RUNPOD_API_KEY (for cloud),
 """
 
 import base64
+import hashlib
 import os
 import platform
 import re
@@ -23,6 +24,7 @@ import subprocess
 import sys
 import threading
 import time
+import tempfile
 import uuid
 
 import requests
@@ -30,6 +32,8 @@ from functools import wraps
 from flask import (Flask, request, jsonify, send_from_directory, send_file, Response,
                    session, redirect)
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from cryptography.fernet import Fernet, InvalidToken
 
 # import the shared workflow logic from the repo root (one level up)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -105,6 +109,17 @@ CLOUD_GPU_OPTIONS = [
 RUNPOD_EP_URL = f"https://rest.runpod.io/v1/endpoints/{ENDPOINT_ID}"
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "qwen/qwen3-vl-235b-a22b-instruct")
+# RunningHub Cloud is deliberately independent from RunPod, ComfyUI, and the
+# Home Agent. These defaults match the published Scail 2 API workflow; keep
+# them overrideable so an exported RunningHub API workflow can change safely.
+RUNNINGHUB_BASE_URL = "https://www.runninghub.ai/openapi/v2"
+RUNNINGHUB_WORKFLOW_ID = os.environ.get("RUNNINGHUB_WORKFLOW_ID", "2099782685577601026")
+RUNNINGHUB_REFERENCE_NODE_ID = os.environ.get("RUNNINGHUB_REFERENCE_NODE_ID", "58")
+RUNNINGHUB_VIDEO_NODE_ID = os.environ.get("RUNNINGHUB_VIDEO_NODE_ID", "113")
+RUNNINGHUB_REFERENCE_FIELD = os.environ.get("RUNNINGHUB_REFERENCE_FIELD", "image")
+RUNNINGHUB_VIDEO_FIELD = os.environ.get("RUNNINGHUB_VIDEO_FIELD", "video")
+RUNNINGHUB_MAX_IMAGE_BYTES = 25 * 1024 * 1024
+RUNNINGHUB_MAX_VIDEO_BYTES = 500 * 1024 * 1024
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # So the app can start ComfyUI for you when it's not running (only used when
@@ -224,6 +239,33 @@ app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   PERMANENT_SESSION_LIFETIME=60 * 60 * 24 * 14)
 
 
+def _runninghub_fernet():
+    """Return the server-only cipher used for stored RunningHub credentials.
+
+    A dedicated RUNNINGHUB_CREDENTIAL_KEY is preferred. Falling back to the
+    persistent Flask secret keeps existing self-hosted installs working without
+    putting an API key in browser storage or source control.
+    """
+    material = os.environ.get("RUNNINGHUB_CREDENTIAL_KEY", app.secret_key)
+    digest = hashlib.sha256(material.encode("utf-8")).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def _encrypt_runninghub_key(key):
+    return _runninghub_fernet().encrypt(key.encode("utf-8")).decode("ascii")
+
+
+def _decrypt_runninghub_key(ciphertext):
+    try:
+        return _runninghub_fernet().decrypt(ciphertext.encode("ascii")).decode("utf-8")
+    except (InvalidToken, AttributeError, ValueError):
+        return ""
+
+
+def _mask_runninghub_key(key):
+    return "••••••••" + key[-4:] if len(key) >= 4 else "••••••••"
+
+
 def load_users():
     return _json.load(open(USERS_FILE, encoding="utf-8")) if os.path.exists(USERS_FILE) else {}
 
@@ -328,7 +370,8 @@ def api_signup():
     first = len(users) == 0   # the very first account becomes the admin
     users[u] = {"password": generate_password_hash(p),
                 "role": "admin" if first else "user",
-                "status": "active" if first else "pending"}
+                "status": "active" if first else "pending",
+                "runninghub_plus": False}
     save_users(users)
     return jsonify({"ok": True, "first": first, "status": users[u]["status"]})
 
@@ -349,7 +392,8 @@ def api_me():
 @admin_required
 def api_users():
     users = load_users()
-    return jsonify({"users": [{"username": k, "role": v["role"], "status": v["status"]}
+    return jsonify({"users": [{"username": k, "role": v["role"], "status": v["status"],
+                                "runninghub_plus": bool(v.get("runninghub_plus"))}
                               for k, v in sorted(users.items())]})
 
 
@@ -369,6 +413,11 @@ def api_user_action(name, action):
         users[name]["status"] = "disabled"
     elif action == "make-admin":
         users[name]["role"] = "admin"
+    elif action == "set-runninghub-plus":
+        enabled = (request.get_json(silent=True) or {}).get("enabled")
+        if not isinstance(enabled, bool):
+            return jsonify({"error": "enabled must be true or false"}), 400
+        users[name]["runninghub_plus"] = enabled
     elif action == "delete":
         if users[name]["role"] == "admin" and admins <= 1:
             return jsonify({"error": "cannot delete the last admin"}), 400
@@ -2261,6 +2310,311 @@ def _save_to_gallery(inp, images, seed):
         except Exception:
             pass  # non-fatal; grid just falls back to the full image
     return keys
+
+
+# ----------------------------- RunningHub Cloud -------------------------------
+# Cloud jobs persist on the Studio server. They never travel through the Home
+# Agent, so a job continues while the user's PC is off.
+RUNNINGHUB_JOBS_FILE = os.path.join(HERE, "runninghub_jobs.json")
+RUNNINGHUB_UPLOAD_DIR = os.path.join(HERE, "runninghub_uploads")
+RUNNINGHUB_JOBS_LOCK = threading.Lock()
+os.makedirs(RUNNINGHUB_UPLOAD_DIR, exist_ok=True)
+
+
+def _load_runninghub_jobs():
+    try:
+        data = _json.load(open(RUNNINGHUB_JOBS_FILE, encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+RUNNINGHUB_JOBS = _load_runninghub_jobs()
+
+
+def _save_runninghub_jobs():
+    tmp = RUNNINGHUB_JOBS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        _json.dump(RUNNINGHUB_JOBS, f, indent=2)
+    os.replace(tmp, RUNNINGHUB_JOBS_FILE)
+
+
+def _runninghub_update(job_id, **changes):
+    with RUNNINGHUB_JOBS_LOCK:
+        job = RUNNINGHUB_JOBS.get(job_id)
+        if not job:
+            return None
+        job.update(changes)
+        job["updated_at"] = int(time.time())
+        _save_runninghub_jobs()
+        return dict(job)
+
+
+def _runninghub_user_settings(username):
+    rec = load_users().get(username, {})
+    key = _decrypt_runninghub_key(rec.get("runninghub_key_enc", ""))
+    return {
+        "configured": bool(key),
+        "key_suffix": _mask_runninghub_key(key) if key else "",
+        "plus_allowed": bool(rec.get("runninghub_plus")),
+    }
+
+
+def _runninghub_upload(api_key, path, mime_type):
+    name = secure_filename(os.path.basename(path)) or "upload.bin"
+    with open(path, "rb") as f:
+        response = requests.post(
+            f"{RUNNINGHUB_BASE_URL}/media/upload/binary",
+            headers={"Authorization": f"Bearer {api_key}"},
+            files={"file": (name, f, mime_type)}, timeout=900)
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    if not response.ok or data.get("code") not in (0, "0", None):
+        raise RuntimeError(data.get("message") or data.get("msg") or
+                           f"RunningHub upload failed ({response.status_code}).")
+    file_name = (data.get("data") or {}).get("fileName")
+    if not file_name:
+        raise RuntimeError("RunningHub upload did not return a file name.")
+    return file_name
+
+
+def _runninghub_submit(api_key, image_name, video_name, instance_type):
+    payload = {
+        "addMetadata": True,
+        "nodeInfoList": [
+            {"nodeId": RUNNINGHUB_REFERENCE_NODE_ID, "fieldName": RUNNINGHUB_REFERENCE_FIELD,
+             "fieldValue": image_name},
+            {"nodeId": RUNNINGHUB_VIDEO_NODE_ID, "fieldName": RUNNINGHUB_VIDEO_FIELD,
+             "fieldValue": video_name},
+        ],
+        "instanceType": instance_type,
+        "usePersonalQueue": False,
+    }
+    response = requests.post(
+        f"{RUNNINGHUB_BASE_URL}/run/workflow/{RUNNINGHUB_WORKFLOW_ID}",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json=payload, timeout=90)
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    if not response.ok or not data.get("taskId"):
+        raise RuntimeError(data.get("errorMessage") or data.get("message") or
+                           f"RunningHub did not accept the task ({response.status_code}).")
+    return data
+
+
+def _runninghub_query(api_key, task_id):
+    response = requests.post(
+        f"{RUNNINGHUB_BASE_URL}/query",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"taskId": task_id}, timeout=60)
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    if not response.ok:
+        raise RuntimeError(data.get("errorMessage") or f"RunningHub status check failed ({response.status_code}).")
+    return data
+
+
+def _runninghub_import_result(job, result):
+    outputs = result.get("results") or []
+    video = next((o for o in outputs if str(o.get("outputType", "")).lower() in ("mp4", "mov", "webm")
+                  and o.get("url")), None)
+    if not video:
+        raise RuntimeError("RunningHub finished but returned no downloadable video.")
+    with tempfile.TemporaryDirectory(prefix="atelier-rh-") as td:
+        dst = os.path.join(td, "cloud-result." + str(video.get("outputType", "mp4")).lower())
+        response = requests.get(video["url"], stream=True, timeout=900)
+        response.raise_for_status()
+        with open(dst, "wb") as f:
+            for chunk in response.iter_content(65536):
+                if chunk:
+                    f.write(chunk)
+        if os.path.getsize(dst) < 1024:
+            raise RuntimeError("RunningHub returned an empty video file.")
+        # Gallery already streams arbitrary MP4 keys and lazily builds thumbs.
+        key = f"gallery/cloud/{int(time.time())}_{job['id']}.mp4"
+        r2_store.upload(dst, key)
+    return key
+
+
+def _runninghub_cleanup_uploads(job):
+    for path in (job.get("reference_path"), job.get("video_path")):
+        try:
+            if path and os.path.exists(path):
+                os.remove(path)
+        except OSError:
+            pass
+    try:
+        directory = os.path.dirname(job.get("reference_path") or "")
+        if directory and os.path.isdir(directory):
+            os.rmdir(directory)
+    except OSError:
+        pass
+
+
+def _runninghub_run(job_id):
+    """Upload, submit, poll, and import one persisted RunningHub job."""
+    try:
+        with RUNNINGHUB_JOBS_LOCK:
+            job = dict(RUNNINGHUB_JOBS.get(job_id) or {})
+        if not job:
+            return
+        api_key = _decrypt_runninghub_key(job.get("key_enc", ""))
+        if not api_key:
+            raise RuntimeError("The RunningHub key is unavailable for this job.")
+        task_id = job.get("task_id")
+        if not task_id:
+            _runninghub_update(job_id, status="uploading", message="Uploading reference image to RunningHub…")
+            image_name = _runninghub_upload(api_key, job["reference_path"], job.get("reference_type") or "image/png")
+            _runninghub_update(job_id, status="uploading", message="Uploading driving video to RunningHub…")
+            video_name = _runninghub_upload(api_key, job["video_path"], job.get("video_type") or "video/mp4")
+            _runninghub_update(job_id, status="submitting", message="Submitting Scail 2 to RunningHub…")
+            submitted = _runninghub_submit(api_key, image_name, video_name, job["instance_type"])
+            task_id = str(submitted["taskId"])
+            _runninghub_update(job_id, task_id=task_id, status="queued", message="Queued on RunningHub.")
+            _runninghub_cleanup_uploads(job)
+
+        deadline = time.time() + 45 * 60
+        while time.time() < deadline:
+            result = _runninghub_query(api_key, task_id)
+            state = str(result.get("status") or "").upper()
+            usage = result.get("usage") or {}
+            changes = {"rh_coins": usage.get("consumeCoins"), "runtime": usage.get("taskCostTime")}
+            if state in ("QUEUED", "PENDING"):
+                _runninghub_update(job_id, status="queued", message="Queued on RunningHub.", **changes)
+            elif state in ("RUNNING", "PROCESSING"):
+                _runninghub_update(job_id, status="running", message="Generating on RunningHub…", **changes)
+            elif state == "SUCCESS":
+                _runninghub_update(job_id, status="importing", message="Saving completed video to Gallery…", **changes)
+                with RUNNINGHUB_JOBS_LOCK:
+                    completed_job = dict(RUNNINGHUB_JOBS[job_id])
+                gallery_key = _runninghub_import_result(completed_job, result)
+                _runninghub_update(job_id, status="done", message="Saved to Gallery.", gallery_key=gallery_key, **changes)
+                return
+            elif state in ("FAILED", "CANCELLED", "ERROR"):
+                reason = result.get("errorMessage") or result.get("failedReason") or "RunningHub task failed."
+                _runninghub_update(job_id, status="failed", message="Cloud generation failed.", error=str(reason)[:1000], **changes)
+                return
+            time.sleep(5)
+        raise RuntimeError("RunningHub task did not finish within 45 minutes.")
+    except Exception as e:
+        _runninghub_update(job_id, status="failed", message="Cloud generation failed.",
+                           error=f"{type(e).__name__}: {e}")
+    finally:
+        with RUNNINGHUB_JOBS_LOCK:
+            existing = dict(RUNNINGHUB_JOBS.get(job_id) or {})
+        _runninghub_cleanup_uploads(existing)
+
+
+def _resume_runninghub_jobs():
+    """Resume polling confirmed tasks after a Studio restart without re-submitting."""
+    for job_id, job in list(RUNNINGHUB_JOBS.items()):
+        if job.get("task_id") and job.get("status") in {"queued", "running", "importing"}:
+            threading.Thread(target=_runninghub_run, args=(job_id,), daemon=True).start()
+        elif job.get("status") in {"uploading", "submitting"}:
+            # A restart here leaves task creation uncertain. Never submit again:
+            # the user can check RunningHub and retry safely if needed.
+            _runninghub_update(job_id, status="failed", message="Cloud job needs review.",
+                               error="Studio restarted before RunningHub task confirmation; check RunningHub before retrying.")
+
+
+_resume_runninghub_jobs()
+
+
+@app.get("/api/runninghub/settings")
+def runninghub_settings():
+    username = session["user"]
+    return jsonify({**_runninghub_user_settings(username), "workflow_id": RUNNINGHUB_WORKFLOW_ID,
+                    "standard": "default", "plus": "plus"})
+
+
+@app.put("/api/runninghub/settings")
+def runninghub_save_settings():
+    key = (request.get_json(force=True).get("api_key") or "").strip()
+    if len(key) < 16:
+        return jsonify({"error": "Enter a valid RunningHub API key."}), 400
+    users = load_users()
+    users[session["user"]]["runninghub_key_enc"] = _encrypt_runninghub_key(key)
+    save_users(users)
+    return jsonify({"ok": True, **_runninghub_user_settings(session["user"])})
+
+
+@app.delete("/api/runninghub/settings")
+def runninghub_delete_settings():
+    users = load_users()
+    users[session["user"]].pop("runninghub_key_enc", None)
+    save_users(users)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/runninghub/jobs")
+def runninghub_create_job():
+    username = session["user"]
+    settings = _runninghub_user_settings(username)
+    if not settings["configured"]:
+        return jsonify({"error": "Save your RunningHub API key before starting a cloud job."}), 400
+    reference, video = request.files.get("reference"), request.files.get("video")
+    if not reference or not video or not reference.filename or not video.filename:
+        return jsonify({"error": "A reference image and driving video are required."}), 400
+    if (request.content_length or 0) > RUNNINGHUB_MAX_IMAGE_BYTES + RUNNINGHUB_MAX_VIDEO_BYTES + 1024 * 1024:
+        return jsonify({"error": "Files are too large for Cloud upload."}), 413
+    requested = (request.form.get("instance_type") or "default").strip().lower()
+    if requested not in ("default", "plus"):
+        return jsonify({"error": "Unsupported RunningHub instance."}), 400
+    if requested == "plus" and not settings["plus_allowed"]:
+        return jsonify({"error": "Plus is not enabled for your account."}), 403
+    job_id = uuid.uuid4().hex
+    job_dir = os.path.join(RUNNINGHUB_UPLOAD_DIR, job_id)
+    os.makedirs(job_dir, exist_ok=False)
+    reference_path = os.path.join(job_dir, "reference_" + (secure_filename(reference.filename) or "image.png"))
+    video_path = os.path.join(job_dir, "driving_" + (secure_filename(video.filename) or "video.mp4"))
+    reference.save(reference_path)
+    video.save(video_path)
+    if os.path.getsize(reference_path) > RUNNINGHUB_MAX_IMAGE_BYTES or os.path.getsize(video_path) > RUNNINGHUB_MAX_VIDEO_BYTES:
+        _runninghub_cleanup_uploads({"reference_path": reference_path, "video_path": video_path})
+        return jsonify({"error": "Reference image or driving video exceeds the Cloud upload limit."}), 413
+    users = load_users()
+    job = {"id": job_id, "user": username, "status": "submitting", "message": "Preparing cloud job…",
+           "created_at": int(time.time()), "updated_at": int(time.time()), "instance_type": requested,
+           "workflow_id": RUNNINGHUB_WORKFLOW_ID, "key_enc": users[username]["runninghub_key_enc"],
+           "reference_path": reference_path, "reference_type": reference.mimetype,
+           "video_path": video_path, "video_type": video.mimetype}
+    with RUNNINGHUB_JOBS_LOCK:
+        RUNNINGHUB_JOBS[job_id] = job
+        _save_runninghub_jobs()
+    threading.Thread(target=_runninghub_run, args=(job_id,), daemon=True).start()
+    return jsonify({"id": job_id, "status": "submitting"}), 202
+
+
+def _runninghub_public_job(job):
+    safe = {k: v for k, v in job.items() if k not in {"key_enc", "reference_path", "video_path"}}
+    if safe.get("gallery_key"):
+        from urllib.parse import quote
+        safe["gallery_url"] = f"/api/media?key={quote(safe['gallery_key'], safe='')}"
+    return safe
+
+
+@app.get("/api/runninghub/jobs")
+def runninghub_list_jobs():
+    username = session["user"]
+    with RUNNINGHUB_JOBS_LOCK:
+        jobs = [_runninghub_public_job(dict(j)) for j in RUNNINGHUB_JOBS.values() if j.get("user") == username]
+    jobs.sort(key=lambda j: j.get("created_at", 0), reverse=True)
+    return jsonify({"jobs": jobs[:30]})
+
+
+@app.get("/api/runninghub/jobs/<job_id>")
+def runninghub_get_job(job_id):
+    with RUNNINGHUB_JOBS_LOCK:
+        job = dict(RUNNINGHUB_JOBS.get(job_id) or {})
+    if not job or job.get("user") != session["user"]:
+        return jsonify({"error": "Cloud job not found."}), 404
+    return jsonify(_runninghub_public_job(job))
 
 
 @app.get("/api/gallery/groups")

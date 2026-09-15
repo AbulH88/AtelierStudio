@@ -2,3 +2,5 @@ runpod
 requests
 websocket-client
 Pillow
+cryptography
+flask

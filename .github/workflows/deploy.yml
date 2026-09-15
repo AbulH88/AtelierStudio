@@ -57,8 +57,9 @@ jobs:
             workflow_krea2carousel.json workflow_scail2motion.json workflow_scail2motionv2.json workflow_scail2motiondirecttest.json \
             workflow_ltx25i2v.json \
             webapp/app.py webapp/r2_store.py webapp/index.html webapp/login.html \
+            requirements.txt \
             webapp/.krea2_models.json webapp/.krea2_helpers.json \
           | ssh -i ~/.ssh/deploy_key -p "$PORT" \
               -o StrictHostKeyChecking=accept-new \
               "$USER@$HOST" \
-              "tar xzf - -C /root/atelier && systemctl restart atelier && echo 'deployed + atelier restarted'"
+              "tar xzf - -C /root/atelier && (python3 -c 'import cryptography' 2>/dev/null || python3 -m pip install cryptography) && systemctl restart atelier && echo 'deployed + atelier restarted'"
