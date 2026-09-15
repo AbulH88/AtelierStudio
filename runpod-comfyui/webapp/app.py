@@ -2650,9 +2650,15 @@ def _runninghub_public_job(job):
 def runninghub_list_jobs():
     username = session["user"]
     with RUNNINGHUB_JOBS_LOCK:
-        jobs = [_runninghub_public_job(dict(j)) for j in RUNNINGHUB_JOBS.values() if j.get("user") == username]
+        user_jobs = [dict(j) for j in RUNNINGHUB_JOBS.values() if j.get("user") == username]
+    user_jobs.sort(key=lambda j: j.get("created_at", 0), reverse=True)
+    # Cloud is a live work surface, not an archive. Keep every active task
+    # visible, plus only the latest completed video for immediate download.
+    active = [j for j in user_jobs if j.get("status") in {"uploading", "submitting", "queued", "running", "importing"}]
+    latest_done = next((j for j in user_jobs if j.get("status") == "done"), None)
+    jobs = active + ([latest_done] if latest_done else [])
     jobs.sort(key=lambda j: j.get("created_at", 0), reverse=True)
-    return jsonify({"jobs": jobs[:30]})
+    return jsonify({"jobs": [_runninghub_public_job(j) for j in jobs]})
 
 
 @app.get("/api/runninghub/jobs/<job_id>")

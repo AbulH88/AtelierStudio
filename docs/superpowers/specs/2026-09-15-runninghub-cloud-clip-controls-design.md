@@ -41,11 +41,13 @@ RunningHub's actual runtime and RH coin usage.
 
 ## Completed video access
 
-Each completed Cloud job expands below its compact detail row. The expanded
-card plays the Studio Gallery copy of the MP4 and provides a direct `Download
-MP4` link alongside `Open Gallery`. The player never relies on RunningHub's
-temporary result URL, so it remains available after the 24-hour RunningHub link
-expires. Queued, running, and failed jobs remain compact.
+Cloud remains a lightweight live-work surface: it shows every active job and
+only the newest completed job. That completed card plays the Studio Gallery
+copy of the MP4 and provides a direct `Download MP4` link alongside `Open
+Gallery`. Older completed and failed jobs are not rendered on Cloud; users find
+all finished outputs in Gallery. The player never relies on RunningHub's
+temporary result URL, so the newest result remains available after the 24-hour
+RunningHub link expires.
 
 ## Verification
 

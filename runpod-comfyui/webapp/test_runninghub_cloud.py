@@ -100,3 +100,14 @@ def test_public_completed_job_has_preview_download_and_timing():
     assert public["gallery_url"].endswith("gallery%2Fcloud%2Fvideo.mp4")
     assert public["download_url"].endswith("gallery%2Fcloud%2Fvideo.mp4&download=1")
     assert public["elapsed_seconds"] >= 0
+
+
+def test_job_list_keeps_active_and_latest_completed_only(maker_client, monkeypatch):
+    monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {
+        "done-old": {"id": "done-old", "user": "maker", "status": "done", "created_at": 1},
+        "failed": {"id": "failed", "user": "maker", "status": "failed", "created_at": 2},
+        "done-new": {"id": "done-new", "user": "maker", "status": "done", "created_at": 3},
+        "running": {"id": "running", "user": "maker", "status": "running", "created_at": 4},
+    })
+    job_ids = [job["id"] for job in maker_client.get("/api/runninghub/jobs").get_json()["jobs"]]
+    assert job_ids == ["running", "done-new"]

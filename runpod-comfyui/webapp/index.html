@@ -1566,7 +1566,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
       <div class="cloud-control"><div class="cloud-control-head"><h2>Scail 2 output</h2><small>Direct resolution before any local enhancement</small></div><div class="cloud-fixed"><span><b>Runtime</b> Standard by default</span><span><b>Resolution</b> 720 × 1280</span><span><b>Workflow</b> Scail 2</span></div><div class="cloud-clip-controls"><label>Start at<select id="cloudStartAt"><option value="0">0 seconds</option><option value="1">1 second</option><option value="2">2 seconds</option><option value="3">3 seconds</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="10">10 seconds</option></select></label><label>Generate<select id="cloudDuration"><option value="full">Full clip</option><option value="3">3 seconds</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="10">10 seconds</option></select></label><label>Frame sampling<select id="cloudSampling"><option value="1">Every frame</option><option value="2">Every 2nd frame</option><option value="3">Every 3rd frame</option></select></label></div><button id="cloudRun" class="cloud-run" disabled>✦ &nbsp; Generate on RunningHub</button><p id="cloudError" class="cloud-error"></p></div>
     </section>
     <aside class="cloud-settings"><h2>Cloud Settings</h2><div id="cloudConnection" class="cloud-connected off">● RunningHub key required</div><div class="cloud-field"><span>API key</span><div class="cloud-key-row"><input id="cloudApiKey" type="password" autocomplete="off" placeholder="Paste your RunningHub API key"><button id="cloudSaveKey" type="button">Save</button></div><small id="cloudKeyHint" class="hint">Your key is encrypted on the Studio server.</small></div><button id="cloudRemoveKey" class="cloud-manage hide" type="button">Remove saved key</button><div class="cloud-field"><span>Instance</span><select id="cloudInstance"><option value="default">Standard · 24 GB VRAM</option><option id="cloudPlusOption" value="plus" class="hide">Plus · 48 GB VRAM</option></select></div><div class="cloud-field"><span>Published workflow</span><input id="cloudWorkflow" readonly value="Scail 2 · 720 × 1280"></div><p class="enhance-foot">Cloud jobs use only RunningHub. RIFE, DLSS, and RTX enhancement remain local tools.</p></aside>
-    <section class="cloud-jobs"><h2>Cloud jobs</h2><div id="cloudJobList" class="cloud-job-list"><div class="cloud-empty">No Cloud jobs yet.</div></div></section>
+    <section class="cloud-jobs"><h2>Current Cloud job</h2><div id="cloudJobList" class="cloud-job-list"><div class="cloud-empty">No active Cloud job. Your completed videos are in Gallery.</div></div></section>
   </div>
 </div>
 
@@ -3262,7 +3262,7 @@ $('#cloudReferenceInput').onchange=e=>selectCloudFile('reference',e.target.files
 $('#cloudVideoInput').onchange=e=>selectCloudFile('video',e.target.files[0]);
 function renderCloudJobs(jobs){
   const list=$('#cloudJobList');list.replaceChildren();
-  if(!jobs.length){const empty=document.createElement('div');empty.className='cloud-empty';empty.textContent='No Cloud jobs yet.';list.append(empty);return;}
+  if(!jobs.length){const empty=document.createElement('div');empty.className='cloud-empty';empty.textContent='No active Cloud job. Your completed videos are in Gallery.';list.append(empty);return;}
   jobs.forEach(job=>{
     const card=document.createElement('article');card.className='cloud-job-card';
     const row=document.createElement('div');row.className='cloud-job';
