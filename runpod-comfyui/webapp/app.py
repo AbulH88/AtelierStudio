@@ -1504,8 +1504,6 @@ def _build_input(body):
         inp["upscale"] = bool(body.get("upscale", False))   # 2x RTX super-res + RIFE tail
         if inp["mode"] == "scail2motionv2":
             inp["generation_resolution"] = body.get("generation_resolution", "720p")
-        elif inp["mode"] == "scail2motiondirecttest":
-            inp["direct_resolution"] = body.get("direct_resolution", "720p")
     elif inp["mode"] == "adv":   # INSTARAW advanced (LOCAL only): t2i + image-guided i2i
         inp["img2img"] = bool(body.get("img2img", False))
         inp["aspect"] = body.get("aspect", "3:4 (Portrait)")

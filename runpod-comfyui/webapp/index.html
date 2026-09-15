@@ -1087,12 +1087,8 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
           <span class="hint" style="color:var(--faint);font-size:12px">reference photo is cropped to the driving-video shape first</span>
         </div>
         <div class="inline hide" id="mScailDirectResolutionField" style="margin-top:14px;gap:10px">
-          <label for="mScailDirectResolution">Direct resolution <span style="color:var(--faint)">· before RTX</span></label>
-          <select id="mScailDirectResolution" style="min-width:220px;background:var(--ink2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font-family:var(--mono)">
-            <option value="480p">480p · 480×864</option>
-            <option value="720p" selected>720p · 704×1280</option>
-            <option value="1080p">1080p · 1088×1920</option>
-          </select>
+          <label>Direct resolution <span style="color:var(--faint)">· before RTX</span></label>
+          <strong style="font:600 16px var(--mono);color:var(--amber)">720p · 720×1280</strong>
           <label style="color:var(--faint)">fixed portrait crop + direct SCAIL size</label>
         </div>
         <div class="inline" style="margin-top:14px;gap:10px">
@@ -3549,7 +3545,6 @@ $('#go').onclick=async()=>{
     body.prompt=$('#mPrompt').value.trim();
     body.upscale=$('#mUpscaleSw').classList.contains('on');
     if(S.mode==='scail2motionv2') body.generation_resolution=$('#mScailTestResolution').value;
-    if(S.mode==='scail2motiondirecttest') body.direct_resolution=$('#mScailDirectResolution').value;
   }
   else if(S.mode==='ltx25i2v'){
     try{ body.image_b64=await _fileToB64(S.ltxImg); }

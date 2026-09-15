@@ -15,7 +15,7 @@ def _load_graph():
 
 def test_direct_test_uses_fixed_portrait_dimensions_before_scail():
     graph = _load_graph()
-    assert graph["sc2_target_width"]["inputs"]["value"] == 704
+    assert graph["sc2_target_width"]["inputs"]["value"] == 720
     assert graph["sc2_target_height"]["inputs"]["value"] == 1280
     assert graph["sc2_target_width"]["class_type"] == "PrimitiveInt"
     assert graph["sc2_target_height"]["class_type"] == "PrimitiveInt"
@@ -29,19 +29,6 @@ def test_direct_test_uses_fixed_portrait_dimensions_before_scail():
     assert graph["56"]["inputs"]["image"] == ["sc2_ref_crop", 0]
     assert graph["116"]["inputs"]["images"] == ["sc2_ref_crop", 0]
     assert graph["132"]["inputs"]["reference_image"] == ["sc2_ref_crop", 0]
-
-
-def test_direct_resolution_presets_and_safe_default():
-    expected = {"480p": (480, 864), "720p": (704, 1280), "1080p": (1088, 1920),
-                "bad": (704, 1280), None: (704, 1280)}
-    for preset, size in expected.items():
-        graph = _load_graph()
-        inp = {"prompt": "x"}
-        if preset is not None:
-            inp["direct_resolution"] = preset
-        out = cc._build_scail2motion(graph, inp, seed=1, video_name="v.mp4", ref_name="r.png")
-        assert out["sc2_target_width"]["inputs"]["value"] == size[0]
-        assert out["sc2_target_height"]["inputs"]["value"] == size[1]
 
 
 def test_direct_test_uses_the_installed_scail2_model_path():

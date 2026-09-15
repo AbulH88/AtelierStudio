@@ -83,7 +83,7 @@
     "_meta": {"title": "Crop Reference to Driving Video"}
   },
   "sc2_target_width": {
-    "inputs": {"value": 704},
+    "inputs": {"value": 720},
     "class_type": "PrimitiveInt",
     "_meta": {"title": "Direct Generation Width"}
   },

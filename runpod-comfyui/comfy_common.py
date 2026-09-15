@@ -651,12 +651,6 @@ def _build_scail2motion(graph, inp, seed, video_name, ref_name):
         resolution_megapixels = {"480p": 0.4, "720p": 0.9, "1080p": 2.1}
         graph["102"]["inputs"]["resize_type.megapixels"] = resolution_megapixels.get(
             inp.get("generation_resolution"), resolution_megapixels["720p"])
-    if "direct_resolution" in inp:
-        direct_sizes = {"480p": (480, 864), "720p": (704, 1280),
-                        "1080p": (1088, 1920)}
-        width, height = direct_sizes.get(inp.get("direct_resolution"), direct_sizes["720p"])
-        graph["sc2_target_width"]["inputs"]["value"] = width
-        graph["sc2_target_height"]["inputs"]["value"] = height
     graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
     graph[nm["sampler"]]["inputs"]["seed"] = seed
     if inp.get("character_lora_path"):
