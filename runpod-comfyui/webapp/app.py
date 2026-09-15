@@ -118,6 +118,10 @@ RUNNINGHUB_REFERENCE_NODE_ID = os.environ.get("RUNNINGHUB_REFERENCE_NODE_ID", "5
 RUNNINGHUB_VIDEO_NODE_ID = os.environ.get("RUNNINGHUB_VIDEO_NODE_ID", "113")
 RUNNINGHUB_REFERENCE_FIELD = os.environ.get("RUNNINGHUB_REFERENCE_FIELD", "image")
 RUNNINGHUB_VIDEO_FIELD = os.environ.get("RUNNINGHUB_VIDEO_FIELD", "video")
+RUNNINGHUB_VIDEO_FPS = 24
+# Standard Scail 2 on RunningHub has been measured at about ten minutes for a
+# short clip. This is only used to label an estimate while the task runs.
+RUNNINGHUB_STANDARD_ESTIMATE_SECONDS = 10 * 60
 RUNNINGHUB_MAX_IMAGE_BYTES = 25 * 1024 * 1024
 RUNNINGHUB_MAX_VIDEO_BYTES = 500 * 1024 * 1024
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -2380,7 +2384,8 @@ def _runninghub_upload(api_key, path, mime_type):
     return file_name
 
 
-def _runninghub_submit(api_key, image_name, video_name, instance_type):
+def _runninghub_submit(api_key, image_name, video_name, instance_type, clip):
+    """Submit Scail 2 with the published VHS_LoadVideo controls on node 113."""
     payload = {
         "addMetadata": True,
         "nodeInfoList": [
@@ -2388,6 +2393,14 @@ def _runninghub_submit(api_key, image_name, video_name, instance_type):
              "fieldValue": image_name},
             {"nodeId": RUNNINGHUB_VIDEO_NODE_ID, "fieldName": RUNNINGHUB_VIDEO_FIELD,
              "fieldValue": video_name},
+            {"nodeId": RUNNINGHUB_VIDEO_NODE_ID, "fieldName": "force_rate",
+             "fieldValue": str(RUNNINGHUB_VIDEO_FPS)},
+            {"nodeId": RUNNINGHUB_VIDEO_NODE_ID, "fieldName": "skip_first_frames",
+             "fieldValue": str(clip["skip_first_frames"])},
+            {"nodeId": RUNNINGHUB_VIDEO_NODE_ID, "fieldName": "frame_load_cap",
+             "fieldValue": str(clip["frame_load_cap"])},
+            {"nodeId": RUNNINGHUB_VIDEO_NODE_ID, "fieldName": "select_every_nth",
+             "fieldValue": str(clip["select_every_nth"])},
         ],
         "instanceType": instance_type,
         "usePersonalQueue": False,
@@ -2474,7 +2487,9 @@ def _runninghub_run(job_id):
             _runninghub_update(job_id, status="uploading", message="Uploading driving video to RunningHub…")
             video_name = _runninghub_upload(api_key, job["video_path"], job.get("video_type") or "video/mp4")
             _runninghub_update(job_id, status="submitting", message="Submitting Scail 2 to RunningHub…")
-            submitted = _runninghub_submit(api_key, image_name, video_name, job["instance_type"])
+            clip = job.get("clip") or {"skip_first_frames": 0, "frame_load_cap": 0,
+                                        "select_every_nth": 1}
+            submitted = _runninghub_submit(api_key, image_name, video_name, job["instance_type"], clip)
             task_id = str(submitted["taskId"])
             _runninghub_update(job_id, task_id=task_id, status="queued", message="Queued on RunningHub.")
             _runninghub_cleanup_uploads(job)
@@ -2568,6 +2583,31 @@ def runninghub_create_job():
         return jsonify({"error": "Unsupported RunningHub instance."}), 400
     if requested == "plus" and not settings["plus_allowed"]:
         return jsonify({"error": "Plus is not enabled for your account."}), 403
+    try:
+        start_seconds = int(request.form.get("start_seconds") or 0)
+        duration_value = (request.form.get("duration_seconds") or "full").strip().lower()
+        select_every_nth = int(request.form.get("select_every_nth") or 1)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Cloud clip controls must be valid numbers."}), 400
+    if start_seconds < 0 or start_seconds > 600:
+        return jsonify({"error": "Start time must be between 0 and 600 seconds."}), 400
+    if duration_value == "full":
+        frame_load_cap = 0
+        duration_seconds = None
+    else:
+        try:
+            duration_seconds = int(duration_value)
+        except ValueError:
+            return jsonify({"error": "Choose Full clip or a valid duration."}), 400
+        if duration_seconds not in (3, 5, 8, 10):
+            return jsonify({"error": "Choose 3, 5, 8, 10 seconds, or Full clip."}), 400
+        frame_load_cap = duration_seconds * RUNNINGHUB_VIDEO_FPS
+    if select_every_nth not in (1, 2, 3):
+        return jsonify({"error": "Frame sampling must be every 1, 2, or 3 frames."}), 400
+    clip = {"start_seconds": start_seconds, "duration_seconds": duration_seconds,
+            "force_rate": RUNNINGHUB_VIDEO_FPS,
+            "skip_first_frames": start_seconds * RUNNINGHUB_VIDEO_FPS,
+            "frame_load_cap": frame_load_cap, "select_every_nth": select_every_nth}
     job_id = uuid.uuid4().hex
     job_dir = os.path.join(RUNNINGHUB_UPLOAD_DIR, job_id)
     os.makedirs(job_dir, exist_ok=False)
@@ -2583,7 +2623,8 @@ def runninghub_create_job():
            "created_at": int(time.time()), "updated_at": int(time.time()), "instance_type": requested,
            "workflow_id": RUNNINGHUB_WORKFLOW_ID, "key_enc": users[username]["runninghub_key_enc"],
            "reference_path": reference_path, "reference_type": reference.mimetype,
-           "video_path": video_path, "video_type": video.mimetype}
+           "video_path": video_path, "video_type": video.mimetype, "clip": clip,
+           "estimated_total_seconds": RUNNINGHUB_STANDARD_ESTIMATE_SECONDS if requested == "default" else None}
     with RUNNINGHUB_JOBS_LOCK:
         RUNNINGHUB_JOBS[job_id] = job
         _save_runninghub_jobs()
@@ -2593,9 +2634,15 @@ def runninghub_create_job():
 
 def _runninghub_public_job(job):
     safe = {k: v for k, v in job.items() if k not in {"key_enc", "reference_path", "video_path"}}
+    elapsed = max(0, int(time.time()) - int(safe.get("created_at") or time.time()))
+    safe["elapsed_seconds"] = elapsed
+    if safe.get("status") in {"uploading", "submitting", "running", "importing"} and safe.get("estimated_total_seconds"):
+        safe["estimated_remaining_seconds"] = max(0, safe["estimated_total_seconds"] - elapsed)
     if safe.get("gallery_key"):
         from urllib.parse import quote
-        safe["gallery_url"] = f"/api/media?key={quote(safe['gallery_key'], safe='')}"
+        url_key = quote(safe["gallery_key"], safe="")
+        safe["gallery_url"] = f"/api/media?key={url_key}"
+        safe["download_url"] = f"/api/media?key={url_key}&download=1"
     return safe
 
 

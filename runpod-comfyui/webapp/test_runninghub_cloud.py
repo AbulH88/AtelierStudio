@@ -65,7 +65,7 @@ def test_admin_can_enable_plus(users):
     assert users["maker"]["runninghub_plus"] is True
 
 
-def test_submit_uses_published_image_and_video_nodes(monkeypatch):
+def test_submit_uses_published_image_video_and_clip_nodes(monkeypatch):
     seen = {}
 
     class Response:
@@ -80,10 +80,23 @@ def test_submit_uses_published_image_and_video_nodes(monkeypatch):
         return Response()
 
     monkeypatch.setattr(A.requests, "post", fake_post)
-    response = A._runninghub_submit("key", "api/ref.png", "api/drive.mp4", "default")
+    clip = {"skip_first_frames": 48, "frame_load_cap": 120, "select_every_nth": 2}
+    response = A._runninghub_submit("key", "api/ref.png", "api/drive.mp4", "default", clip)
     assert response["taskId"] == "task-123"
     assert seen["payload"]["instanceType"] == "default"
     assert seen["payload"]["nodeInfoList"] == [
         {"nodeId": A.RUNNINGHUB_REFERENCE_NODE_ID, "fieldName": A.RUNNINGHUB_REFERENCE_FIELD, "fieldValue": "api/ref.png"},
         {"nodeId": A.RUNNINGHUB_VIDEO_NODE_ID, "fieldName": A.RUNNINGHUB_VIDEO_FIELD, "fieldValue": "api/drive.mp4"},
+        {"nodeId": A.RUNNINGHUB_VIDEO_NODE_ID, "fieldName": "force_rate", "fieldValue": "24"},
+        {"nodeId": A.RUNNINGHUB_VIDEO_NODE_ID, "fieldName": "skip_first_frames", "fieldValue": "48"},
+        {"nodeId": A.RUNNINGHUB_VIDEO_NODE_ID, "fieldName": "frame_load_cap", "fieldValue": "120"},
+        {"nodeId": A.RUNNINGHUB_VIDEO_NODE_ID, "fieldName": "select_every_nth", "fieldValue": "2"},
     ]
+
+
+def test_public_completed_job_has_preview_download_and_timing():
+    job = {"id": "job", "created_at": 0, "status": "done", "gallery_key": "gallery/cloud/video.mp4"}
+    public = A._runninghub_public_job(job)
+    assert public["gallery_url"].endswith("gallery%2Fcloud%2Fvideo.mp4")
+    assert public["download_url"].endswith("gallery%2Fcloud%2Fvideo.mp4&download=1")
+    assert public["elapsed_seconds"] >= 0
