@@ -3820,7 +3820,7 @@ function renderGallery() {
     const checked = isSel ? 'checked' : '';
     const isVid = _isVid(im.name);
     const media = isVid
-      ? `<video src="${im.url}" data-url="${im.url}" data-name="${im.name}" muted preload="metadata" style="cursor:pointer" onmouseover="this.play()" onmouseout="this.pause();this.currentTime=0"></video>`
+      ? `<img class="gal-video-thumb" src="${im.thumb_url || ''}" loading="lazy" data-url="${im.url}" data-name="${im.name}" style="cursor:pointer" alt="Video preview">`
       : `<img src="${im.thumb_url || im.url}" loading="lazy" data-url="${im.url}" onerror="this.onerror=null;this.src=this.dataset.url;">`;
     // "Use as Motion reference photo" only makes sense for images
     const motionBtn = isVid ? '' : `<button class="gmotion" data-url="${im.url}" title="Use as Motion reference photo">→ Motion ref</button>`;
@@ -3834,13 +3834,14 @@ function renderGallery() {
   $$('#galGrid .gmotion').forEach(b => b.onclick = e => { e.stopPropagation(); galToMotionRef(b.dataset.url); });
 
   $$('#galGrid img').forEach(im => {
+    if (im.classList.contains('gal-video-thumb')) {
+      im.onclick = (e) => { e.stopPropagation(); openReelPlayer(im.dataset.url, im.dataset.name); };
+      return;
+    }
     im.onclick = (e) => {
       $('#imgviewImg').src = im.dataset.url;
       $('#imgview').classList.add('on');
     };
-  });
-  $$('#galGrid video').forEach(v => {
-    v.onclick = (e) => { e.stopPropagation(); openReelPlayer(v.dataset.url, v.dataset.name); };
   });
   
   $$('#galGrid .gdel').forEach(b => {

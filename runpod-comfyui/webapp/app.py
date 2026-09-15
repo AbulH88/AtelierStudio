@@ -1311,16 +1311,22 @@ def _ensure_thumb(thumb_key):
     the normal not-found path and pick it up on the next load."""
     if not thumb_key.startswith("thumbs/") or not thumb_key.endswith(".webp"):
         return None
-    src_key = "gallery/" + thumb_key[len("thumbs/"):-len(".webp")] + ".png"
+    stem = "gallery/" + thumb_key[len("thumbs/"):-len(".webp")]
     with _THUMB_BUILD_LOCK:
         if thumb_key in _THUMB_BUILDING:
             return None
         _THUMB_BUILDING.add(thumb_key)
     try:
-        src = r2_store.stream(src_key, None)
-        if src.status_code != 200:
+        thumb = None
+        for ext in (".png", ".mp4", ".mov", ".webm"):
+            src = r2_store.stream(stem + ext, None)
+            if src.status_code != 200:
+                continue
+            thumb = _make_thumb(src.content) if ext == ".png" else _make_video_thumb(src.content)
+            if thumb is not None:
+                break
+        if thumb is None:
             return None
-        thumb = _make_thumb(src.content)
         r2_store.upload_bytes(thumb_key, thumb)
         return thumb
     except Exception:
@@ -1957,6 +1963,12 @@ def _run_gen_job(job_id, target, inp, body):
                     muxed.append(base64.b64encode(raw).decode())
                     key = f"gallery/{group}/{ts}_{seed}_{i}.mp4"
                     r2_store.upload_bytes(key, raw)
+                    try:
+                        thumb = _make_video_thumb(raw)
+                        if thumb is not None:
+                            r2_store.upload_bytes(f"thumbs/{group}/{ts}_{seed}_{i}.webp", thumb)
+                    except Exception:
+                        pass
                     urls.append(f"/api/media?key={key}")
             except Exception:
                 muxed, urls = vids, []          # R2/mux failed -> fall back to base64
@@ -2093,6 +2105,24 @@ def _make_thumb(png_bytes, max_dim=480, quality=72):
     return buf.getvalue()
 
 
+def _make_video_thumb(video_bytes, max_width=480, quality=72):
+    """Extract one small WebP preview without exposing the private source video."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        src = os.path.join(td, "source.mp4")
+        dst = os.path.join(td, "thumb.webp")
+        with open(src, "wb") as f:
+            f.write(video_bytes)
+        result = subprocess.run([
+            "ffmpeg", "-y", "-ss", "0.25", "-i", src, "-frames:v", "1",
+            "-vf", f"scale={max_width}:-2", "-c:v", "libwebp", "-q:v", str(quality), dst,
+        ], capture_output=True, timeout=45)
+        if result.returncode != 0 or not os.path.exists(dst):
+            return None
+        with open(dst, "rb") as f:
+            return f.read()
+
+
 def _save_to_gallery(inp, images, seed):
     """Persist each generated image to R2. Returns the list of R2 keys written,
     so the result can be served as lightweight URLs instead of base64 blobs.
@@ -2135,13 +2165,12 @@ def gallery_list():
     group = request.args.get("group", "")
     prefix = f"gallery/{group}/" if group else "gallery/"
     imgs = r2_store.list_objs(prefix)
-    # Every PNG gets a thumb_url even when the thumbnail doesn't exist yet:
-    # /api/media builds a missing one on first request (see _ensure_thumb), so
-    # older images heal themselves as they're browsed instead of needing a
-    # bulk migration.
+    # Every supported Gallery media type gets a thumb_url. Missing previews heal
+    # on their first view, including older videos, so the grid never preloads MP4s.
     for im in imgs:
-        if im["key"].lower().endswith(".png"):
-            thumb_key = "thumbs/" + im["key"][len("gallery/"):-4] + ".webp"
+        if im["key"].lower().endswith((".png", ".mp4", ".mov", ".webm")):
+            stem, _ext = os.path.splitext(im["key"][len("gallery/"):])
+            thumb_key = "thumbs/" + stem + ".webp"
             im["thumb_url"] = f"/api/media?key={quote(thumb_key, safe='')}"
     imgs.sort(key=lambda x: x["name"], reverse=True)   # newest first
     return jsonify({"images": imgs})
