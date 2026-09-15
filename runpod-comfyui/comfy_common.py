@@ -148,9 +148,9 @@ KREA2T2IHQ = {"positive": "439", "seed_gen": "433", "latent": "458", "char": "44
 KREA2CAROUSEL = {"positive": "6", "latent": "10", "ksampler": "98",
                  "char": "28", "renoise": "110", "model": "1"}
 
-# High Quality Motion Control SCAIL 2 — two coexisting versions, V1
-# (workflow_scail2motion.json) and V2.0 (workflow_scail2motionv2.json), both
-# selectable in the UI as separate modes ("scail2motion" / "scail2motionv2"). Both
+# High Quality Motion Control SCAIL 2 — V1, V2.0, and an isolated direct-size test
+# (workflow_scail2motiondirecttest.json), selectable as separate modes. The test
+# workflow sets a fixed, /32-safe portrait size before SCAIL; V2 remains untouched.
 # are the user's exports verbatim — the app does not strip or rewire anything in
 # either shipped JSON. Node ids are IDENTICAL between the two files (same graph,
 # different tuning), so both modes share this one node-id map and _build_scail2motion
@@ -651,6 +651,12 @@ def _build_scail2motion(graph, inp, seed, video_name, ref_name):
         resolution_megapixels = {"480p": 0.4, "720p": 0.9, "1080p": 2.1}
         graph["102"]["inputs"]["resize_type.megapixels"] = resolution_megapixels.get(
             inp.get("generation_resolution"), resolution_megapixels["720p"])
+    if "direct_resolution" in inp:
+        direct_sizes = {"480p": (480, 864), "720p": (704, 1280),
+                        "1080p": (1088, 1920)}
+        width, height = direct_sizes.get(inp.get("direct_resolution"), direct_sizes["720p"])
+        graph["sc2_target_width"]["inputs"]["value"] = width
+        graph["sc2_target_height"]["inputs"]["value"] = height
     graph[nm["positive"]]["inputs"]["text"] = _prompt_with_trigger(inp)
     graph[nm["sampler"]]["inputs"]["seed"] = seed
     if inp.get("character_lora_path"):
@@ -875,11 +881,11 @@ def generate(base, workflow_dir, inp, client_id=None, max_batch=2):
 
     # SCAIL-2 motion control: same driving-video + ref-photo shape as "video" above,
     # different pipeline (SAM3 tracking + WanSCAILInfinity instead of Wan 2.2 Animate).
-    # "scail2motion" (V1) and "scail2motionv2" (the cropped-resolution V2.0)
+    # V1, cropped-resolution V2.0, and the isolated fixed direct-resolution test
     # are separate workflow files with identical SCAIL node ids —
     # wf_path already resolved to the right one from `mode` above, so one branch
     # covers both.
-    if mode in ("scail2motion", "scail2motionv2"):
+    if mode in ("scail2motion", "scail2motionv2", "scail2motiondirecttest"):
         video_name = upload_video(base, base64.b64decode(inp["video_b64"]),
                                   inp.get("video_filename", "driving.mp4"))
         ref_name = upload_image(base, base64.b64decode(inp["ref_b64"]))

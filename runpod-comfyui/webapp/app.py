@@ -244,6 +244,7 @@ WORKFLOW_DEFS = [
     ("ltx25i2v", "LTX 2.5 I2V"),
     ("scail2motion", "High Quality Motion Control Scail 2 · V1.0"),
     ("scail2motionv2", "High Quality Motion Control Scail 2 · V2.0"),
+    ("scail2motiondirecttest", "High Quality Motion Control Scail 2 · Direct Resolution Test"),
     ("adv", "Instaraw Advance"),
     ("krea2", "Krea2 Image to Image"),
     ("krea2new", "Krea2 Image to Image new"),
@@ -1494,7 +1495,7 @@ def _build_input(body):
     elif inp["mode"] == "ltx25i2v":   # LTX 2.5 image-to-video: first-frame photo + prompt -> mp4
         inp["image_b64"] = body.get("image_b64", "")
         inp["duration"] = int(body.get("duration", 10))
-    elif inp["mode"] in ("scail2motion", "scail2motionv2"):   # SCAIL-2 V1/V2.0: same shape as "video"
+    elif inp["mode"] in ("scail2motion", "scail2motionv2", "scail2motiondirecttest"):   # SCAIL-2: same shape as "video"
         inp["video_b64"] = body.get("video_b64", "")
         inp["video_filename"] = body.get("video_filename", "driving.mp4")
         inp["ref_b64"] = body.get("ref_b64", "")
@@ -1503,6 +1504,8 @@ def _build_input(body):
         inp["upscale"] = bool(body.get("upscale", False))   # 2x RTX super-res + RIFE tail
         if inp["mode"] == "scail2motionv2":
             inp["generation_resolution"] = body.get("generation_resolution", "720p")
+        elif inp["mode"] == "scail2motiondirecttest":
+            inp["direct_resolution"] = body.get("direct_resolution", "720p")
     elif inp["mode"] == "adv":   # INSTARAW advanced (LOCAL only): t2i + image-guided i2i
         inp["img2img"] = bool(body.get("img2img", False))
         inp["aspect"] = body.get("aspect", "3:4 (Portrait)")
@@ -1939,7 +1942,7 @@ def _run_gen_job(job_id, target, inp, body):
 
         if not out or "error" in out:
             raise RuntimeError((out or {}).get("error", "No output from worker."))
-        if inp["mode"] in ("video", "ltx25i2v", "scail2motion", "scail2motionv2"):  # -> mp4(s)
+        if inp["mode"] in ("video", "ltx25i2v", "scail2motion", "scail2motionv2", "scail2motiondirecttest"):  # -> mp4(s)
             # May be 1 (raw only) or 2 (raw + RTX-upscaled) videos. Carry the driving
             # audio onto each, persist each to R2 under gallery/ (same prefix images
             # use) so motion results show up in the Gallery tab too — /api/gallery/list
@@ -2025,10 +2028,11 @@ def generate():
             return jsonify({"error": f"{label} mode runs on Local only."}), 400
         if not body.get("prompt", "").strip() and not body.get("image_b64"):
             return jsonify({"error": "Type a prompt or attach an image to describe."}), 400
-    elif mode in ("video", "scail2motion", "scail2motionv2"):
+    elif mode in ("video", "scail2motion", "scail2motionv2", "scail2motiondirecttest"):
         if target != "local":   # heavy Wan2.2 Animate / SCAIL-2 pipeline runs on the home GPU only
             label = {"video": "Motion", "scail2motion": "High Quality Motion Control Scail 2",
-                     "scail2motionv2": "High Quality Motion Control Scail 2 V2.0"}[mode]
+                     "scail2motionv2": "High Quality Motion Control Scail 2 V2.0",
+                     "scail2motiondirecttest": "High Quality Motion Control Scail 2 Direct Resolution Test"}[mode]
             return jsonify({"error": f"{label} mode runs on Local only."}), 400
         if not body.get("video_b64"):
             return jsonify({"error": "Upload a driving video."}), 400
