@@ -16,6 +16,7 @@ PROXY_URL = os.environ.get("R2_PROXY_URL", "").rstrip("/")
 PROXY_SECRET = os.environ.get("R2_PROXY_SECRET", "")
 H = {"x-auth": PROXY_SECRET}
 BUCKET = "reels"  # for the /api/reels/config display
+_INTERNAL_REEL_PREFIXES = ("gallery/", "thumbs/", "thumbs-reels/")
 
 # A fresh `requests.get/put()` call opens a brand-new TLS connection every time —
 # measured ~1s of pure handshake overhead per call to the Worker, vs ~100ms with
@@ -41,7 +42,8 @@ def _k(key):
 def list_folders():
     r = _SESSION.get(f"{PROXY_URL}/?list&delimiter=/", headers=H, timeout=30)
     r.raise_for_status()
-    return sorted(p.rstrip("/") for p in r.json().get("prefixes", []))
+    return sorted(p.rstrip("/") for p in r.json().get("prefixes", [])
+                  if p not in _INTERNAL_REEL_PREFIXES)
 
 
 def create_folder(name):
@@ -57,7 +59,7 @@ def list_reels(folder):
     items = []
     for o in r.json().get("objects", []):
         key = o["key"]
-        if key.endswith("/.keep"):
+        if key.endswith("/.keep") or key.startswith(_INTERNAL_REEL_PREFIXES):
             continue
         items.append({"key": key, "name": key.split("/")[-1],
                       "size_mb": round(o["size"] / 1e6, 1),
