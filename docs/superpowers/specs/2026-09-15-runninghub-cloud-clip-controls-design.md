@@ -39,9 +39,18 @@ Queued jobs state that they are waiting for RunningHub capacity rather than
 pretending to have a countdown. On completion, the estimate is replaced with
 RunningHub's actual runtime and RH coin usage.
 
+## Completed video access
+
+Each completed Cloud job expands below its compact detail row. The expanded
+card plays the Studio Gallery copy of the MP4 and provides a direct `Download
+MP4` link alongside `Open Gallery`. The player never relies on RunningHub's
+temporary result URL, so it remains available after the 24-hour RunningHub link
+expires. Queued, running, and failed jobs remain compact.
+
 ## Verification
 
 Test the generated `nodeInfoList` for Full clip and a five-second segment that
 starts at two seconds, then manually submit a short Standard test after deploy.
 Verify queued, running, failed, and completed job displays with mocked API
-responses, including explicit estimated versus actual timing text.
+responses, including explicit estimated versus actual timing text and a direct
+download URL for the imported Gallery MP4.
