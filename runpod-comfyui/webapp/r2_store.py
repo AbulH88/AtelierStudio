@@ -103,6 +103,34 @@ def delete(key):
     _SESSION.delete(f"{PROXY_URL}/{_k(key)}", headers=H, timeout=30).raise_for_status()
 
 
+def exists(key):
+    """Whether an object exists, without downloading its full body."""
+    response = _SESSION.get(f"{PROXY_URL}/{_k(key)}", headers=H, stream=True, timeout=30)
+    try:
+        if response.status_code == 404:
+            return False
+        response.raise_for_status()
+        return True
+    finally:
+        response.close()
+
+
+def move(source_key, destination_key):
+    """Copy an R2 object to a new key, then remove its source after success."""
+    if source_key == destination_key:
+        return
+    if exists(destination_key):
+        raise FileExistsError("An item with that name already exists in the destination folder.")
+    response = _SESSION.get(f"{PROXY_URL}/{_k(source_key)}", headers=H, stream=True, timeout=900)
+    try:
+        response.raise_for_status()
+        _SESSION.put(f"{PROXY_URL}/{_k(destination_key)}", headers=H,
+                     data=response.raw, timeout=900).raise_for_status()
+    finally:
+        response.close()
+    delete(source_key)
+
+
 def delete_folder(folder):
     """Delete every object under a folder prefix (incl. the .keep marker)."""
     folder = folder.strip("/")

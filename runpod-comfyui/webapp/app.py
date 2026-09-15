@@ -1337,7 +1337,10 @@ def reels_folders():
 @app.post("/api/reels/folder")
 @admin_required
 def reels_folder_create():
-    name = request.get_json(force=True).get("name", "").strip()
+    try:
+        name = _folder_name(request.get_json(force=True).get("name", ""))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     if not name:
         return jsonify({"error": "Folder name required."}), 400
     r2_store.create_folder(name)
@@ -1557,6 +1560,58 @@ def reels_delete():
     if key:
         r2_store.delete(key)
     return jsonify({"ok": True})
+
+
+def _folder_name(value):
+    """A single safe user-facing folder segment (the empty string is root)."""
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 _.-]{0,79}", value):
+        raise ValueError("Folder names may use letters, numbers, spaces, dots, dashes, and underscores.")
+    return value
+
+
+def _move_library_media(key, folder, library, thumbs_prefix):
+    """Move one library object and its optional preview sidecar together."""
+    folder = _folder_name(folder)
+    if not key.startswith(library):
+        raise ValueError("That item does not belong to this library.")
+    relative = key[len(library):]
+    if not relative or "/" in relative.rsplit("/", 1)[-1]:
+        raise ValueError("Invalid media key.")
+    filename = relative.rsplit("/", 1)[-1]
+    destination = library + (folder + "/" if folder else "") + filename
+    if key == destination:
+        return destination
+    r2_store.move(key, destination)
+    source_stem, _ = os.path.splitext(relative)
+    destination_stem, _ = os.path.splitext(destination[len(library):])
+    source_thumb = thumbs_prefix + source_stem + ".webp"
+    destination_thumb = thumbs_prefix + destination_stem + ".webp"
+    if r2_store.exists(source_thumb):
+        try:
+            r2_store.move(source_thumb, destination_thumb)
+        except Exception:
+            # A missing preview is self-healed on next library view; the media
+            # move itself must not be rolled back after it has safely completed.
+            pass
+    return destination
+
+
+@app.post("/api/reels/move")
+def reels_move():
+    body = request.get_json(force=True)
+    try:
+        source = body.get("key", "")
+        if source.startswith(("gallery/", "thumbs/", "thumbs-reels/")):
+            raise ValueError("That item does not belong to the Reel library.")
+        key = _move_library_media(source, body.get("folder", ""), "", "thumbs-reels/")
+        return jsonify({"ok": True, "key": key})
+    except (ValueError, FileExistsError) as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.post("/api/reels/use")
@@ -2701,6 +2756,30 @@ def gallery_delete():
     if key.startswith("gallery/"):
         r2_store.delete(key)
     return jsonify({"ok": True})
+
+
+@app.post("/api/gallery/folder")
+def gallery_folder_create():
+    try:
+        folder = _folder_name(request.get_json(force=True).get("name", ""))
+        if not folder:
+            raise ValueError("Folder name required.")
+        r2_store.create_folder(f"gallery/{folder}")
+        return jsonify({"ok": True, "folder": folder})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.post("/api/gallery/move")
+def gallery_move():
+    body = request.get_json(force=True)
+    try:
+        key = _move_library_media(body.get("key", ""), body.get("folder", ""), "gallery/", "thumbs/")
+        return jsonify({"ok": True, "key": key})
+    except (ValueError, FileExistsError) as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.post("/api/gallery/bulk-delete")
