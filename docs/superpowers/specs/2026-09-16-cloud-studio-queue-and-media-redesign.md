@@ -61,6 +61,8 @@ Bring the deployed Cloud Studio in line with the approved dark editorial mockups
 - Keep the left workflow navigation, central workflow canvas, and right queue rail on wide screens.
 - The center canvas must not be forced off-screen by the queue rail.
 - On narrower displays, the right rail moves below the workspace; media cards reflow without horizontal scrolling.
+- The three-column Cloud Studio layout is reserved for viewports wider than 1800px. Below that width, the queue rail moves below the workflow canvas so the active workflow remains readable.
+- Below 1100px, the workflow navigation, workspace, and queue stack vertically. H3 headings, steppers, mode controls, media cards, and settings must wrap rather than clip.
 
 ## Validation and errors
 

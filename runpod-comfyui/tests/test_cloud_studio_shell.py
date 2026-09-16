@@ -46,6 +46,12 @@ def test_h3_only_exposes_workflow_backed_settings_and_optional_audio():
     assert "['image','audio']" in HTML
 
 
+def test_cloud_studio_stacks_before_workspace_is_squeezed():
+    assert "@media(max-width:1800px)" in HTML
+    assert "@media(max-width:1100px)" in HTML
+    assert "grid-column:1/-1" in HTML
+
+
 def test_h3_submit_stays_guarded_until_optional_nodes_are_published():
     assert 'id="h3Run" class="cloud-run" disabled' in HTML
     assert "waiting for the optional RunningHub reference nodes" in HTML
