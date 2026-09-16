@@ -44,6 +44,7 @@ Bring the deployed Cloud Studio in line with the approved dark editorial mockups
 - Limits remain nine images, three videos, three audio files, and twelve total references.
 - At least one image is required. Video and audio are optional and cannot be submitted alone.
 - Every section has an elegant dashed Add card with a type-specific icon, supported formats, and remaining capacity.
+- Each Add card accepts either a click-to-browse upload or files dragged from the user's computer. Dragging a valid file over the matching card highlights the drop zone; unsupported media is rejected with a clear message.
 - Uploaded media uses clean thumbnail cards with a short filename, type/index label, Replace, and Remove controls.
 - Audio cards use an audio icon, filename, optional duration, and playback control.
 - Video cards use a poster thumbnail and open the same modal player rather than expanding inline.

@@ -46,6 +46,13 @@ def test_h3_only_exposes_workflow_backed_settings_and_optional_audio():
     assert "['image','audio']" in HTML
 
 
+def test_h3_add_cards_support_drag_and_drop_from_computer():
+    assert "ondragover" in HTML
+    assert "ondrop" in HTML
+    assert "drag-over" in HTML
+    assert "Drop a supported ${type} file" in HTML
+
+
 def test_cloud_studio_stacks_before_workspace_is_squeezed():
     assert "@media(max-width:1800px)" in HTML
     assert "@media(max-width:1100px)" in HTML
