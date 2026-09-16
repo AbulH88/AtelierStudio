@@ -24,11 +24,20 @@ Bring the deployed Cloud Studio in line with the approved dark editorial mockups
 - Restart recovery preserves queued, active, completed, and failed jobs. It must not submit the same job twice.
 - Upload preparation does not consume a generation slot; submission and RunningHub execution do.
 - Failed or cancelled jobs release their slot and allow the next queued job to start.
+- RunningHub terminal states `CANCEL` and `CANCELLED` are both treated as cancelled.
+- A user may cancel their own waiting or active job from the Cloud Queue. Waiting jobs are cancelled locally; submitted jobs call RunningHub's `/task/openapi/cancel` endpoint using the server-held credential and task ID.
+- Cancellation first displays `Cancelling…`, then a terminal `Cancelled` state. The queue slot is released only after local state is made terminal, and dispatch immediately considers the next waiting job.
+- Cancelling a task directly in RunningHub is reconciled by polling and produces the same terminal state in Atelier.
+- Cancellation is idempotent: repeated requests return the current terminal state and never cancel a different task.
+- Job ownership is enforced server-side; a user cannot cancel another user's job.
+- The backend rejects a second active or waiting submission for the same user and workflow with HTTP 409. This protects against rapid double-clicks even if browser state is stale.
 
 ## Cloud Studio right rail
 
 - Replace the large raw job output with the approved compact Cloud Queue design.
 - The current job uses a progress ring, workflow name, status, and estimated time when available.
+- The current-job card provides a Cancel Job action while the job is waiting, uploading, submitting, queued, or running.
+- Workflow labels are derived from each job's workflow key: `Scail 2 Motion` and `MiniMax H3 Ref2V`; they are never inferred merely from the presence of a workflow ID.
 - Recent jobs appear as compact thumbnail rows with status dots and duration/aspect metadata.
 - Completed-job thumbnails open a modal player. Videos are never rendered full-size inside the right rail.
 - The modal contains playback, Download, Open in Gallery, and Close actions.
@@ -71,6 +80,7 @@ Bring the deployed Cloud Studio in line with the approved dark editorial mockups
 - Queue position is shown before a job reaches RunningHub.
 - Credential-unavailable, insufficient-balance, upload, submission, and provider failures receive distinct user-facing messages.
 - A server-side validation layer enforces all reference and concurrency rules; browser validation is only a convenience.
+- While the current user has an active job for a workflow, that workflow's Generate button is disabled and shows the live state (`Queued…`, `Generating…`, or `Cancelling…`). It returns to its normal label only after completion, failure, or cancellation.
 
 ## Testing and delivery
 
