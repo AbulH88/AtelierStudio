@@ -48,6 +48,12 @@ Bring the deployed Cloud Studio in line with the approved dark editorial mockups
 - Audio cards use an audio icon, filename, optional duration, and playback control.
 - Video cards use a poster thumbnail and open the same modal player rather than expanding inline.
 - Empty optional references are omitted from submission.
+- The H3 settings row contains only workflow-backed Aspect Ratio and Duration controls.
+- Quality and Instance are not exposed because they are not user-selectable inputs in the supplied H3 workflow; infrastructure selection remains a backend concern.
+
+## Primary navigation
+
+- Cloud Studio is the second top-level destination, directly after Local Studio and before Gallery.
 
 ## Visual language and responsiveness
 

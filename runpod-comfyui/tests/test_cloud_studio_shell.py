@@ -7,6 +7,7 @@ HTML = (Path(__file__).parents[1] / "webapp" / "index.html").read_text(encoding=
 def test_local_and_cloud_are_separate_top_level_destinations():
     assert 'data-page="studio">Local Studio<' in HTML
     assert 'data-page="cloud">Cloud Studio<' in HTML
+    assert HTML.index('data-page="cloud">Cloud Studio<') < HTML.index('data-page="gallery">Gallery<')
 
 
 def test_cloud_shell_contains_workflow_navigation_and_shared_queue():
@@ -35,6 +36,14 @@ def test_cloud_credentials_are_admin_managed_and_video_uses_modal():
     assert 'id="cloudSaveKey"' not in HTML
     assert 'id="cloudVideoModal"' in HTML
     assert "Credentials are securely managed by your administrator." in HTML
+
+
+def test_h3_only_exposes_workflow_backed_settings_and_optional_audio():
+    assert 'id="h3Aspect"' in HTML
+    assert 'id="h3Duration"' in HTML
+    assert 'id="h3Quality"' not in HTML
+    assert 'id="h3Instance"' not in HTML
+    assert "['image','audio']" in HTML
 
 
 def test_h3_submit_stays_guarded_until_optional_nodes_are_published():
