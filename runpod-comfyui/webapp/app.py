@@ -2408,6 +2408,8 @@ def _save_to_gallery(inp, images, seed):
 RUNNINGHUB_JOBS_FILE = os.path.join(HERE, "runninghub_jobs.json")
 RUNNINGHUB_UPLOAD_DIR = os.path.join(HERE, "runninghub_uploads")
 RUNNINGHUB_JOBS_LOCK = threading.Lock()
+RUNNINGHUB_ACTIVE_STATUSES = {"waiting", "uploading", "submitting", "queued", "running", "importing", "cancelling"}
+RUNNINGHUB_TERMINAL_STATUSES = {"done", "failed", "cancelled"}
 os.makedirs(RUNNINGHUB_UPLOAD_DIR, exist_ok=True)
 
 
@@ -2454,10 +2456,28 @@ def _runninghub_user_settings(username):
     }
 
 
+def _runninghub_workflow_key(job):
+    return job.get("workflow_key") or "scail"
+
+
+def _runninghub_has_active_locked(username, workflow_key, exclude_id=None):
+    return any(
+        job_id != exclude_id and job.get("user") == username
+        and _runninghub_workflow_key(job) == workflow_key
+        and job.get("status") in RUNNINGHUB_ACTIVE_STATUSES
+        for job_id, job in RUNNINGHUB_JOBS.items()
+    )
+
+
+def _runninghub_is_cancelled(job_id):
+    with RUNNINGHUB_JOBS_LOCK:
+        return (RUNNINGHUB_JOBS.get(job_id) or {}).get("status") in {"cancelling", "cancelled"}
+
+
 def _runninghub_dispatch():
     """Start the oldest waiting jobs while each credential has free capacity."""
     start = []
-    active_states = {"uploading", "submitting", "queued", "running", "importing"}
+    active_states = RUNNINGHUB_ACTIVE_STATUSES - {"waiting"}
     with RUNNINGHUB_JOBS_LOCK:
         jobs = list(RUNNINGHUB_JOBS.values())
         active = {}
@@ -2594,6 +2614,22 @@ def _runninghub_query(api_key, task_id):
     return data
 
 
+def _runninghub_cancel(api_key, task_id):
+    response = requests.post(
+        "https://www.runninghub.ai/task/openapi/cancel",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"apiKey": api_key, "taskId": str(task_id)}, timeout=60)
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    code = data.get("code")
+    if code not in (807, "807") and (not response.ok or code not in (0, "0", None)):
+        raise RuntimeError(data.get("message") or data.get("msg") or
+                           f"RunningHub cancellation failed ({response.status_code}).")
+    return data
+
+
 def _runninghub_import_result(job, result):
     outputs = result.get("results") or []
     video = next((o for o in outputs if str(o.get("outputType", "")).lower() in ("mp4", "mov", "webm")
@@ -2650,8 +2686,12 @@ def _runninghub_run(job_id):
                 uploads = {"image": [], "video": [], "audio": []}
                 for media_type, items in job["h3_refs"].items():
                     for item in items:
+                        if _runninghub_is_cancelled(job_id):
+                            return
                         _runninghub_update(job_id, status="uploading", message=f"Uploading H3 {media_type} reference…")
                         uploads[media_type].append(_runninghub_upload(api_key, item["path"], item["type"]))
+                if _runninghub_is_cancelled(job_id):
+                    return
                 _runninghub_update(job_id, status="submitting", message="Submitting MiniMax H3 to RunningHub…")
                 submitted = _runninghub_submit_h3(api_key, job, uploads)
             else:
@@ -2664,11 +2704,17 @@ def _runninghub_run(job_id):
                                             "select_every_nth": 1}
                 submitted = _runninghub_submit(api_key, image_name, video_name, job["instance_type"], clip)
             task_id = str(submitted["taskId"])
+            if _runninghub_is_cancelled(job_id):
+                _runninghub_cancel(api_key, task_id)
+                _runninghub_update(job_id, task_id=task_id, status="cancelled", message="Cloud job cancelled.")
+                return
             _runninghub_update(job_id, task_id=task_id, status="queued", message="Queued on RunningHub.")
             _runninghub_cleanup_uploads(job)
 
         deadline = time.time() + 45 * 60
         while time.time() < deadline:
+            if _runninghub_is_cancelled(job_id):
+                return
             result = _runninghub_query(api_key, task_id)
             state = str(result.get("status") or "").upper()
             usage = result.get("usage") or {}
@@ -2684,7 +2730,10 @@ def _runninghub_run(job_id):
                 gallery_key = _runninghub_import_result(completed_job, result)
                 _runninghub_update(job_id, status="done", message="Saved to Gallery.", gallery_key=gallery_key, **changes)
                 return
-            elif state in ("FAILED", "CANCELLED", "ERROR"):
+            elif state in ("CANCEL", "CANCELLED", "CANCELED"):
+                _runninghub_update(job_id, status="cancelled", message="Cloud job cancelled.", **changes)
+                return
+            elif state in ("FAILED", "ERROR"):
                 reason = result.get("errorMessage") or result.get("failedReason") or "RunningHub task failed."
                 _runninghub_update(job_id, status="failed", message="Cloud generation failed.", error=str(reason)[:1000], **changes)
                 return
@@ -2752,6 +2801,9 @@ def runninghub_create_job():
     settings = _runninghub_user_settings(username)
     if not settings["configured"]:
         return jsonify({"error": "Save your RunningHub API key before starting a cloud job."}), 400
+    with RUNNINGHUB_JOBS_LOCK:
+        if _runninghub_has_active_locked(username, "scail"):
+            return jsonify({"error": "A Scail 2 cloud job is already active. Wait for it or cancel it first."}), 409
     reference, video = request.files.get("reference"), request.files.get("video")
     if not reference or not video or not reference.filename or not video.filename:
         return jsonify({"error": "A reference image and driving video are required."}), 400
@@ -2797,7 +2849,7 @@ def runninghub_create_job():
     if os.path.getsize(reference_path) > RUNNINGHUB_MAX_IMAGE_BYTES or os.path.getsize(video_path) > RUNNINGHUB_MAX_VIDEO_BYTES:
         _runninghub_cleanup_uploads({"reference_path": reference_path, "video_path": video_path})
         return jsonify({"error": "Reference image or driving video exceeds the Cloud upload limit."}), 413
-    job = {"id": job_id, "user": username, "status": "waiting", "message": "Waiting for a cloud slot…",
+    job = {"id": job_id, "user": username, "workflow_key": "scail", "status": "waiting", "message": "Waiting for a cloud slot…",
            "created_at": int(time.time()), "updated_at": int(time.time()), "instance_type": requested,
            "workflow_id": RUNNINGHUB_WORKFLOW_ID, "key_enc": settings["key_enc"],
            "key_fingerprint": settings["key_fingerprint"], "key_concurrency": settings["concurrency"],
@@ -2805,6 +2857,9 @@ def runninghub_create_job():
            "video_path": video_path, "video_type": video.mimetype, "clip": clip,
            "estimated_total_seconds": RUNNINGHUB_STANDARD_ESTIMATE_SECONDS if requested == "default" else None}
     with RUNNINGHUB_JOBS_LOCK:
+        if _runninghub_has_active_locked(username, "scail"):
+            _runninghub_cleanup_uploads(job)
+            return jsonify({"error": "A Scail 2 cloud job is already active. Wait for it or cancel it first."}), 409
         RUNNINGHUB_JOBS[job_id] = job
         _save_runninghub_jobs()
     _runninghub_dispatch()
@@ -2817,6 +2872,9 @@ def runninghub_create_h3_job():
     settings = _runninghub_user_settings(username)
     if not settings["configured"]:
         return jsonify({"error": "Cloud access has not been assigned by an administrator."}), 403
+    with RUNNINGHUB_JOBS_LOCK:
+        if _runninghub_has_active_locked(username, "h3"):
+            return jsonify({"error": "A MiniMax H3 cloud job is already active. Wait for it or cancel it first."}), 409
     images = [f for f in request.files.getlist("images") if f and f.filename]
     videos = [f for f in request.files.getlist("videos") if f and f.filename]
     audios = [f for f in request.files.getlist("audio") if f and f.filename]
@@ -2865,6 +2923,9 @@ def runninghub_create_h3_job():
            "h3_refs": refs, "h3_prompt": prompt, "h3_aspect": aspect, "h3_duration": duration,
            "estimated_total_seconds": None}
     with RUNNINGHUB_JOBS_LOCK:
+        if _runninghub_has_active_locked(username, "h3"):
+            _runninghub_cleanup_uploads(job)
+            return jsonify({"error": "A MiniMax H3 cloud job is already active. Wait for it or cancel it first."}), 409
         RUNNINGHUB_JOBS[job_id] = job
         _save_runninghub_jobs()
     _runninghub_dispatch()
@@ -2893,8 +2954,8 @@ def runninghub_list_jobs():
     user_jobs.sort(key=lambda j: j.get("created_at", 0), reverse=True)
     # Cloud is a live work surface, not an archive. Keep every active task
     # visible plus a compact recent history for the queue rail.
-    active = [j for j in user_jobs if j.get("status") in {"waiting", "uploading", "submitting", "queued", "running", "importing"}]
-    recent = [j for j in user_jobs if j.get("status") in {"done", "failed"}][:5]
+    active = [j for j in user_jobs if j.get("status") in RUNNINGHUB_ACTIVE_STATUSES]
+    recent = [j for j in user_jobs if j.get("status") in RUNNINGHUB_TERMINAL_STATUSES][:5]
     jobs = active + recent
     jobs.sort(key=lambda j: j.get("created_at", 0), reverse=True)
     return jsonify({"jobs": [_runninghub_public_job(j) for j in jobs]})
@@ -2907,6 +2968,40 @@ def runninghub_get_job(job_id):
     if not job or job.get("user") != session["user"]:
         return jsonify({"error": "Cloud job not found."}), 404
     return jsonify(_runninghub_public_job(job))
+
+
+@app.post("/api/runninghub/jobs/<job_id>/cancel")
+def runninghub_cancel_job(job_id):
+    username = session["user"]
+    with RUNNINGHUB_JOBS_LOCK:
+        job = dict(RUNNINGHUB_JOBS.get(job_id) or {})
+    if not job or job.get("user") != username:
+        return jsonify({"error": "Cloud job not found."}), 404
+    if job.get("status") in RUNNINGHUB_TERMINAL_STATUSES:
+        return jsonify(_runninghub_public_job(job))
+
+    task_id = job.get("task_id")
+    if not task_id:
+        cancelled = _runninghub_update(job_id, status="cancelled", message="Cloud job cancelled.")
+        _runninghub_cleanup_uploads(cancelled or job)
+        _runninghub_dispatch()
+        return jsonify(_runninghub_public_job(cancelled or job))
+
+    previous_status, previous_message = job.get("status"), job.get("message")
+    _runninghub_update(job_id, status="cancelling", message="Cancelling on RunningHub…")
+    try:
+        api_key = _decrypt_runninghub_key(job.get("key_enc", ""))
+        if not api_key:
+            raise RuntimeError("The RunningHub key is unavailable for this job.")
+        _runninghub_cancel(api_key, task_id)
+    except Exception as e:
+        _runninghub_update(job_id, status=previous_status, message=previous_message,
+                           error=f"Cancellation failed: {e}")
+        return jsonify({"error": str(e)}), 502
+    cancelled = _runninghub_update(job_id, status="cancelled", message="Cloud job cancelled.")
+    _runninghub_cleanup_uploads(cancelled or job)
+    _runninghub_dispatch()
+    return jsonify(_runninghub_public_job(cancelled or job))
 
 
 @app.get("/api/gallery/groups")

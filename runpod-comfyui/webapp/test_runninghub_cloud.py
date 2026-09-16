@@ -166,3 +166,47 @@ def test_dispatch_serializes_jobs_with_same_key(monkeypatch):
     A._runninghub_dispatch()
     assert started == ["other"]
     assert A.RUNNINGHUB_JOBS["next"]["status"] == "waiting"
+
+
+def test_cancel_calls_runninghub_cancel_contract(monkeypatch):
+    seen = {}
+
+    class Response:
+        ok = True
+        status_code = 200
+        def json(self):
+            return {"code": 0, "msg": "success"}
+
+    def fake_post(url, **kwargs):
+        seen.update(url=url, **kwargs)
+        return Response()
+
+    monkeypatch.setattr(A.requests, "post", fake_post)
+    A._runninghub_cancel("rh-secret", "task-123")
+    assert seen["url"] == "https://www.runninghub.ai/task/openapi/cancel"
+    assert seen["json"] == {"apiKey": "rh-secret", "taskId": "task-123"}
+    assert seen["headers"]["Authorization"] == "Bearer rh-secret"
+
+
+def test_owner_can_cancel_waiting_job_without_provider_call(maker_client, monkeypatch):
+    monkeypatch.setattr(A, "_save_runninghub_jobs", lambda: None)
+    monkeypatch.setattr(A, "_runninghub_dispatch", lambda: None)
+    monkeypatch.setattr(A, "_runninghub_cleanup_uploads", lambda _job: None)
+    monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {
+        "waiting": {"id": "waiting", "user": "maker", "workflow_key": "h3",
+                    "status": "waiting", "created_at": 1}
+    })
+    response = maker_client.post("/api/runninghub/jobs/waiting/cancel")
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "cancelled"
+    assert A.RUNNINGHUB_JOBS["waiting"]["status"] == "cancelled"
+
+
+def test_active_workflow_detection_is_scoped_per_user_and_workflow(monkeypatch):
+    monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {
+        "h3": {"id": "h3", "user": "maker", "workflow_key": "h3", "status": "running"},
+        "scail": {"id": "scail", "user": "other", "workflow_key": "scail", "status": "waiting"},
+    })
+    with A.RUNNINGHUB_JOBS_LOCK:
+        assert A._runninghub_has_active_locked("maker", "h3") is True
+        assert A._runninghub_has_active_locked("maker", "scail") is False
