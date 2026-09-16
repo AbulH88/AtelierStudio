@@ -27,6 +27,15 @@ def maker_client(users):
     return client
 
 
+@pytest.fixture
+def admin_client(users):
+    A.app.config["TESTING"] = True
+    client = A.app.test_client()
+    with client.session_transaction() as sess:
+        sess["user"] = "admin"
+    return client
+
+
 def test_credential_is_encrypted_and_masked():
     key = "rh_example_secret_1234567890"
     encrypted = A._encrypt_runninghub_key(key)
@@ -35,13 +44,14 @@ def test_credential_is_encrypted_and_masked():
     assert A._mask_runninghub_key(key).endswith("7890")
 
 
-def test_user_can_save_key_without_getting_it_back(maker_client, users):
-    response = maker_client.put("/api/runninghub/settings", json={"api_key": "rh_example_secret_1234567890"})
+def test_only_admin_can_assign_key_without_getting_it_back(maker_client, admin_client, users):
+    assert maker_client.put("/api/runninghub/settings", json={"api_key": "rh_example_secret_1234567890"}).status_code == 403
+    response = admin_client.post("/api/users/maker/set-runninghub-key", json={"api_key": "rh_example_secret_1234567890", "concurrency": 2})
     body = response.get_json()
     assert response.status_code == 200
-    assert body["configured"] is True
     assert "rh_example" not in json.dumps(body)
     assert A._decrypt_runninghub_key(users["maker"]["runninghub_key_enc"]).startswith("rh_example")
+    assert users["maker"]["runninghub_concurrency"] == 2
 
 
 def test_plus_requires_an_admin_entitlement(maker_client, users):
@@ -95,14 +105,15 @@ def test_submit_uses_published_image_video_and_clip_nodes(monkeypatch):
 
 
 def test_public_completed_job_has_preview_download_and_timing():
-    job = {"id": "job", "created_at": 0, "status": "done", "gallery_key": "gallery/cloud/video.mp4"}
+    job = {"id": "job", "created_at": 0, "status": "done", "gallery_key": "gallery/cloud/video.mp4", "key_fingerprint": "secret-fingerprint"}
     public = A._runninghub_public_job(job)
     assert public["gallery_url"].endswith("gallery%2Fcloud%2Fvideo.mp4")
     assert public["download_url"].endswith("gallery%2Fcloud%2Fvideo.mp4&download=1")
     assert public["elapsed_seconds"] >= 0
+    assert "key_fingerprint" not in public
 
 
-def test_job_list_keeps_active_and_latest_completed_only(maker_client, monkeypatch):
+def test_job_list_keeps_active_and_compact_recent_history(maker_client, monkeypatch):
     monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {
         "done-old": {"id": "done-old", "user": "maker", "status": "done", "created_at": 1},
         "failed": {"id": "failed", "user": "maker", "status": "failed", "created_at": 2},
@@ -110,4 +121,21 @@ def test_job_list_keeps_active_and_latest_completed_only(maker_client, monkeypat
         "running": {"id": "running", "user": "maker", "status": "running", "created_at": 4},
     })
     job_ids = [job["id"] for job in maker_client.get("/api/runninghub/jobs").get_json()["jobs"]]
-    assert job_ids == ["running", "done-new"]
+    assert job_ids == ["running", "done-new", "failed", "done-old"]
+
+
+def test_dispatch_serializes_jobs_with_same_key(monkeypatch):
+    started = []
+    class Thread:
+        def __init__(self, target, args, daemon): self.args = args
+        def start(self): started.append(self.args[0])
+    monkeypatch.setattr(A.threading, "Thread", Thread)
+    monkeypatch.setattr(A, "_save_runninghub_jobs", lambda: None)
+    monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {
+        "active": {"id": "active", "status": "running", "key_fingerprint": "same", "key_concurrency": 1, "created_at": 1},
+        "next": {"id": "next", "status": "waiting", "key_fingerprint": "same", "key_concurrency": 1, "created_at": 2},
+        "other": {"id": "other", "status": "waiting", "key_fingerprint": "different", "key_concurrency": 1, "created_at": 3},
+    })
+    A._runninghub_dispatch()
+    assert started == ["other"]
+    assert A.RUNNINGHUB_JOBS["next"]["status"] == "waiting"

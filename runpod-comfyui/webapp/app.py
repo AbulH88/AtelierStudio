@@ -113,6 +113,8 @@ OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "qwen/qwen3-vl-235b-a22b-i
 # Home Agent. These defaults match the published Scail 2 API workflow; keep
 # them overrideable so an exported RunningHub API workflow can change safely.
 RUNNINGHUB_BASE_URL = "https://www.runninghub.ai/openapi/v2"
+RUNNINGHUB_GLOBAL_API_KEY = os.environ.get("RUNNINGHUB_API_KEY", "").strip()
+RUNNINGHUB_GLOBAL_CONCURRENCY = max(1, int(os.environ.get("RUNNINGHUB_CONCURRENCY", "1")))
 RUNNINGHUB_WORKFLOW_ID = os.environ.get("RUNNINGHUB_WORKFLOW_ID", "2099782685577601026")
 RUNNINGHUB_REFERENCE_NODE_ID = os.environ.get("RUNNINGHUB_REFERENCE_NODE_ID", "58")
 RUNNINGHUB_VIDEO_NODE_ID = os.environ.get("RUNNINGHUB_VIDEO_NODE_ID", "113")
@@ -397,7 +399,10 @@ def api_me():
 def api_users():
     users = load_users()
     return jsonify({"users": [{"username": k, "role": v["role"], "status": v["status"],
-                                "runninghub_plus": bool(v.get("runninghub_plus"))}
+                                "runninghub_plus": bool(v.get("runninghub_plus")),
+                                "runninghub_configured": bool(v.get("runninghub_key_enc") or RUNNINGHUB_GLOBAL_API_KEY),
+                                "runninghub_private": bool(v.get("runninghub_key_enc")),
+                                "runninghub_concurrency": max(1, int(v.get("runninghub_concurrency", RUNNINGHUB_GLOBAL_CONCURRENCY) or 1))}
                               for k, v in sorted(users.items())]})
 
 
@@ -422,6 +427,20 @@ def api_user_action(name, action):
         if not isinstance(enabled, bool):
             return jsonify({"error": "enabled must be true or false"}), 400
         users[name]["runninghub_plus"] = enabled
+    elif action == "set-runninghub-key":
+        body = request.get_json(silent=True) or {}
+        key = str(body.get("api_key") or "").strip()
+        try:
+            concurrency = max(1, min(100, int(body.get("concurrency") or 1)))
+        except (TypeError, ValueError):
+            return jsonify({"error": "concurrency must be between 1 and 100"}), 400
+        if len(key) < 16:
+            return jsonify({"error": "Enter a valid RunningHub API key."}), 400
+        users[name]["runninghub_key_enc"] = _encrypt_runninghub_key(key)
+        users[name]["runninghub_concurrency"] = concurrency
+    elif action == "remove-runninghub-key":
+        users[name].pop("runninghub_key_enc", None)
+        users[name].pop("runninghub_concurrency", None)
     elif action == "delete":
         if users[name]["role"] == "admin" and admins <= 1:
             return jsonify({"error": "cannot delete the last admin"}), 400
@@ -2411,12 +2430,50 @@ def _runninghub_update(job_id, **changes):
 
 def _runninghub_user_settings(username):
     rec = load_users().get(username, {})
-    key = _decrypt_runninghub_key(rec.get("runninghub_key_enc", ""))
+    private_key = _decrypt_runninghub_key(rec.get("runninghub_key_enc", ""))
+    key = private_key or RUNNINGHUB_GLOBAL_API_KEY
     return {
         "configured": bool(key),
-        "key_suffix": _mask_runninghub_key(key) if key else "",
         "plus_allowed": bool(rec.get("runninghub_plus")),
+        "source": "private" if private_key else "global" if key else "none",
+        "concurrency": max(1, int(rec.get("runninghub_concurrency", 1 if private_key else RUNNINGHUB_GLOBAL_CONCURRENCY) or 1)),
+        "key_enc": _encrypt_runninghub_key(key) if key else "",
+        "key_fingerprint": hashlib.sha256(key.encode("utf-8")).hexdigest() if key else "",
     }
+
+
+def _runninghub_dispatch():
+    """Start the oldest waiting jobs while each credential has free capacity."""
+    start = []
+    active_states = {"uploading", "submitting", "queued", "running", "importing"}
+    with RUNNINGHUB_JOBS_LOCK:
+        jobs = list(RUNNINGHUB_JOBS.values())
+        active = {}
+        limits = {}
+        for job in jobs:
+            if job.get("status") in active_states | {"waiting"}:
+                fp = job.get("key_fingerprint", "")
+                value = max(1, int(job.get("key_concurrency", 1) or 1))
+                limits[fp] = min(limits.get(fp, value), value)
+            if job.get("status") in active_states:
+                fp = job.get("key_fingerprint", "")
+                active[fp] = active.get(fp, 0) + 1
+        for job in sorted(jobs, key=lambda item: item.get("created_at", 0)):
+            if job.get("status") != "waiting":
+                continue
+            fp = job.get("key_fingerprint", "")
+            limit = limits.get(fp, 1)
+            if active.get(fp, 0) >= limit:
+                continue
+            job["status"] = "uploading"
+            job["message"] = "Preparing cloud upload…"
+            job["updated_at"] = int(time.time())
+            active[fp] = active.get(fp, 0) + 1
+            start.append(job["id"])
+        if start:
+            _save_runninghub_jobs()
+    for job_id in start:
+        threading.Thread(target=_runninghub_run, args=(job_id,), daemon=True).start()
 
 
 def _runninghub_upload(api_key, path, mime_type):
@@ -2579,6 +2636,7 @@ def _runninghub_run(job_id):
         with RUNNINGHUB_JOBS_LOCK:
             existing = dict(RUNNINGHUB_JOBS.get(job_id) or {})
         _runninghub_cleanup_uploads(existing)
+        _runninghub_dispatch()
 
 
 def _resume_runninghub_jobs():
@@ -2591,6 +2649,7 @@ def _resume_runninghub_jobs():
             # the user can check RunningHub and retry safely if needed.
             _runninghub_update(job_id, status="failed", message="Cloud job needs review.",
                                error="Studio restarted before RunningHub task confirmation; check RunningHub before retrying.")
+    _runninghub_dispatch()
 
 
 _resume_runninghub_jobs()
@@ -2599,11 +2658,14 @@ _resume_runninghub_jobs()
 @app.get("/api/runninghub/settings")
 def runninghub_settings():
     username = session["user"]
-    return jsonify({**_runninghub_user_settings(username), "workflow_id": RUNNINGHUB_WORKFLOW_ID,
+    settings = _runninghub_user_settings(username)
+    return jsonify({"configured": settings["configured"], "plus_allowed": settings["plus_allowed"],
+                    "concurrency": settings["concurrency"], "workflow_id": RUNNINGHUB_WORKFLOW_ID,
                     "standard": "default", "plus": "plus"})
 
 
 @app.put("/api/runninghub/settings")
+@admin_required
 def runninghub_save_settings():
     key = (request.get_json(force=True).get("api_key") or "").strip()
     if len(key) < 16:
@@ -2615,6 +2677,7 @@ def runninghub_save_settings():
 
 
 @app.delete("/api/runninghub/settings")
+@admin_required
 def runninghub_delete_settings():
     users = load_users()
     users[session["user"]].pop("runninghub_key_enc", None)
@@ -2673,22 +2736,22 @@ def runninghub_create_job():
     if os.path.getsize(reference_path) > RUNNINGHUB_MAX_IMAGE_BYTES or os.path.getsize(video_path) > RUNNINGHUB_MAX_VIDEO_BYTES:
         _runninghub_cleanup_uploads({"reference_path": reference_path, "video_path": video_path})
         return jsonify({"error": "Reference image or driving video exceeds the Cloud upload limit."}), 413
-    users = load_users()
-    job = {"id": job_id, "user": username, "status": "submitting", "message": "Preparing cloud job…",
+    job = {"id": job_id, "user": username, "status": "waiting", "message": "Waiting for a cloud slot…",
            "created_at": int(time.time()), "updated_at": int(time.time()), "instance_type": requested,
-           "workflow_id": RUNNINGHUB_WORKFLOW_ID, "key_enc": users[username]["runninghub_key_enc"],
+           "workflow_id": RUNNINGHUB_WORKFLOW_ID, "key_enc": settings["key_enc"],
+           "key_fingerprint": settings["key_fingerprint"], "key_concurrency": settings["concurrency"],
            "reference_path": reference_path, "reference_type": reference.mimetype,
            "video_path": video_path, "video_type": video.mimetype, "clip": clip,
            "estimated_total_seconds": RUNNINGHUB_STANDARD_ESTIMATE_SECONDS if requested == "default" else None}
     with RUNNINGHUB_JOBS_LOCK:
         RUNNINGHUB_JOBS[job_id] = job
         _save_runninghub_jobs()
-    threading.Thread(target=_runninghub_run, args=(job_id,), daemon=True).start()
-    return jsonify({"id": job_id, "status": "submitting"}), 202
+    _runninghub_dispatch()
+    return jsonify({"id": job_id, "status": "waiting"}), 202
 
 
 def _runninghub_public_job(job):
-    safe = {k: v for k, v in job.items() if k not in {"key_enc", "reference_path", "video_path"}}
+    safe = {k: v for k, v in job.items() if k not in {"key_enc", "key_fingerprint", "key_concurrency", "reference_path", "video_path"}}
     elapsed = max(0, int(time.time()) - int(safe.get("created_at") or time.time()))
     safe["elapsed_seconds"] = elapsed
     if safe.get("status") in {"uploading", "submitting", "running", "importing"} and safe.get("estimated_total_seconds"):
@@ -2708,10 +2771,10 @@ def runninghub_list_jobs():
         user_jobs = [dict(j) for j in RUNNINGHUB_JOBS.values() if j.get("user") == username]
     user_jobs.sort(key=lambda j: j.get("created_at", 0), reverse=True)
     # Cloud is a live work surface, not an archive. Keep every active task
-    # visible, plus only the latest completed video for immediate download.
-    active = [j for j in user_jobs if j.get("status") in {"uploading", "submitting", "queued", "running", "importing"}]
-    latest_done = next((j for j in user_jobs if j.get("status") == "done"), None)
-    jobs = active + ([latest_done] if latest_done else [])
+    # visible plus a compact recent history for the queue rail.
+    active = [j for j in user_jobs if j.get("status") in {"waiting", "uploading", "submitting", "queued", "running", "importing"}]
+    recent = [j for j in user_jobs if j.get("status") in {"done", "failed"}][:5]
+    jobs = active + recent
     jobs.sort(key=lambda j: j.get("created_at", 0), reverse=True)
     return jsonify({"jobs": [_runninghub_public_job(j) for j in jobs]})
 
