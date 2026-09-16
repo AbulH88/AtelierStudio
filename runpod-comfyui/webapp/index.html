@@ -1607,7 +1607,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
           <input id="h3ImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/heic,image/heif" multiple hidden><input id="h3VideoInput" type="file" accept="video/mp4,video/quicktime" multiple hidden><input id="h3AudioInput" type="file" accept="audio/wav,audio/mpeg" multiple hidden>
           <label class="h3-prompt">Prompt <textarea id="h3Prompt" maxlength="7000" placeholder="Describe the video and explain the role of Image1, Video1, Audio1…"></textarea></label>
           <div class="h3-controls"><label>Aspect Ratio<select id="h3Aspect"><option>9:16</option><option>16:9</option><option>1:1</option><option>4:3</option><option>3:4</option></select></label><label>Duration<select id="h3Duration"><option value="5">5s</option><option value="10" selected>10s</option><option value="15">15s</option></select></label></div>
-          <button id="h3Run" class="cloud-run" disabled>Generate on RunningHub</button><p id="h3Error" class="cloud-error">H3 submission will unlock after the published workflow exposes its optional reference nodes.</p>
+          <button id="h3Run" class="cloud-run" disabled>Generate on RunningHub</button><p id="h3Error" class="cloud-error">Add an image and prompt to prepare your H3 job.</p>
         </div>
       </section>
     </main>
@@ -3303,14 +3303,16 @@ function selectCloudWorkflow(key){
 }
 $$('.cloud-workflow-item[data-cloud-workflow]').forEach(b=>b.onclick=()=>selectCloudWorkflow(b.dataset.cloudWorkflow));
 $('#cloudJobsNav').onclick=()=>document.querySelector('.cloud-queue-rail').scrollIntoView({behavior:'smooth'});
-function h3ModeLimit(type){if(type==='video'&&h3Mode!=='omni')return 0;if(type==='image')return h3Mode==='i2v'?1:h3Mode==='flf'?2:9;return 3;}
+function h3ModeLimit(type){if(type==='video'&&h3Mode!=='omni')return 0;if(type==='image')return h3Mode==='i2v'?1:h3Mode==='flf'?2:3;if(type==='video')return 1;return 3;}
 function h3Validate(){
   const total=h3References.image.length+h3References.video.length+h3References.audio.length;
   let error='';if(!h3References.image.length)error='At least one image is required.';
   else if(h3Mode==='flf'&&h3References.image.length!==2)error='First & Last Frame requires exactly two images.';
-  else if(total>12)error='H3 accepts no more than 12 total references.';
-  $('#h3Error').textContent=error||'H3 submission is waiting for the optional RunningHub reference nodes to be published.';
-  $('#h3Run').disabled=true;
+  else if(total>7)error='This published H3 workflow supports up to seven total references.';
+  else if(!$('#h3Prompt').value.trim())error='Enter a prompt to generate.';
+  else if(!cloudConfigured)error='Cloud access has not been assigned by an administrator.';
+  $('#h3Error').textContent=error||'Ready to submit MiniMax H3 to the Cloud Queue.';
+  $('#h3Run').disabled=!!error;
 }
 function renderH3References(){
   const labels={image:'Images',video:'Videos',audio:'Audio'},icons={image:'▧',video:'▻',audio:'♫'},formats={image:'PNG, JPG, WEBP',video:'MP4, MOV',audio:'WAV, MP3'};
@@ -3328,7 +3330,9 @@ function addH3Files(type,files){
   [...files].slice(0,room).forEach(file=>h3References[type].push({file,url:URL.createObjectURL(file)}));renderH3References();
 }
 ['image','video','audio'].forEach(type=>$('#h3'+type[0].toUpperCase()+type.slice(1)+'Input').onchange=e=>{addH3Files(type,e.target.files);e.target.value='';});
-$$('#h3ModeTabs button').forEach(b=>b.onclick=()=>{h3Mode=b.dataset.mode;$$('#h3ModeTabs button').forEach(x=>x.classList.toggle('on',x===b));if(h3Mode!=='omni'){h3References.video.forEach(x=>URL.revokeObjectURL(x.url));h3References.video=[];}const max=h3ModeLimit('image');while(h3References.image.length>max){const x=h3References.image.pop();URL.revokeObjectURL(x.url);}$('#h3ReferenceTitle').textContent=h3Mode==='flf'?'Add first and last frames':h3Mode==='omni'?'Build your reference set':'Add a source image';$('#h3ReferenceHint').textContent=h3Mode==='omni'?'Images are required. Video and audio are optional.':h3Mode==='flf'?'Two images required. Audio is optional.':'One image required. Audio is optional.';renderH3References();});
+$$('#h3ModeTabs button').forEach(b=>b.onclick=()=>{h3Mode=b.dataset.mode;$$('#h3ModeTabs button').forEach(x=>x.classList.toggle('on',x===b));if(h3Mode!=='omni'){h3References.video.forEach(x=>URL.revokeObjectURL(x.url));h3References.video=[];}const max=h3ModeLimit('image');while(h3References.image.length>max){const x=h3References.image.pop();URL.revokeObjectURL(x.url);}$('#h3ReferenceTitle').textContent=h3Mode==='flf'?'Add first and last frames':h3Mode==='omni'?'Build your reference set':'Add a source image';$('#h3ReferenceHint').textContent=h3Mode==='omni'?'Up to 3 images, 1 video, and 3 audio references.':h3Mode==='flf'?'Two images required. Audio is optional.':'One image required. Audio is optional.';renderH3References();});
+$('#h3Prompt').addEventListener('input',h3Validate);
+$('#h3Run').onclick=async()=>{if($('#h3Run').disabled)return;const body=new FormData();h3References.image.forEach(x=>body.append('images',x.file));h3References.video.forEach(x=>body.append('videos',x.file));h3References.audio.forEach(x=>body.append('audio',x.file));body.append('prompt',$('#h3Prompt').value.trim());body.append('aspect',$('#h3Aspect').value);body.append('duration',$('#h3Duration').value);$('#h3Run').disabled=true;$('#h3Run').textContent='Submitting to RunningHub…';try{const r=await fetch('/api/runninghub/h3/jobs',{method:'POST',body});const d=await r.json();if(!r.ok)throw new Error(d.error||'H3 job could not start.');await loadCloudJobs();if(!cloudJobPoll)cloudJobPoll=setInterval(loadCloudJobs,5000);}catch(e){$('#h3Error').textContent=String(e.message||e);}finally{$('#h3Run').textContent='Generate on RunningHub';h3Validate();}};
 renderH3References();
 function cloudControls(){ $('#cloudRun').disabled=!cloudConfigured||!cloudReferenceFile||!cloudVideoFile; }
 function selectCloudFile(kind,file){
@@ -3354,14 +3358,14 @@ function openCloudVideo(job){$('#cloudModalVideo').src=job.gallery_url;$('#cloud
 function closeCloudVideo(){$('#cloudModalVideo').pause();$('#cloudModalVideo').removeAttribute('src');$('#cloudModalVideo').load();$('#cloudVideoModal').classList.add('hide');}
 $('#cloudModalClose').onclick=closeCloudVideo;$('#cloudVideoModal').onclick=e=>{if(e.target===$('#cloudVideoModal'))closeCloudVideo();};$('#cloudModalGallery').onclick=()=>{closeCloudVideo();showPage('gallery');};
 async function loadCloudJobs(){
-  try{const r=await fetch('/api/runninghub/jobs');const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load Cloud jobs.');renderCloudJobs(d.jobs||[]);const active=(d.jobs||[]).some(j=>['uploading','submitting','queued','running','importing'].includes(j.status));if(active&&!cloudJobPoll)cloudJobPoll=setInterval(loadCloudJobs,5000);if(!active&&cloudJobPoll){clearInterval(cloudJobPoll);cloudJobPoll=null;}}
+  try{const r=await fetch('/api/runninghub/jobs');const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load Cloud jobs.');renderCloudJobs(d.jobs||[]);const active=(d.jobs||[]).some(j=>['waiting','uploading','submitting','queued','running','importing'].includes(j.status));if(active&&!cloudJobPoll)cloudJobPoll=setInterval(loadCloudJobs,5000);if(!active&&cloudJobPoll){clearInterval(cloudJobPoll);cloudJobPoll=null;}}
   catch(e){$('#cloudError').textContent=String(e.message||e);}
 }
 async function loadCloudSettings(){
   const r=await fetch('/api/runninghub/settings');const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load Cloud settings.');
   cloudConfigured=!!d.configured;const status=$('#cloudConnection');status.classList.toggle('off',!cloudConfigured);status.textContent=cloudConfigured?'● RunningHub connected':'● Cloud access not assigned';
   $('#cloudUsageState').textContent=cloudConfigured?'Cloud access ready · '+d.concurrency+' simultaneous job'+(d.concurrency===1?'':'s'):'Ask an administrator to enable Cloud access.';$('#cloudUsageNote').textContent='Credentials are securely managed by your administrator.';
-  $('#cloudPlusOption').classList.toggle('hide',!d.plus_allowed);if(!d.plus_allowed)$('#cloudInstance').value='default';
+  $('#cloudPlusOption').classList.toggle('hide',!d.plus_allowed);if(!d.plus_allowed)$('#cloudInstance').value='default';h3Validate();
   $('#cloudWorkflow').value='Scail 2 · 720 × 1280 · '+(d.workflow_id||'configured');cloudControls();
 }
 async function openCloud(){try{await Promise.all([loadCloudSettings(),loadCloudJobs()]);}catch(e){$('#cloudError').textContent=String(e.message||e);}}

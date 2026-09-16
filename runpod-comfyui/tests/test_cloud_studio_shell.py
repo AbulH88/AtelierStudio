@@ -24,11 +24,11 @@ def test_h3_reference_modes_and_upload_limits_are_exposed():
     assert 'id="h3ImageCount">0</span>' in HTML
     assert 'id="h3VideoCount">0</span>' in HTML
     assert 'id="h3AudioCount">0</span>' in HTML
-    assert "h3Mode==='flf'?2:9" in HTML
+    assert "h3Mode==='flf'?2:3" in HTML
     assert "return 3" in HTML
-    assert "total>12" in HTML
+    assert "total>7" in HTML
     assert 'id="h3ReferenceSections"' in HTML
-    assert "Images are required. Video and audio are optional." in HTML
+    assert "Up to 3 images, 1 video, and 3 audio references." in HTML
 
 
 def test_cloud_credentials_are_admin_managed_and_video_uses_modal():
@@ -52,6 +52,7 @@ def test_cloud_studio_stacks_before_workspace_is_squeezed():
     assert "grid-column:1/-1" in HTML
 
 
-def test_h3_submit_stays_guarded_until_optional_nodes_are_published():
+def test_h3_submit_uses_the_supported_runninghub_route():
     assert 'id="h3Run" class="cloud-run" disabled' in HTML
-    assert "waiting for the optional RunningHub reference nodes" in HTML
+    assert "/api/runninghub/h3/jobs" in HTML
+    assert "Ready to submit MiniMax H3" in HTML

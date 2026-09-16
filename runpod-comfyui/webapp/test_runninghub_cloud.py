@@ -104,6 +104,29 @@ def test_submit_uses_published_image_video_and_clip_nodes(monkeypatch):
     ]
 
 
+def test_h3_submit_maps_confirmed_nodes_and_clears_unused_samples(monkeypatch):
+    seen = {}
+
+    class Response:
+        ok = True
+        status_code = 200
+        def json(self):
+            return {"taskId": "h3-task"}
+
+    monkeypatch.setattr(A.requests, "post", lambda _url, **kwargs: (seen.update(kwargs) or Response()))
+    job = {"h3_refs": {"image": [{}, {}], "video": [], "audio": [{}]},
+           "h3_prompt": "test", "h3_aspect": "9:16", "h3_duration": 10}
+    result = A._runninghub_submit_h3("key", job, {"image": ["one.png", "two.png"], "video": [], "audio": ["sound.mp3"]})
+    values = {(item["nodeId"], item["fieldName"]): item["fieldValue"] for item in seen["json"]["nodeInfoList"]}
+    assert result["taskId"] == "h3-task"
+    assert values[(331, "image")] == "one.png"
+    assert values[(43, "image")] == "two.png"
+    assert values[(19, "image")] == "None"
+    assert values[(27, "video")] == ""
+    assert values[(48, "audio")] == "sound.mp3"
+    assert values[(14, "audio")] == "None"
+
+
 def test_public_completed_job_has_preview_download_and_timing():
     job = {"id": "job", "created_at": 0, "status": "done", "gallery_key": "gallery/cloud/video.mp4", "key_fingerprint": "secret-fingerprint"}
     public = A._runninghub_public_job(job)

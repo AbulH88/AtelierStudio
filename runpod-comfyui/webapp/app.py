@@ -116,6 +116,8 @@ RUNNINGHUB_BASE_URL = "https://www.runninghub.ai/openapi/v2"
 RUNNINGHUB_GLOBAL_API_KEY = os.environ.get("RUNNINGHUB_API_KEY", "").strip()
 RUNNINGHUB_GLOBAL_CONCURRENCY = max(1, int(os.environ.get("RUNNINGHUB_CONCURRENCY", "1")))
 RUNNINGHUB_WORKFLOW_ID = os.environ.get("RUNNINGHUB_WORKFLOW_ID", "2099782685577601026")
+RUNNINGHUB_H3_WORKFLOW_ID = os.environ.get("RUNNINGHUB_H3_WORKFLOW_ID", "2100168430615019522")
+RUNNINGHUB_H3_INSTANCE = os.environ.get("RUNNINGHUB_H3_INSTANCE", "ultra")
 RUNNINGHUB_REFERENCE_NODE_ID = os.environ.get("RUNNINGHUB_REFERENCE_NODE_ID", "58")
 RUNNINGHUB_VIDEO_NODE_ID = os.environ.get("RUNNINGHUB_VIDEO_NODE_ID", "113")
 RUNNINGHUB_REFERENCE_FIELD = os.environ.get("RUNNINGHUB_REFERENCE_FIELD", "image")
@@ -126,6 +128,13 @@ RUNNINGHUB_VIDEO_FPS = 24
 RUNNINGHUB_STANDARD_ESTIMATE_SECONDS = 10 * 60
 RUNNINGHUB_MAX_IMAGE_BYTES = 25 * 1024 * 1024
 RUNNINGHUB_MAX_VIDEO_BYTES = 500 * 1024 * 1024
+RUNNINGHUB_MAX_AUDIO_BYTES = 100 * 1024 * 1024
+RUNNINGHUB_H3_IMAGE_NODES = (331, 43, 19)
+RUNNINGHUB_H3_VIDEO_NODE = 27
+RUNNINGHUB_H3_AUDIO_NODES = (48, 14, 15)
+RUNNINGHUB_H3_PROMPT_NODE = 263
+RUNNINGHUB_H3_ASPECT_NODE = 252
+RUNNINGHUB_H3_DURATION_NODE = 259
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # So the app can start ComfyUI for you when it's not running (only used when
@@ -2531,6 +2540,43 @@ def _runninghub_submit(api_key, image_name, video_name, instance_type, clip):
     return data
 
 
+def _runninghub_submit_h3(api_key, job, uploads):
+    """Submit the published H3 Ref2V workflow using its confirmed connected nodes."""
+    refs = job["h3_refs"]
+    nodes = []
+    for index, node_id in enumerate(RUNNINGHUB_H3_IMAGE_NODES):
+        nodes.append({"nodeId": node_id, "fieldName": "image",
+                      "fieldValue": uploads["image"][index] if index < len(uploads["image"]) else "None"})
+    nodes.append({"nodeId": RUNNINGHUB_H3_VIDEO_NODE, "fieldName": "video",
+                  "fieldValue": uploads["video"][0] if uploads["video"] else ""})
+    for index, node_id in enumerate(RUNNINGHUB_H3_AUDIO_NODES):
+        nodes.append({"nodeId": node_id, "fieldName": "audio",
+                      "fieldValue": uploads["audio"][index] if index < len(uploads["audio"]) else "None"})
+    aspect_map = {
+        "9:16": "9:16 (Portrait Widescreen)", "16:9": "16:9 (Landscape Widescreen)",
+        "1:1": "1:1 (Square)", "4:3": "4:3 (Landscape)", "3:4": "3:4 (Portrait)",
+    }
+    nodes.extend([
+        {"nodeId": RUNNINGHUB_H3_PROMPT_NODE, "fieldName": "text", "fieldValue": job["h3_prompt"]},
+        {"nodeId": RUNNINGHUB_H3_ASPECT_NODE, "fieldName": "aspect_ratio",
+         "fieldValue": aspect_map.get(job["h3_aspect"], aspect_map["9:16"])},
+        {"nodeId": RUNNINGHUB_H3_DURATION_NODE, "fieldName": "value", "fieldValue": str(job["h3_duration"])}
+    ])
+    response = requests.post(
+        f"{RUNNINGHUB_BASE_URL}/run/workflow/{RUNNINGHUB_H3_WORKFLOW_ID}",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"addMetadata": True, "nodeInfoList": nodes, "instanceType": RUNNINGHUB_H3_INSTANCE,
+              "usePersonalQueue": False}, timeout=90)
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    if not response.ok or not data.get("taskId"):
+        raise RuntimeError(data.get("errorMessage") or data.get("message") or
+                           f"RunningHub did not accept the H3 task ({response.status_code}).")
+    return data
+
+
 def _runninghub_query(api_key, task_id):
     response = requests.post(
         f"{RUNNINGHUB_BASE_URL}/query",
@@ -2568,14 +2614,17 @@ def _runninghub_import_result(job, result):
 
 
 def _runninghub_cleanup_uploads(job):
-    for path in (job.get("reference_path"), job.get("video_path")):
+    paths = [job.get("reference_path"), job.get("video_path")]
+    for items in (job.get("h3_refs") or {}).values():
+        paths.extend(item.get("path") for item in items)
+    for path in paths:
         try:
             if path and os.path.exists(path):
                 os.remove(path)
         except OSError:
             pass
     try:
-        directory = os.path.dirname(job.get("reference_path") or "")
+        directory = os.path.dirname(job.get("reference_path") or next((p for p in paths if p), ""))
         if directory and os.path.isdir(directory):
             os.rmdir(directory)
     except OSError:
@@ -2594,14 +2643,23 @@ def _runninghub_run(job_id):
             raise RuntimeError("The RunningHub key is unavailable for this job.")
         task_id = job.get("task_id")
         if not task_id:
-            _runninghub_update(job_id, status="uploading", message="Uploading reference image to RunningHub…")
-            image_name = _runninghub_upload(api_key, job["reference_path"], job.get("reference_type") or "image/png")
-            _runninghub_update(job_id, status="uploading", message="Uploading driving video to RunningHub…")
-            video_name = _runninghub_upload(api_key, job["video_path"], job.get("video_type") or "video/mp4")
-            _runninghub_update(job_id, status="submitting", message="Submitting Scail 2 to RunningHub…")
-            clip = job.get("clip") or {"skip_first_frames": 0, "frame_load_cap": 0,
-                                        "select_every_nth": 1}
-            submitted = _runninghub_submit(api_key, image_name, video_name, job["instance_type"], clip)
+            if job.get("workflow_key") == "h3":
+                uploads = {"image": [], "video": [], "audio": []}
+                for media_type, items in job["h3_refs"].items():
+                    for item in items:
+                        _runninghub_update(job_id, status="uploading", message=f"Uploading H3 {media_type} reference…")
+                        uploads[media_type].append(_runninghub_upload(api_key, item["path"], item["type"]))
+                _runninghub_update(job_id, status="submitting", message="Submitting MiniMax H3 to RunningHub…")
+                submitted = _runninghub_submit_h3(api_key, job, uploads)
+            else:
+                _runninghub_update(job_id, status="uploading", message="Uploading reference image to RunningHub…")
+                image_name = _runninghub_upload(api_key, job["reference_path"], job.get("reference_type") or "image/png")
+                _runninghub_update(job_id, status="uploading", message="Uploading driving video to RunningHub…")
+                video_name = _runninghub_upload(api_key, job["video_path"], job.get("video_type") or "video/mp4")
+                _runninghub_update(job_id, status="submitting", message="Submitting Scail 2 to RunningHub…")
+                clip = job.get("clip") or {"skip_first_frames": 0, "frame_load_cap": 0,
+                                            "select_every_nth": 1}
+                submitted = _runninghub_submit(api_key, image_name, video_name, job["instance_type"], clip)
             task_id = str(submitted["taskId"])
             _runninghub_update(job_id, task_id=task_id, status="queued", message="Queued on RunningHub.")
             _runninghub_cleanup_uploads(job)
@@ -2750,8 +2808,68 @@ def runninghub_create_job():
     return jsonify({"id": job_id, "status": "waiting"}), 202
 
 
+@app.post("/api/runninghub/h3/jobs")
+def runninghub_create_h3_job():
+    username = session["user"]
+    settings = _runninghub_user_settings(username)
+    if not settings["configured"]:
+        return jsonify({"error": "Cloud access has not been assigned by an administrator."}), 403
+    images = [f for f in request.files.getlist("images") if f and f.filename]
+    videos = [f for f in request.files.getlist("videos") if f and f.filename]
+    audios = [f for f in request.files.getlist("audio") if f and f.filename]
+    if not 1 <= len(images) <= len(RUNNINGHUB_H3_IMAGE_NODES):
+        return jsonify({"error": "This published H3 workflow supports one to three images."}), 400
+    if len(videos) > 1:
+        return jsonify({"error": "This published H3 workflow supports one optional video reference."}), 400
+    if len(audios) > len(RUNNINGHUB_H3_AUDIO_NODES):
+        return jsonify({"error": "H3 supports up to three audio references."}), 400
+    prompt = (request.form.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"error": "Enter a prompt for MiniMax H3."}), 400
+    aspect = (request.form.get("aspect") or "9:16").strip()
+    if aspect not in {"9:16", "16:9", "1:1", "4:3", "3:4"}:
+        return jsonify({"error": "Choose a supported aspect ratio."}), 400
+    try:
+        duration = int(request.form.get("duration") or 10)
+    except ValueError:
+        return jsonify({"error": "Choose a valid duration."}), 400
+    if duration not in {5, 10, 15}:
+        return jsonify({"error": "H3 duration must be 5, 10, or 15 seconds."}), 400
+    groups = {"image": images, "video": videos, "audio": audios}
+    limits = {"image": RUNNINGHUB_MAX_IMAGE_BYTES, "video": RUNNINGHUB_MAX_VIDEO_BYTES,
+              "audio": RUNNINGHUB_MAX_AUDIO_BYTES}
+    job_id = uuid.uuid4().hex
+    job_dir = os.path.join(RUNNINGHUB_UPLOAD_DIR, job_id)
+    os.makedirs(job_dir, exist_ok=False)
+    refs = {"image": [], "video": [], "audio": []}
+    try:
+        for kind, files in groups.items():
+            for index, upload in enumerate(files, 1):
+                safe_name = secure_filename(upload.filename) or f"{kind}-{index}"
+                path = os.path.join(job_dir, f"{kind}_{index}_{safe_name}")
+                upload.save(path)
+                if os.path.getsize(path) > limits[kind]:
+                    raise ValueError(f"{kind.title()} {index} exceeds the Cloud upload limit.")
+                refs[kind].append({"path": path, "type": upload.mimetype or "application/octet-stream"})
+    except Exception as e:
+        _runninghub_cleanup_uploads({"h3_refs": refs})
+        return jsonify({"error": str(e)}), 413 if isinstance(e, ValueError) else 400
+    job = {"id": job_id, "user": username, "workflow_key": "h3", "status": "waiting",
+           "message": "Waiting for a cloud slot…", "created_at": int(time.time()),
+           "updated_at": int(time.time()), "instance_type": RUNNINGHUB_H3_INSTANCE,
+           "workflow_id": RUNNINGHUB_H3_WORKFLOW_ID, "key_enc": settings["key_enc"],
+           "key_fingerprint": settings["key_fingerprint"], "key_concurrency": settings["concurrency"],
+           "h3_refs": refs, "h3_prompt": prompt, "h3_aspect": aspect, "h3_duration": duration,
+           "estimated_total_seconds": None}
+    with RUNNINGHUB_JOBS_LOCK:
+        RUNNINGHUB_JOBS[job_id] = job
+        _save_runninghub_jobs()
+    _runninghub_dispatch()
+    return jsonify({"id": job_id, "status": "waiting"}), 202
+
+
 def _runninghub_public_job(job):
-    safe = {k: v for k, v in job.items() if k not in {"key_enc", "key_fingerprint", "key_concurrency", "reference_path", "video_path"}}
+    safe = {k: v for k, v in job.items() if k not in {"key_enc", "key_fingerprint", "key_concurrency", "reference_path", "video_path", "h3_refs"}}
     elapsed = max(0, int(time.time()) - int(safe.get("created_at") or time.time()))
     safe["elapsed_seconds"] = elapsed
     if safe.get("status") in {"uploading", "submitting", "running", "importing"} and safe.get("estimated_total_seconds"):
