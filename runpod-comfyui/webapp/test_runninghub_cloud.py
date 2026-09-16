@@ -127,6 +127,10 @@ def test_h3_submit_maps_confirmed_nodes_and_clears_unused_samples(monkeypatch):
     assert values[(14, "audio")] == "None"
 
 
+def test_h3_defaults_to_standard_instance():
+    assert A.RUNNINGHUB_H3_INSTANCE == "default"
+
+
 def test_public_completed_job_has_preview_download_and_timing():
     job = {"id": "job", "created_at": 0, "status": "done", "gallery_key": "gallery/cloud/video.mp4", "key_fingerprint": "secret-fingerprint"}
     public = A._runninghub_public_job(job)

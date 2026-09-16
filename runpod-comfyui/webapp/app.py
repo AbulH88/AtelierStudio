@@ -117,7 +117,10 @@ RUNNINGHUB_GLOBAL_API_KEY = os.environ.get("RUNNINGHUB_API_KEY", "").strip()
 RUNNINGHUB_GLOBAL_CONCURRENCY = max(1, int(os.environ.get("RUNNINGHUB_CONCURRENCY", "1")))
 RUNNINGHUB_WORKFLOW_ID = os.environ.get("RUNNINGHUB_WORKFLOW_ID", "2099782685577601026")
 RUNNINGHUB_H3_WORKFLOW_ID = os.environ.get("RUNNINGHUB_H3_WORKFLOW_ID", "2100168430615019522")
-RUNNINGHUB_H3_INSTANCE = os.environ.get("RUNNINGHUB_H3_INSTANCE", "ultra")
+# H3 runs successfully on RunningHub Standard in the manually verified workflow.
+# Keep infrastructure selection server-side; the Studio UI intentionally has no
+# per-user instance selector.
+RUNNINGHUB_H3_INSTANCE = os.environ.get("RUNNINGHUB_H3_INSTANCE", "default")
 RUNNINGHUB_REFERENCE_NODE_ID = os.environ.get("RUNNINGHUB_REFERENCE_NODE_ID", "58")
 RUNNINGHUB_VIDEO_NODE_ID = os.environ.get("RUNNINGHUB_VIDEO_NODE_ID", "113")
 RUNNINGHUB_REFERENCE_FIELD = os.environ.get("RUNNINGHUB_REFERENCE_FIELD", "image")
