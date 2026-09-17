@@ -151,7 +151,7 @@ def test_krea_submit_maps_published_nodes_and_selected_lora(monkeypatch):
 
     monkeypatch.setattr(A.requests, "post", lambda url, **kwargs: (seen.update(url=url, **kwargs) or Response()))
     job = {"krea_prompt": "portrait prompt", "krea_width": 1080, "krea_height": 1920,
-           "krea_lora_filename": "Sophie-v3.safetensors"}
+           "krea_lora_filename": "Sophie-v3.safetensors", "krea_denoise": 0.64}
     result = A._runninghub_submit_krea2("key", job, "api/source.png")
     values = {(item["nodeId"], item["fieldName"]): item["fieldValue"] for item in seen["json"]["nodeInfoList"]}
     assert result["taskId"] == "krea-task"
@@ -160,8 +160,20 @@ def test_krea_submit_maps_published_nodes_and_selected_lora(monkeypatch):
     assert values[(13, "width")] == "1080"
     assert values[(13, "height")] == "1920"
     assert values[(46, "lora_name")] == "Sophie-v3.safetensors"
+    assert values[(4, "denoise")] == "0.64"
+    assert (1, "denoise") not in values
     state = json.loads(values[(46, "LoraLoaderState")])
     assert state["loras"] == [{"name": "Sophie-v3.safetensors", "on": True, "sm": 1, "sc": 1, "triggers": []}]
+
+
+def test_krea_job_rejects_out_of_range_denoise(maker_client, users):
+    users["maker"]["runninghub_key_enc"] = A._encrypt_runninghub_key("rh_example_secret_1234567890")
+    response = maker_client.post("/api/runninghub/krea2/jobs", data={
+        "denoise": "1.2",
+        "image": (BytesIO(b"fake-image"), "source.png"),
+    })
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "Denoise must be a number from 0 to 1."
 
 
 def test_public_completed_job_has_preview_download_and_timing():

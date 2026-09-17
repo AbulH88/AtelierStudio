@@ -17,6 +17,7 @@ Optional env: RUNPOD_ENDPOINT_ID, RUNPOD_API_KEY (for cloud),
 
 import base64
 import hashlib
+import math
 import os
 import platform
 import re
@@ -144,6 +145,7 @@ RUNNINGHUB_KREA2_IMAGE_NODE = 33
 RUNNINGHUB_KREA2_PROMPT_NODE = 5
 RUNNINGHUB_KREA2_RESIZE_NODE = 13
 RUNNINGHUB_KREA2_LORA_NODE = 46
+RUNNINGHUB_KREA2_BASE_SAMPLER_NODE = 4
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # So the app can start ComfyUI for you when it's not running (only used when
@@ -2691,6 +2693,8 @@ def _runninghub_submit_krea2(api_key, job, image_name):
         {"nodeId": RUNNINGHUB_KREA2_LORA_NODE, "fieldName": "lora_name",
          "fieldValue": job["krea_lora_filename"]},
         {"nodeId": RUNNINGHUB_KREA2_LORA_NODE, "fieldName": "LoraLoaderState", "fieldValue": lora_state},
+        {"nodeId": RUNNINGHUB_KREA2_BASE_SAMPLER_NODE, "fieldName": "denoise",
+         "fieldValue": f"{job['krea_denoise']:.2f}"},
     ]
     response = requests.post(
         f"{RUNNINGHUB_BASE_URL}/run/workflow/{RUNNINGHUB_KREA2_WORKFLOW_ID}",
@@ -3088,6 +3092,12 @@ def runninghub_create_krea2_job():
     image = request.files.get("image")
     prompt = (request.form.get("prompt") or "").strip()
     preset_key = (request.form.get("resolution_key") or "").strip()
+    try:
+        denoise = float(request.form.get("denoise", "0.60"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Denoise must be a number from 0 to 1."}), 400
+    if not math.isfinite(denoise) or denoise < 0 or denoise > 1:
+        return jsonify({"error": "Denoise must be a number from 0 to 1."}), 400
     if not image or not image.filename:
         return jsonify({"error": "A source image is required."}), 400
     if not prompt:
@@ -3113,7 +3123,7 @@ def runninghub_create_krea2_job():
            "key_enc": settings["key_enc"], "key_fingerprint": settings["key_fingerprint"],
            "key_concurrency": settings["concurrency"], "krea_image_path": image_path,
            "krea_image_type": image.mimetype, "krea_prompt": prompt, "krea_resolution_key": preset_key,
-           "krea_width": preset["width"], "krea_height": preset["height"],
+           "krea_width": preset["width"], "krea_height": preset["height"], "krea_denoise": denoise,
            "krea_character_id": lora["character_id"], "krea_character_name": lora["character_name"],
            "krea_version_id": lora["version_id"], "krea_version_label": lora["version_label"],
            "krea_lora_filename": lora["filename"], "estimated_total_seconds": None}
