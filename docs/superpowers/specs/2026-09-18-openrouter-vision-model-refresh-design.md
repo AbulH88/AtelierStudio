@@ -16,6 +16,7 @@ The selector will contain exactly these models, in this order:
 4. `z-ai/glm-5.3-flash` — GLM 5.3 Flash; inexpensive alternative.
 5. `google/gemini-3.8-flash` — Gemini 3.8 Flash; SFW-focused option.
 6. `deepseek/deepseek-v4.1-flash` — DeepSeek V4.1 Flash; inexpensive native-vision option.
+7. `openai/gpt-5.6-luna` — GPT-5.6 Luna; SFW/OpenAI option for general image descriptions.
 
 The application default will change from `qwen/qwen3-vl-235b-a22b-instruct` to `qwen/qwen3.8-27b`. Existing stale entries will be removed rather than retained as legacy choices.
 
@@ -29,7 +30,7 @@ The application default will change from `qwen/qwen3-vl-235b-a22b-instruct` to `
 
 ## Labels and safety
 
-Labels will communicate cost/availability and the known intended role of each option without claiming guaranteed moderation behavior. Provider-side safety behavior can change and must not be treated as an application guarantee. Gemini remains labeled as SFW-focused; the other models are alternatives for the existing body-description workflow.
+Labels will communicate cost/availability and the known intended role of each option without claiming guaranteed moderation behavior. Provider-side safety behavior can change and must not be treated as an application guarantee. Gemini and GPT-5.6 Luna remain labeled as SFW-focused; the other models are alternatives for the existing body-description workflow.
 
 ## Validation
 
