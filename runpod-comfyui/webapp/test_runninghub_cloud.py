@@ -131,6 +131,39 @@ def test_h3_defaults_to_standard_instance():
     assert A.RUNNINGHUB_H3_INSTANCE == "default"
 
 
+def test_krea_lora_registry_normalizes_paths_and_one_default():
+    data = A._normalize_runninghub_loras([{"id": "sophie", "name": "Sophie", "versions": [
+        {"id": "v1", "label": "V1", "filename": r"models\loras\Sophie-v1.safetensors", "default": True},
+        {"id": "v3", "label": "V3", "filename": "models/loras/Sophie-v3.safetensors", "default": True},
+    ]}])
+    assert [v["filename"] for v in data[0]["versions"]] == ["Sophie-v1.safetensors", "Sophie-v3.safetensors"]
+    assert [v["default"] for v in data[0]["versions"]] == [True, False]
+
+
+def test_krea_submit_maps_published_nodes_and_selected_lora(monkeypatch):
+    seen = {}
+
+    class Response:
+        ok = True
+        status_code = 200
+        def json(self):
+            return {"taskId": "krea-task"}
+
+    monkeypatch.setattr(A.requests, "post", lambda url, **kwargs: (seen.update(url=url, **kwargs) or Response()))
+    job = {"krea_prompt": "portrait prompt", "krea_width": 1080, "krea_height": 1920,
+           "krea_lora_filename": "Sophie-v3.safetensors"}
+    result = A._runninghub_submit_krea2("key", job, "api/source.png")
+    values = {(item["nodeId"], item["fieldName"]): item["fieldValue"] for item in seen["json"]["nodeInfoList"]}
+    assert result["taskId"] == "krea-task"
+    assert values[(33, "image")] == "api/source.png"
+    assert values[(5, "text")] == "portrait prompt"
+    assert values[(13, "width")] == "1080"
+    assert values[(13, "height")] == "1920"
+    assert values[(46, "lora_name")] == "Sophie-v3.safetensors"
+    state = json.loads(values[(46, "LoraLoaderState")])
+    assert state["loras"] == [{"name": "Sophie-v3.safetensors", "on": True, "sm": 1, "sc": 1, "triggers": []}]
+
+
 def test_public_completed_job_has_preview_download_and_timing():
     job = {"id": "job", "created_at": 0, "status": "done", "gallery_key": "gallery/cloud/video.mp4", "key_fingerprint": "secret-fingerprint"}
     public = A._runninghub_public_job(job)

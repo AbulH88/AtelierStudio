@@ -138,6 +138,12 @@ RUNNINGHUB_H3_AUDIO_NODES = (48, 14, 15)
 RUNNINGHUB_H3_PROMPT_NODE = 263
 RUNNINGHUB_H3_ASPECT_NODE = 252
 RUNNINGHUB_H3_DURATION_NODE = 259
+RUNNINGHUB_KREA2_WORKFLOW_ID = os.environ.get("RUNNINGHUB_KREA2_WORKFLOW_ID", "2100309003213901825")
+RUNNINGHUB_KREA2_INSTANCE = os.environ.get("RUNNINGHUB_KREA2_INSTANCE", "default")
+RUNNINGHUB_KREA2_IMAGE_NODE = 33
+RUNNINGHUB_KREA2_PROMPT_NODE = 5
+RUNNINGHUB_KREA2_RESIZE_NODE = 13
+RUNNINGHUB_KREA2_LORA_NODE = 46
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # So the app can start ComfyUI for you when it's not running (only used when
@@ -2407,10 +2413,83 @@ def _save_to_gallery(inp, images, seed):
 # Agent, so a job continues while the user's PC is off.
 RUNNINGHUB_JOBS_FILE = os.path.join(HERE, "runninghub_jobs.json")
 RUNNINGHUB_UPLOAD_DIR = os.path.join(HERE, "runninghub_uploads")
+RUNNINGHUB_LORAS_FILE = os.path.join(HERE, "runninghub_loras.json")
 RUNNINGHUB_JOBS_LOCK = threading.Lock()
+RUNNINGHUB_LORAS_LOCK = threading.Lock()
 RUNNINGHUB_ACTIVE_STATUSES = {"waiting", "uploading", "submitting", "queued", "running", "importing", "cancelling"}
 RUNNINGHUB_TERMINAL_STATUSES = {"done", "failed", "cancelled"}
 os.makedirs(RUNNINGHUB_UPLOAD_DIR, exist_ok=True)
+
+
+def _default_runninghub_loras():
+    return [{"id": "sophie-joy-talking", "name": "SophieJoyTalking", "enabled": True,
+             "preview_url": "", "versions": [
+                 {"id": "v1", "label": "V1.0", "filename": "Sophie-step00003000.safetensors",
+                  "enabled": True, "default": True, "preview_url": ""}
+             ]}]
+
+
+def _load_runninghub_loras():
+    try:
+        data = _json.load(open(RUNNINGHUB_LORAS_FILE, encoding="utf-8"))
+        return data if isinstance(data, list) else _default_runninghub_loras()
+    except (OSError, ValueError, TypeError):
+        return _default_runninghub_loras()
+
+
+def _save_runninghub_loras(data):
+    tmp = RUNNINGHUB_LORAS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        _json.dump(data, f, indent=2)
+    os.replace(tmp, RUNNINGHUB_LORAS_FILE)
+
+
+def _normalize_runninghub_loras(raw):
+    if not isinstance(raw, list):
+        raise ValueError("Characters must be a list.")
+    clean, seen_chars = [], set()
+    for char in raw:
+        name = str((char or {}).get("name") or "").strip()
+        char_id = str((char or {}).get("id") or uuid.uuid4().hex).strip()
+        if not name or not char_id or char_id in seen_chars:
+            raise ValueError("Every character needs a unique ID and display name.")
+        seen_chars.add(char_id)
+        versions, seen_versions, default_seen = [], set(), False
+        for version in (char or {}).get("versions") or []:
+            label = str((version or {}).get("label") or "").strip()
+            version_id = str((version or {}).get("id") or uuid.uuid4().hex).strip()
+            filename = str((version or {}).get("filename") or "").strip().replace("\\", "/")
+            if filename.lower().startswith("models/loras/"):
+                filename = filename[len("models/loras/"):]
+            if not label or not version_id or version_id in seen_versions or not filename.lower().endswith(".safetensors"):
+                raise ValueError(f"Every {name} version needs a unique ID, label, and .safetensors filename.")
+            seen_versions.add(version_id)
+            is_default = bool((version or {}).get("default")) and not default_seen
+            default_seen = default_seen or is_default
+            versions.append({"id": version_id, "label": label, "filename": filename,
+                             "enabled": bool((version or {}).get("enabled", True)), "default": is_default,
+                             "preview_url": str((version or {}).get("preview_url") or "").strip()})
+        if not versions:
+            raise ValueError(f"{name} needs at least one version.")
+        if not default_seen:
+            versions[0]["default"] = True
+        clean.append({"id": char_id, "name": name, "enabled": bool((char or {}).get("enabled", True)),
+                      "preview_url": str((char or {}).get("preview_url") or "").strip(), "versions": versions})
+    return clean
+
+
+def _resolve_runninghub_lora(character_id, version_id):
+    with RUNNINGHUB_LORAS_LOCK:
+        data = _load_runninghub_loras()
+    character = next((c for c in data if c.get("id") == character_id and c.get("enabled")), None)
+    if not character:
+        return None
+    version = next((v for v in character.get("versions", [])
+                    if v.get("id") == version_id and v.get("enabled")), None)
+    if not version:
+        return None
+    return {"character_id": character_id, "character_name": character["name"],
+            "version_id": version_id, "version_label": version["label"], "filename": version["filename"]}
 
 
 def _load_runninghub_jobs():
@@ -2600,6 +2679,34 @@ def _runninghub_submit_h3(api_key, job, uploads):
     return data
 
 
+def _runninghub_submit_krea2(api_key, job, image_name):
+    lora_state = _json.dumps({"version": 1, "sep": ", ", "cacheMode": "last", "loras": [{
+        "name": job["krea_lora_filename"], "on": True, "sm": 1, "sc": 1, "triggers": []
+    }]}, separators=(",", ":"))
+    nodes = [
+        {"nodeId": RUNNINGHUB_KREA2_IMAGE_NODE, "fieldName": "image", "fieldValue": image_name},
+        {"nodeId": RUNNINGHUB_KREA2_PROMPT_NODE, "fieldName": "text", "fieldValue": job["krea_prompt"]},
+        {"nodeId": RUNNINGHUB_KREA2_RESIZE_NODE, "fieldName": "width", "fieldValue": str(job["krea_width"])},
+        {"nodeId": RUNNINGHUB_KREA2_RESIZE_NODE, "fieldName": "height", "fieldValue": str(job["krea_height"])},
+        {"nodeId": RUNNINGHUB_KREA2_LORA_NODE, "fieldName": "lora_name",
+         "fieldValue": job["krea_lora_filename"]},
+        {"nodeId": RUNNINGHUB_KREA2_LORA_NODE, "fieldName": "LoraLoaderState", "fieldValue": lora_state},
+    ]
+    response = requests.post(
+        f"{RUNNINGHUB_BASE_URL}/run/workflow/{RUNNINGHUB_KREA2_WORKFLOW_ID}",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"addMetadata": True, "nodeInfoList": nodes, "instanceType": RUNNINGHUB_KREA2_INSTANCE,
+              "usePersonalQueue": False}, timeout=90)
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    if not response.ok or not data.get("taskId"):
+        raise RuntimeError(data.get("errorMessage") or data.get("message") or
+                           f"RunningHub did not accept the Krea2 task ({response.status_code}).")
+    return data
+
+
 def _runninghub_query(api_key, task_id):
     response = requests.post(
         f"{RUNNINGHUB_BASE_URL}/query",
@@ -2632,28 +2739,29 @@ def _runninghub_cancel(api_key, task_id):
 
 def _runninghub_import_result(job, result):
     outputs = result.get("results") or []
-    video = next((o for o in outputs if str(o.get("outputType", "")).lower() in ("mp4", "mov", "webm")
-                  and o.get("url")), None)
-    if not video:
-        raise RuntimeError("RunningHub finished but returned no downloadable video.")
+    wanted = ("png", "jpg", "jpeg", "webp") if _runninghub_workflow_key(job) == "krea2_i2i_hq" else ("mp4", "mov", "webm")
+    output = next((o for o in outputs if str(o.get("outputType", "")).lower() in wanted and o.get("url")), None)
+    if not output:
+        raise RuntimeError("RunningHub finished but returned no downloadable result.")
     with tempfile.TemporaryDirectory(prefix="atelier-rh-") as td:
-        dst = os.path.join(td, "cloud-result." + str(video.get("outputType", "mp4")).lower())
-        response = requests.get(video["url"], stream=True, timeout=900)
+        extension = str(output.get("outputType", wanted[0])).lower()
+        dst = os.path.join(td, "cloud-result." + extension)
+        response = requests.get(output["url"], stream=True, timeout=900)
         response.raise_for_status()
         with open(dst, "wb") as f:
             for chunk in response.iter_content(65536):
                 if chunk:
                     f.write(chunk)
         if os.path.getsize(dst) < 1024:
-            raise RuntimeError("RunningHub returned an empty video file.")
-        # Gallery already streams arbitrary MP4 keys and lazily builds thumbs.
-        key = f"gallery/cloud/{int(time.time())}_{job['id']}.mp4"
+            raise RuntimeError("RunningHub returned an empty result file.")
+        # Gallery streams cloud media and lazily builds previews.
+        key = f"gallery/cloud/{int(time.time())}_{job['id']}.{extension}"
         r2_store.upload(dst, key)
     return key
 
 
 def _runninghub_cleanup_uploads(job):
-    paths = [job.get("reference_path"), job.get("video_path")]
+    paths = [job.get("reference_path"), job.get("video_path"), job.get("krea_image_path")]
     for items in (job.get("h3_refs") or {}).values():
         paths.extend(item.get("path") for item in items)
     for path in paths:
@@ -2682,7 +2790,14 @@ def _runninghub_run(job_id):
             raise RuntimeError("The RunningHub key is unavailable for this job.")
         task_id = job.get("task_id")
         if not task_id:
-            if job.get("workflow_key") == "h3":
+            if job.get("workflow_key") == "krea2_i2i_hq":
+                _runninghub_update(job_id, status="uploading", message="Uploading Krea2 source image…")
+                image_name = _runninghub_upload(api_key, job["krea_image_path"], job.get("krea_image_type") or "image/png")
+                if _runninghub_is_cancelled(job_id):
+                    return
+                _runninghub_update(job_id, status="submitting", message="Submitting Krea2 Image HQ to RunningHub…")
+                submitted = _runninghub_submit_krea2(api_key, job, image_name)
+            elif job.get("workflow_key") == "h3":
                 uploads = {"image": [], "video": [], "audio": []}
                 for media_type, items in job["h3_refs"].items():
                     for item in items:
@@ -2763,6 +2878,35 @@ def _resume_runninghub_jobs():
 
 
 _resume_runninghub_jobs()
+
+
+@app.get("/api/runninghub/loras")
+def runninghub_loras():
+    with RUNNINGHUB_LORAS_LOCK:
+        data = _load_runninghub_loras()
+    is_admin = load_users().get(session["user"], {}).get("role") == "admin"
+    if is_admin:
+        return jsonify({"characters": data})
+    public = []
+    for character in data:
+        if not character.get("enabled"):
+            continue
+        versions = [v for v in character.get("versions", []) if v.get("enabled")]
+        if versions:
+            public.append({**character, "versions": versions})
+    return jsonify({"characters": public})
+
+
+@app.put("/api/runninghub/loras")
+@admin_required
+def runninghub_save_loras():
+    try:
+        data = _normalize_runninghub_loras((request.get_json(silent=True) or {}).get("characters"))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    with RUNNINGHUB_LORAS_LOCK:
+        _save_runninghub_loras(data)
+    return jsonify({"ok": True, "characters": data})
 
 
 @app.get("/api/runninghub/settings")
@@ -2932,8 +3076,59 @@ def runninghub_create_h3_job():
     return jsonify({"id": job_id, "status": "waiting"}), 202
 
 
+@app.post("/api/runninghub/krea2/jobs")
+def runninghub_create_krea2_job():
+    username = session["user"]
+    settings = _runninghub_user_settings(username)
+    if not settings["configured"]:
+        return jsonify({"error": "Cloud access has not been assigned by an administrator."}), 403
+    with RUNNINGHUB_JOBS_LOCK:
+        if _runninghub_has_active_locked(username, "krea2_i2i_hq"):
+            return jsonify({"error": "A Krea2 Image HQ cloud job is already active. Wait for it or cancel it first."}), 409
+    image = request.files.get("image")
+    prompt = (request.form.get("prompt") or "").strip()
+    preset_key = (request.form.get("resolution_key") or "").strip()
+    if not image or not image.filename:
+        return jsonify({"error": "A source image is required."}), 400
+    if not prompt:
+        return jsonify({"error": "Enter or generate a prompt."}), 400
+    preset = next((p for p in RES_PRESETS if p["key"] == preset_key), None)
+    if not preset:
+        return jsonify({"error": "Choose a supported Krea2 resolution."}), 400
+    lora = _resolve_runninghub_lora((request.form.get("character_id") or "").strip(),
+                                    (request.form.get("version_id") or "").strip())
+    if not lora:
+        return jsonify({"error": "Choose an available Cloud character and version."}), 400
+    job_id = uuid.uuid4().hex
+    job_dir = os.path.join(RUNNINGHUB_UPLOAD_DIR, job_id)
+    os.makedirs(job_dir, exist_ok=False)
+    image_path = os.path.join(job_dir, "source_" + (secure_filename(image.filename) or "image.png"))
+    image.save(image_path)
+    if os.path.getsize(image_path) > RUNNINGHUB_MAX_IMAGE_BYTES:
+        _runninghub_cleanup_uploads({"krea_image_path": image_path})
+        return jsonify({"error": "Source image exceeds the Cloud upload limit."}), 413
+    job = {"id": job_id, "user": username, "workflow_key": "krea2_i2i_hq", "status": "waiting",
+           "message": "Waiting for a cloud slot…", "created_at": int(time.time()), "updated_at": int(time.time()),
+           "instance_type": RUNNINGHUB_KREA2_INSTANCE, "workflow_id": RUNNINGHUB_KREA2_WORKFLOW_ID,
+           "key_enc": settings["key_enc"], "key_fingerprint": settings["key_fingerprint"],
+           "key_concurrency": settings["concurrency"], "krea_image_path": image_path,
+           "krea_image_type": image.mimetype, "krea_prompt": prompt, "krea_resolution_key": preset_key,
+           "krea_width": preset["width"], "krea_height": preset["height"],
+           "krea_character_id": lora["character_id"], "krea_character_name": lora["character_name"],
+           "krea_version_id": lora["version_id"], "krea_version_label": lora["version_label"],
+           "krea_lora_filename": lora["filename"], "estimated_total_seconds": None}
+    with RUNNINGHUB_JOBS_LOCK:
+        if _runninghub_has_active_locked(username, "krea2_i2i_hq"):
+            _runninghub_cleanup_uploads(job)
+            return jsonify({"error": "A Krea2 Image HQ cloud job is already active. Wait for it or cancel it first."}), 409
+        RUNNINGHUB_JOBS[job_id] = job
+        _save_runninghub_jobs()
+    _runninghub_dispatch()
+    return jsonify({"id": job_id, "status": "waiting"}), 202
+
+
 def _runninghub_public_job(job):
-    safe = {k: v for k, v in job.items() if k not in {"key_enc", "key_fingerprint", "key_concurrency", "reference_path", "video_path", "h3_refs"}}
+    safe = {k: v for k, v in job.items() if k not in {"key_enc", "key_fingerprint", "key_concurrency", "reference_path", "video_path", "h3_refs", "krea_image_path"}}
     elapsed = max(0, int(time.time()) - int(safe.get("created_at") or time.time()))
     safe["elapsed_seconds"] = elapsed
     if safe.get("status") in {"uploading", "submitting", "running", "importing"} and safe.get("estimated_total_seconds"):
