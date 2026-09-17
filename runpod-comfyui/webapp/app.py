@@ -109,7 +109,7 @@ CLOUD_GPU_OPTIONS = [
 ]
 RUNPOD_EP_URL = f"https://rest.runpod.io/v1/endpoints/{ENDPOINT_ID}"
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "qwen/qwen3-vl-235b-a22b-instruct")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "qwen/qwen3.8-27b")
 # RunningHub Cloud is deliberately independent from RunPod, ComfyUI, and the
 # Home Agent. These defaults match the published Scail 2 API workflow; keep
 # them overrideable so an exported RunningHub API workflow can change safely.
@@ -948,24 +948,16 @@ LIGHTNING_DEFAULTS = {
 
 
 # Curated OpenRouter vision models for the "Describe with AI" dropdown. Kept short
-# on purpose (the full /models list is 300+). Edit this list to add/remove options;
-# the first entry is the default. DeepSeek has no vision model on OpenRouter, so
-# Qwen3-VL covers the uncensored/strong slot. OpenAI/Anthropic models refuse even
-# non-explicit figure/body-type descriptions of real people (confirmed: refuses
-# "curvy hourglass figure" language on a fully clothed, non-nude photo, Explicit
-# toggle off) — not just NSFW. Effectively unusable for this app's core describe
-# workflow (body type is central to it); kept only for clothing/scene-only use
-# with Body Type left blank.
+# on purpose (the full catalog includes many irrelevant and unstable choices).
+# The first entry is the default. Labels describe the intended role of each model;
+# provider-side moderation and free-model availability can change independently.
 VISION_MODELS = [
-    {"id": "qwen/qwen3-vl-235b-a22b-instruct",      "name": "Qwen3-VL 235B (SFW + NSFW · default)"},
-    {"id": "qwen/qwen3-vl-32b-instruct",            "name": "Qwen3-VL 32B (both · cheaper)"},
-    {"id": "x-ai/grok-4.3",                         "name": "Grok 4.3 (both · least filtered)"},
-    {"id": "openai/gpt-4o",                         "name": "GPT-4o (refuses figure/body descriptions — scene-only)"},
-    {"id": "anthropic/claude-sonnet-5",              "name": "Claude Sonnet 5 (refuses figure/body descriptions — scene-only)"},
-    {"id": "mistralai/mistral-small-3.2-24b-instruct", "name": "Mistral Small 3.2 (both · cheap)"},
-    {"id": "z-ai/glm-4.6v",                         "name": "GLM-4.6V (both)"},
-    {"id": "google/gemini-2.5-flash",               "name": "Gemini 2.5 Flash (SFW only · fast)"},
-    {"id": "nvidia/nemotron-nano-12b-v2-vl:free",   "name": "Nemotron Nano 12B VL (free · SFW)"},
+    {"id": "qwen/qwen3.8-27b",                  "name": "Qwen 3.8 27B (default · balanced)"},
+    {"id": "qwen/qwen3.8-27b:free",             "name": "Qwen 3.8 27B Free (availability varies)"},
+    {"id": "x-ai/grok-4.6",                     "name": "Grok 4.6 (premium · less filtered)"},
+    {"id": "z-ai/glm-5.3-flash",                "name": "GLM 5.3 Flash (inexpensive)"},
+    {"id": "google/gemini-3.8-flash",           "name": "Gemini 3.8 Flash (SFW-focused)"},
+    {"id": "deepseek/deepseek-v4.1-flash",      "name": "DeepSeek V4.1 Flash (inexpensive)"},
 ]
 
 ASPECTS = [
