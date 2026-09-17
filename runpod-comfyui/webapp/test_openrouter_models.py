@@ -11,6 +11,7 @@ EXPECTED_MODEL_IDS = [
     "z-ai/glm-5.3-flash",
     "google/gemini-3.8-flash",
     "deepseek/deepseek-v4.1-flash",
+    "openai/gpt-5.6-luna",
 ]
 
 

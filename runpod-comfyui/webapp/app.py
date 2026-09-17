@@ -958,6 +958,7 @@ VISION_MODELS = [
     {"id": "z-ai/glm-5.3-flash",                "name": "GLM 5.3 Flash (inexpensive)"},
     {"id": "google/gemini-3.8-flash",           "name": "Gemini 3.8 Flash (SFW-focused)"},
     {"id": "deepseek/deepseek-v4.1-flash",      "name": "DeepSeek V4.1 Flash (inexpensive)"},
+    {"id": "openai/gpt-5.6-luna",               "name": "GPT-5.6 Luna (SFW · OpenAI)"},
 ]
 
 ASPECTS = [
@@ -1369,7 +1370,7 @@ def reels_folders():
 @admin_required
 def reels_folder_create():
     try:
-        name = _folder_name(request.get_json(force=True).get("name", ""))
+        name = _folder_path(request.get_json(force=True).get("name", ""))
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     if not name:
@@ -1425,7 +1426,7 @@ def reels_list():
     for reel in reels:
         stem, _ext = os.path.splitext(reel["key"])
         reel["thumb_url"] = f"/api/reels/media?key={quote('thumbs-reels/' + stem + '.webp', safe='')}"
-    return jsonify({"reels": reels})
+    return jsonify({"reels": _enrich_media_creator(reels)})
 
 
 @app.post("/api/reels/download")
@@ -1451,6 +1452,7 @@ def reels_download():
         local = os.path.join(tmpdir, files[0])
         key = (f"{folder}/" if folder else "") + files[0]
         r2_store.upload(local, key)
+        _set_media_creator(key, session.get("user"))
         try:
             with open(local, "rb") as f:
                 thumb = _make_video_thumb(f.read())
@@ -1481,6 +1483,7 @@ def reels_upload():
     try:
         raw = f.read()
         r2_store.upload_bytes(key, raw)
+        _set_media_creator(key, session.get("user"))
         try:
             thumb = _make_video_thumb(raw)
             if thumb is not None:
@@ -1590,6 +1593,7 @@ def reels_delete():
     key = request.get_json(force=True).get("key", "")
     if key:
         r2_store.delete(key)
+        _delete_media_metadata(key)
     return jsonify({"ok": True})
 
 
@@ -1603,9 +1607,20 @@ def _folder_name(value):
     return value
 
 
+def _folder_path(value):
+    """A safe nested folder path; each segment follows _folder_name rules."""
+    value = (value or "").strip().strip("/")
+    if not value:
+        return ""
+    parts = value.split("/")
+    if any(not _folder_name(part) for part in parts):
+        raise ValueError("Folder path contains an invalid segment.")
+    return "/".join(parts)
+
+
 def _move_library_media(key, folder, library, thumbs_prefix):
     """Move one library object and its optional preview sidecar together."""
-    folder = _folder_name(folder)
+    folder = _folder_path(folder)
     if not key.startswith(library):
         raise ValueError("That item does not belong to this library.")
     relative = key[len(library):]
@@ -1616,6 +1631,7 @@ def _move_library_media(key, folder, library, thumbs_prefix):
     if key == destination:
         return destination
     r2_store.move(key, destination)
+    _move_media_metadata(key, destination)
     source_stem, _ = os.path.splitext(relative)
     destination_stem, _ = os.path.splitext(destination[len(library):])
     source_thumb = thumbs_prefix + source_stem + ".webp"
@@ -1639,6 +1655,22 @@ def reels_move():
             raise ValueError("That item does not belong to the Reel library.")
         key = _move_library_media(source, body.get("folder", ""), "", "thumbs-reels/")
         return jsonify({"ok": True, "key": key})
+    except (ValueError, FileExistsError) as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/reels/bulk-move")
+def reels_bulk_move():
+    body = request.get_json(force=True)
+    keys = body.get("keys", [])
+    if not isinstance(keys, list) or not keys:
+        return jsonify({"error": "Select one or more Reels."}), 400
+    try:
+        folder = _folder_path(body.get("folder", ""))
+        moved = [_move_library_media(key, folder, "", "thumbs-reels/") for key in keys]
+        return jsonify({"ok": True, "keys": moved})
     except (ValueError, FileExistsError) as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
@@ -2343,6 +2375,62 @@ def _gallery_group(inp):
         if p.startswith(d["folder"].rstrip("/").lower() + "/"):
             return d["key"]
     return "misc"
+
+
+# Shared libraries remain visible to all users, but this registry records the
+# creator of new media so either library can offer a reliable "My creations"
+# organizer without changing immutable R2 object paths.
+MEDIA_METADATA_FILE = os.path.join(HERE, "media_metadata.json")
+MEDIA_METADATA_LOCK = threading.Lock()
+
+
+def _load_media_metadata():
+    try:
+        with open(MEDIA_METADATA_FILE, encoding="utf-8") as f:
+            data = _json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def _save_media_metadata(data):
+    tmp = MEDIA_METADATA_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        _json.dump(data, f, indent=2, sort_keys=True)
+    os.replace(tmp, MEDIA_METADATA_FILE)
+
+
+def _set_media_creator(key, creator):
+    if not key or not creator:
+        return
+    with MEDIA_METADATA_LOCK:
+        data = _load_media_metadata()
+        data[key] = {"creator": creator}
+        _save_media_metadata(data)
+
+
+def _move_media_metadata(source, destination):
+    with MEDIA_METADATA_LOCK:
+        data = _load_media_metadata()
+        record = data.pop(source, None)
+        if record:
+            data[destination] = record
+            _save_media_metadata(data)
+
+
+def _delete_media_metadata(key):
+    with MEDIA_METADATA_LOCK:
+        data = _load_media_metadata()
+        if key in data:
+            del data[key]
+            _save_media_metadata(data)
+
+
+def _enrich_media_creator(items):
+    data = _load_media_metadata()
+    for item in items:
+        item["creator"] = data.get(item.get("key", ""), {}).get("creator", "Unknown / legacy")
+    return items
 
 
 def _make_thumb(png_bytes, max_dim=480, quality=72):
@@ -3223,7 +3311,7 @@ def gallery_list():
             thumb_key = "thumbs/" + stem + ".webp"
             im["thumb_url"] = f"/api/media?key={quote(thumb_key, safe='')}"
     imgs.sort(key=lambda x: x["name"], reverse=True)   # newest first
-    return jsonify({"images": imgs})
+    return jsonify({"images": _enrich_media_creator(imgs)})
 
 
 @app.post("/api/gallery/delete")
@@ -3231,10 +3319,12 @@ def gallery_delete():
     key = request.get_json(force=True).get("key", "")
     if key.startswith("gallery/"):
         r2_store.delete(key)
+        _delete_media_metadata(key)
     return jsonify({"ok": True})
 
 
 @app.post("/api/gallery/folder")
+@admin_required
 def gallery_folder_create():
     try:
         folder = _folder_name(request.get_json(force=True).get("name", ""))
@@ -3247,6 +3337,7 @@ def gallery_folder_create():
 
 
 @app.post("/api/gallery/move")
+@admin_required
 def gallery_move():
     body = request.get_json(force=True)
     try:
