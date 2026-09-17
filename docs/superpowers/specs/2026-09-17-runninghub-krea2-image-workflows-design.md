@@ -1,5 +1,7 @@
 # RunningHub Krea2 Image Workflows Design
 
+> Implementation status (2026-09-18): The first Krea2 image workflow, Admin LoRA registry, queue integration, Gallery import, denoise control, AI-description controls, and responsive-width fix are deployed. The proposed generalized workflow registry and Admin preview uploads remain future work. See `docs/HANDOFF-2026-09-18-runninghub-cloud.md` for the exact deployed contract.
+
 ## Goal
 
 Replace the Cloud Studio Image placeholder with a working **Krea2 Image to Image High Quality** workflow while establishing a reusable pattern for additional RunningHub image workflows. Reuse Atelier's existing Local Studio prompt, image, resolution, and character concepts instead of creating a second incompatible authoring experience.

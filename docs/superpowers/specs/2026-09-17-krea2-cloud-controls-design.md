@@ -1,5 +1,7 @@
 # Krea2 Cloud Controls Design
 
+> Implementation status (2026-09-18): Deployed. Node 4 is user-controlled with a default of `0.60`; node 1 remains fixed at `0.27`. All listed AI-description controls are implemented in the Cloud visual language. The Cloud workspace width regression was fixed in commit `ca65094`. See `docs/HANDOFF-2026-09-18-runninghub-cloud.md`.
+
 ## Goal
 
 Extend the existing Krea2 Image-to-Image HQ Cloud Studio workflow with the useful controls from Local Studio while preserving the current Cloud Studio visual design.
