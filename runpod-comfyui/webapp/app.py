@@ -146,6 +146,14 @@ RUNNINGHUB_KREA2_PROMPT_NODE = 5
 RUNNINGHUB_KREA2_RESIZE_NODE = 13
 RUNNINGHUB_KREA2_LORA_NODE = 46
 RUNNINGHUB_KREA2_BASE_SAMPLER_NODE = 4
+# These are installed in the published Cloud Krea2 workflow. They are a fixed
+# realism pair, deliberately not user-editable: the Cloud panel only controls
+# whether the pair is sent for a job.
+RUNNINGHUB_KREA2_REALISM_HELPERS = (
+    "realism_engine_krea2_v3.1.safetensors",
+    "RealisticSnapshotKrea2.safetensors",
+)
+RUNNINGHUB_KREA2_REALISM_HELPER_STRENGTH = 0.60
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # So the app can start ComfyUI for you when it's not running (only used when
@@ -2827,9 +2835,15 @@ def _runninghub_submit_h3(api_key, job, uploads):
 
 
 def _runninghub_submit_krea2(api_key, job, image_name):
-    lora_state = _json.dumps({"version": 1, "sep": ", ", "cacheMode": "last", "loras": [{
-        "name": job["krea_lora_filename"], "on": True, "sm": 1, "sc": 1, "triggers": []
-    }]}, separators=(",", ":"))
+    loras = [{"name": job["krea_lora_filename"], "on": True, "sm": 1, "sc": 1, "triggers": []}]
+    if job.get("krea_realism_helpers", True):
+        loras.extend({"name": helper, "on": True,
+                      "sm": RUNNINGHUB_KREA2_REALISM_HELPER_STRENGTH,
+                      "sc": RUNNINGHUB_KREA2_REALISM_HELPER_STRENGTH,
+                      "triggers": []}
+                     for helper in RUNNINGHUB_KREA2_REALISM_HELPERS)
+    lora_state = _json.dumps({"version": 1, "sep": ", ", "cacheMode": "last", "loras": loras},
+                             separators=(",", ":"))
     nodes = [
         {"nodeId": RUNNINGHUB_KREA2_IMAGE_NODE, "fieldName": "image", "fieldValue": image_name},
         {"nodeId": RUNNINGHUB_KREA2_PROMPT_NODE, "fieldName": "text", "fieldValue": job["krea_prompt"]},
@@ -3274,6 +3288,7 @@ def runninghub_create_krea2_job():
     image = request.files.get("image")
     prompt = (request.form.get("prompt") or "").strip()
     preset_key = (request.form.get("resolution_key") or "").strip()
+    realism_helpers = (request.form.get("realism_helpers", "true") or "").strip().lower() not in {"0", "false", "off", "no"}
     try:
         denoise = float(request.form.get("denoise", "0.60"))
     except (TypeError, ValueError):
@@ -3306,6 +3321,7 @@ def runninghub_create_krea2_job():
            "key_concurrency": settings["concurrency"], "krea_image_path": image_path,
            "krea_image_type": image.mimetype, "krea_prompt": prompt, "krea_resolution_key": preset_key,
            "krea_width": preset["width"], "krea_height": preset["height"], "krea_denoise": denoise,
+           "krea_realism_helpers": realism_helpers,
            "krea_character_id": lora["character_id"], "krea_character_name": lora["character_name"],
            "krea_version_id": lora["version_id"], "krea_version_label": lora["version_label"],
            "krea_lora_filename": lora["filename"], "estimated_total_seconds": None}

@@ -141,7 +141,7 @@ def test_krea_lora_registry_normalizes_paths_and_one_default():
     assert [v["default"] for v in data[0]["versions"]] == [True, False]
 
 
-def test_krea_submit_maps_published_nodes_and_selected_lora(monkeypatch):
+def test_krea_submit_maps_published_nodes_and_enabled_realism_helpers(monkeypatch):
     seen = {}
 
     class Response:
@@ -163,6 +163,29 @@ def test_krea_submit_maps_published_nodes_and_selected_lora(monkeypatch):
     assert values[(46, "lora_name")] == "Sophie-v3.safetensors"
     assert values[(4, "denoise")] == "0.64"
     assert (1, "denoise") not in values
+    state = json.loads(values[(46, "LoraLoaderState")])
+    assert state["loras"] == [
+        {"name": "Sophie-v3.safetensors", "on": True, "sm": 1, "sc": 1, "triggers": []},
+        {"name": "realism_engine_krea2_v3.1.safetensors", "on": True, "sm": 0.60, "sc": 0.60, "triggers": []},
+        {"name": "RealisticSnapshotKrea2.safetensors", "on": True, "sm": 0.60, "sc": 0.60, "triggers": []},
+    ]
+
+
+def test_krea_submit_omits_realism_helpers_when_disabled(monkeypatch):
+    seen = {}
+
+    class Response:
+        ok = True
+        status_code = 200
+        def json(self):
+            return {"taskId": "krea-task"}
+
+    monkeypatch.setattr(A.requests, "post", lambda _url, **kwargs: (seen.update(kwargs) or Response()))
+    job = {"krea_prompt": "portrait prompt", "krea_width": 1080, "krea_height": 1920,
+           "krea_lora_filename": "Sophie-v3.safetensors", "krea_denoise": 0.64,
+           "krea_realism_helpers": False}
+    A._runninghub_submit_krea2("key", job, "api/source.png")
+    values = {(item["nodeId"], item["fieldName"]): item["fieldValue"] for item in seen["json"]["nodeInfoList"]}
     state = json.loads(values[(46, "LoraLoaderState")])
     assert state["loras"] == [{"name": "Sophie-v3.safetensors", "on": True, "sm": 1, "sc": 1, "triggers": []}]
 
