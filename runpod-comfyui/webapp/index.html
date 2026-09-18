@@ -3510,6 +3510,7 @@ async function openAdmin(){
     const r=await(await fetch(`/api/users/${encodeURIComponent(b.dataset.u)}/${b.dataset.a}`,options)).json();
     if(r.error)alert(r.error); openAdmin();
   });
+  $$('.cloud-access-trigger').forEach(button=>button.onclick=()=>openCloudAccessModal(button));
   loadWorkflowsAdmin();loadRunningHubLoraAdmin();
 }
 
@@ -3713,7 +3714,6 @@ async function pickLibraryFolder(kind) {
     backdrop.onclick = event => { if (event.target === backdrop) close(null); };
     panel.onsubmit = event => { event.preventDefault(); const value = select.value === '__new__' ? name.value.trim() : select.value; close(value || null); };
   });
-  $$('.cloud-access-trigger').forEach(button=>button.onclick=()=>openCloudAccessModal(button));
 }
 
 let cloudAccessUser='';
