@@ -146,6 +146,12 @@ RUNNINGHUB_KREA2_PROMPT_NODE = 5
 RUNNINGHUB_KREA2_RESIZE_NODE = 13
 RUNNINGHUB_KREA2_LORA_NODE = 46
 RUNNINGHUB_KREA2_BASE_SAMPLER_NODE = 4
+RUNNINGHUB_KREA2_T2I_WORKFLOW_ID = os.environ.get("RUNNINGHUB_KREA2_T2I_WORKFLOW_ID", "2100976623406669826")
+RUNNINGHUB_KREA2_T2I_INSTANCE = os.environ.get("RUNNINGHUB_KREA2_T2I_INSTANCE", "default")
+RUNNINGHUB_KREA2_T2I_PROMPT_NODE = 6
+RUNNINGHUB_KREA2_T2I_LATENT_NODE = 10
+RUNNINGHUB_KREA2_T2I_SAMPLER_NODE = 98
+RUNNINGHUB_KREA2_T2I_LORA_NODE = 117
 # Default entries for the administrator-managed Cloud Krea2 helper registry.
 RUNNINGHUB_KREA2_DEFAULT_HELPERS = (
     {"filename": "realism_engine_krea2_v3.1.safetensors", "enabled": True, "strength": 0.60},
@@ -250,6 +256,7 @@ app = Flask(__name__, static_folder=None)
 # ----------------------------- auth / login gate ------------------------------
 import json as _json  # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
+RUNNINGHUB_KREA2_T2I_HELPERS_FILE = os.path.join(HERE, "runninghub_krea2_t2i_helpers.json")
 USERS_FILE = os.path.join(HERE, "users.json")
 SECRET_FILE = os.path.join(HERE, ".secret")
 
@@ -400,7 +407,7 @@ def admin_required(fn):
     return w
 
 
-CLOUD_WORKFLOW_IDS = {"krea2_i2i_hq", "scail", "h3", "jobs"}
+CLOUD_WORKFLOW_IDS = {"krea2_i2i_hq", "krea2_t2i", "scail", "h3", "jobs"}
 
 
 def _cloud_workflows_for(username):
@@ -2711,6 +2718,20 @@ def _save_runninghub_krea2_helpers(data):
     os.replace(tmp, RUNNINGHUB_KREA2_HELPERS_FILE)
 
 
+def _load_runninghub_krea2_t2i_helpers():
+    try:
+        return _normalize_runninghub_krea2_helpers(_json.load(open(RUNNINGHUB_KREA2_T2I_HELPERS_FILE, encoding="utf-8")))
+    except (OSError, ValueError, TypeError):
+        return []
+
+
+def _save_runninghub_krea2_t2i_helpers(data):
+    tmp = RUNNINGHUB_KREA2_T2I_HELPERS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        _json.dump(data, f, indent=2)
+    os.replace(tmp, RUNNINGHUB_KREA2_T2I_HELPERS_FILE)
+
+
 def _normalize_runninghub_loras(raw):
     if not isinstance(raw, list):
         raise ValueError("Characters must be a list.")
@@ -2734,12 +2755,15 @@ def _normalize_runninghub_loras(raw):
             is_default = bool((version or {}).get("default")) and not default_seen
             default_seen = default_seen or is_default
             identity_profile = str((version or {}).get("identity_profile") or "").strip()
+            trigger_words = str((version or {}).get("trigger_words") or "").strip()
             if len(identity_profile) > 2000:
                 raise ValueError(f"The identity profile for {name} / {label} is too long.")
+            if len(trigger_words) > 800:
+                raise ValueError(f"The trigger words for {name} / {label} are too long.")
             versions.append({"id": version_id, "label": label, "filename": filename,
                              "enabled": bool((version or {}).get("enabled", True)), "default": is_default,
                              "preview_url": str((version or {}).get("preview_url") or "").strip(),
-                             "identity_profile": identity_profile})
+                             "identity_profile": identity_profile, "trigger_words": trigger_words})
         if not versions:
             raise ValueError(f"{name} needs at least one version.")
         if not default_seen:
@@ -2761,7 +2785,7 @@ def _resolve_runninghub_lora(character_id, version_id):
         return None
     return {"character_id": character_id, "character_name": character["name"],
             "version_id": version_id, "version_label": version["label"], "filename": version["filename"],
-            "identity_profile": version.get("identity_profile", "")}
+            "identity_profile": version.get("identity_profile", ""), "trigger_words": version.get("trigger_words", "")}
 
 
 def _load_runninghub_jobs():
@@ -2989,6 +3013,34 @@ def _runninghub_submit_krea2(api_key, job, image_name):
     return data
 
 
+def _runninghub_submit_krea2_t2i(api_key, job):
+    loras = [{"id": "character", "name": job["krea_lora_filename"], "on": True,
+              "sm": 1, "sc": 1, "triggers": [], "custom": []}]
+    for index, helper in enumerate(job.get("krea_helpers") or [], 1):
+        loras.append({"id": f"helper-{index}", "name": helper["filename"], "on": True,
+                      "sm": helper["strength"], "sc": helper["strength"], "triggers": [], "custom": []})
+    lora_state = _json.dumps({"version": 1, "sep": ", ", "step": 0.05, "defStrength": 1,
+                              "linkStrength": True, "civitai": True, "thumbs": True, "hideExt": True,
+                              "accent": None, "cacheMode": "last", "loras": loras}, separators=(",", ":"))
+    nodes = [
+        {"nodeId": RUNNINGHUB_KREA2_T2I_PROMPT_NODE, "fieldName": "text", "fieldValue": job["krea_prompt"]},
+        {"nodeId": RUNNINGHUB_KREA2_T2I_LATENT_NODE, "fieldName": "width", "fieldValue": str(job["krea_width"])},
+        {"nodeId": RUNNINGHUB_KREA2_T2I_LATENT_NODE, "fieldName": "height", "fieldValue": str(job["krea_height"])},
+        {"nodeId": RUNNINGHUB_KREA2_T2I_LATENT_NODE, "fieldName": "batch_size", "fieldValue": str(job["krea_batch_size"])},
+        {"nodeId": RUNNINGHUB_KREA2_T2I_SAMPLER_NODE, "fieldName": "seed", "fieldValue": str(job["krea_seed"])},
+        {"nodeId": RUNNINGHUB_KREA2_T2I_LORA_NODE, "fieldName": "lora_name", "fieldValue": job["krea_lora_filename"]},
+        {"nodeId": RUNNINGHUB_KREA2_T2I_LORA_NODE, "fieldName": "LoraLoaderState", "fieldValue": lora_state},
+    ]
+    response = requests.post(f"{RUNNINGHUB_BASE_URL}/run/workflow/{RUNNINGHUB_KREA2_T2I_WORKFLOW_ID}",
+                             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                             json={"addMetadata": True, "nodeInfoList": nodes,
+                                   "instanceType": RUNNINGHUB_KREA2_T2I_INSTANCE, "usePersonalQueue": False}, timeout=90)
+    data = response.json()
+    if not response.ok or not data.get("taskId"):
+        raise RuntimeError(data.get("errorMessage") or data.get("message") or "RunningHub did not accept the Krea2 Turbo T2I task.")
+    return data
+
+
 def _runninghub_query(api_key, task_id):
     response = requests.post(
         f"{RUNNINGHUB_BASE_URL}/query",
@@ -3021,7 +3073,7 @@ def _runninghub_cancel(api_key, task_id):
 
 def _runninghub_import_result(job, result):
     outputs = result.get("results") or []
-    wanted = ("png", "jpg", "jpeg", "webp") if _runninghub_workflow_key(job) == "krea2_i2i_hq" else ("mp4", "mov", "webm")
+    wanted = ("png", "jpg", "jpeg", "webp") if _runninghub_workflow_key(job) in {"krea2_i2i_hq", "krea2_t2i"} else ("mp4", "mov", "webm")
     output = next((o for o in outputs if str(o.get("outputType", "")).lower() in wanted and o.get("url")), None)
     if not output:
         raise RuntimeError("RunningHub finished but returned no downloadable result.")
@@ -3073,7 +3125,10 @@ def _runninghub_run(job_id):
             raise RuntimeError("The RunningHub key is unavailable for this job.")
         task_id = job.get("task_id")
         if not task_id:
-            if job.get("workflow_key") == "krea2_i2i_hq":
+            if job.get("workflow_key") == "krea2_t2i":
+                _runninghub_update(job_id, status="submitting", message="Submitting Krea2 Turbo Text-to-Image…")
+                submitted = _runninghub_submit_krea2_t2i(api_key, job)
+            elif job.get("workflow_key") == "krea2_i2i_hq":
                 _runninghub_update(job_id, status="uploading", message="Uploading Krea2 source image…")
                 image_name = _runninghub_upload(api_key, job["krea_image_path"], job.get("krea_image_type") or "image/png")
                 if _runninghub_is_cancelled(job_id):
@@ -3203,6 +3258,32 @@ def runninghub_krea2_helpers_save():
         return jsonify({"error": str(e)}), 400
     with RUNNINGHUB_KREA2_HELPERS_LOCK:
         _save_runninghub_krea2_helpers(helpers)
+    return jsonify({"helpers": helpers})
+
+
+@app.get("/api/runninghub/krea2-t2i/helpers")
+def runninghub_krea2_t2i_helpers():
+    with RUNNINGHUB_KREA2_HELPERS_LOCK:
+        helpers = _load_runninghub_krea2_t2i_helpers()
+    return jsonify({"helpers": [item for item in helpers if item["enabled"]]})
+
+
+@app.get("/api/admin/runninghub/krea2-t2i/helpers")
+@admin_required
+def runninghub_krea2_t2i_helpers_admin():
+    with RUNNINGHUB_KREA2_HELPERS_LOCK:
+        return jsonify({"helpers": _load_runninghub_krea2_t2i_helpers()})
+
+
+@app.put("/api/admin/runninghub/krea2-t2i/helpers")
+@admin_required
+def runninghub_krea2_t2i_helpers_save():
+    try:
+        helpers = _normalize_runninghub_krea2_helpers((request.get_json(force=True) or {}).get("helpers"))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    with RUNNINGHUB_KREA2_HELPERS_LOCK:
+        _save_runninghub_krea2_t2i_helpers(helpers)
     return jsonify({"helpers": helpers})
 
 
@@ -3494,6 +3575,9 @@ def runninghub_create_krea2_job():
                                     (request.form.get("version_id") or "").strip())
     if not lora:
         return jsonify({"error": "Choose an available Cloud character and version."}), 400
+    trigger_words = lora.get("trigger_words", "").strip()
+    if trigger_words:
+        prompt = f"{trigger_words}, {prompt}"
     job_id = uuid.uuid4().hex
     job_dir = os.path.join(RUNNINGHUB_UPLOAD_DIR, job_id)
     os.makedirs(job_dir, exist_ok=False)
@@ -3517,6 +3601,64 @@ def runninghub_create_krea2_job():
         if _runninghub_has_active_locked(username, "krea2_i2i_hq"):
             _runninghub_cleanup_uploads(job)
             return jsonify({"error": "A Krea2 Image HQ cloud job is already active. Wait for it or cancel it first."}), 409
+        RUNNINGHUB_JOBS[job_id] = job
+        _save_runninghub_jobs()
+    _runninghub_dispatch()
+    return jsonify({"id": job_id, "status": "waiting"}), 202
+
+
+@app.post("/api/runninghub/krea2-t2i/jobs")
+@cloud_workflow_required("krea2_t2i")
+def runninghub_create_krea2_t2i_job():
+    username = session["user"]
+    settings = _runninghub_user_settings(username)
+    prompt = (request.form.get("prompt") or "").strip()
+    preset = next((p for p in RES_PRESETS if p["key"] == (request.form.get("resolution_key") or "").strip()), None)
+    if not settings["configured"]:
+        return jsonify({"error": "Cloud access has not been assigned by an administrator."}), 403
+    if not prompt or not preset:
+        return jsonify({"error": "Enter a prompt and choose a supported resolution."}), 400
+    try:
+        batch_size, seed = int(request.form.get("batch_size", "1")), int(request.form.get("seed", "0"))
+        submitted_helpers = _json.loads(request.form.get("helpers", "[]"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Batch, seed, or helper LoRAs are invalid."}), 400
+    if not 1 <= batch_size <= 4 or seed < 0:
+        return jsonify({"error": "Batch must be from 1 to 4 and seed must be positive."}), 400
+    lora = _resolve_runninghub_lora((request.form.get("character_id") or "").strip(),
+                                    (request.form.get("version_id") or "").strip())
+    if not lora:
+        return jsonify({"error": "Choose an available Cloud character and version."}), 400
+    with RUNNINGHUB_KREA2_HELPERS_LOCK:
+        available = {item["filename"].lower(): item for item in _load_runninghub_krea2_t2i_helpers() if item["enabled"]}
+    helpers = []
+    for raw in submitted_helpers if isinstance(submitted_helpers, list) else []:
+        if not bool((raw or {}).get("enabled", True)):
+            continue
+        managed = available.get(str((raw or {}).get("filename") or "").lower())
+        if not managed:
+            return jsonify({"error": "A selected T2I helper LoRA is no longer available."}), 400
+        try:
+            strength = round(float((raw or {}).get("strength", managed["strength"])), 2)
+        except (TypeError, ValueError):
+            return jsonify({"error": "T2I helper strength must be numeric."}), 400
+        if not 0 <= strength <= 2:
+            return jsonify({"error": "T2I helper strength must be from 0 to 2."}), 400
+        helpers.append({"filename": managed["filename"], "strength": strength})
+    final_prompt = f"{lora.get('trigger_words', '').strip()}, {prompt}".strip(", ")
+    job_id = uuid.uuid4().hex
+    job = {"id": job_id, "user": username, "workflow_key": "krea2_t2i", "status": "waiting",
+           "message": "Waiting for a cloud slot…", "created_at": int(time.time()), "updated_at": int(time.time()),
+           "instance_type": RUNNINGHUB_KREA2_T2I_INSTANCE, "workflow_id": RUNNINGHUB_KREA2_T2I_WORKFLOW_ID,
+           "key_enc": settings["key_enc"], "key_fingerprint": settings["key_fingerprint"], "key_concurrency": settings["concurrency"],
+           "krea_prompt": final_prompt, "krea_width": preset["width"], "krea_height": preset["height"],
+           "krea_batch_size": batch_size, "krea_seed": seed, "krea_helpers": helpers,
+           "krea_character_id": lora["character_id"], "krea_character_name": lora["character_name"],
+           "krea_version_id": lora["version_id"], "krea_version_label": lora["version_label"],
+           "krea_lora_filename": lora["filename"], "estimated_total_seconds": None}
+    with RUNNINGHUB_JOBS_LOCK:
+        if _runninghub_has_active_locked(username, "krea2_t2i"):
+            return jsonify({"error": "A Krea2 Turbo Text-to-Image job is already active."}), 409
         RUNNINGHUB_JOBS[job_id] = job
         _save_runninghub_jobs()
     _runninghub_dispatch()

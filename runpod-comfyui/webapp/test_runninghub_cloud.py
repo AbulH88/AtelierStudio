@@ -198,6 +198,23 @@ def test_krea_submit_omits_realism_helpers_when_disabled(monkeypatch):
     assert state["loras"] == [{"name": "Sophie-v3.safetensors", "on": True, "sm": 1, "sc": 1, "triggers": []}]
 
 
+def test_krea_t2i_submit_maps_prompt_seed_batch_and_helpers(monkeypatch):
+    seen = {}
+    class Response:
+        ok = True
+        def json(self): return {"taskId": "t2i-task"}
+    monkeypatch.setattr(A.requests, "post", lambda _url, **kwargs: (seen.update(kwargs) or Response()))
+    job = {"krea_prompt": "trigger, scene", "krea_width": 1152, "krea_height": 1536,
+           "krea_batch_size": 2, "krea_seed": 42, "krea_lora_filename": "Olivia.safetensors",
+           "krea_helpers": [{"filename": "detail.safetensors", "strength": 0.6}]}
+    assert A._runninghub_submit_krea2_t2i("key", job)["taskId"] == "t2i-task"
+    values = {(x["nodeId"], x["fieldName"]): x["fieldValue"] for x in seen["json"]["nodeInfoList"]}
+    assert values[(6, "text")] == "trigger, scene"
+    assert values[(10, "batch_size")] == "2"
+    assert values[(98, "seed")] == "42"
+    assert json.loads(values[(117, "LoraLoaderState")])["loras"][1]["name"] == "detail.safetensors"
+
+
 def test_krea_helper_registry_is_admin_only_and_validated(maker_client, admin_client, monkeypatch):
     saved = []
     monkeypatch.setattr(A, "_save_runninghub_krea2_helpers", lambda helpers: saved.extend(helpers))
