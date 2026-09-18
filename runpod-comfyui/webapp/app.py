@@ -362,6 +362,28 @@ def admin_required(fn):
     return w
 
 
+CLOUD_WORKFLOW_IDS = {"krea2_i2i_hq", "scail", "h3", "jobs"}
+
+
+def _cloud_workflows_for(username):
+    user = load_users().get(username, {})
+    if user.get("role") == "admin":
+        return sorted(CLOUD_WORKFLOW_IDS)
+    allowed = user.get("cloud_workflows", [])
+    return sorted(set(allowed) & CLOUD_WORKFLOW_IDS) if isinstance(allowed, list) else []
+
+
+def cloud_workflow_required(workflow):
+    def decorate(fn):
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            if workflow not in _cloud_workflows_for(session.get("user")):
+                return jsonify({"error": "Your administrator has not enabled this Cloud workflow."}), 403
+            return fn(*args, **kwargs)
+        return wrapped
+    return decorate
+
+
 @app.get("/login")
 def login_page():
     return send_file(os.path.join(HERE, "login.html"))
@@ -419,6 +441,7 @@ def api_me():
 def api_users():
     users = load_users()
     return jsonify({"users": [{"username": k, "role": v["role"], "status": v["status"],
+                                "cloud_workflows": _cloud_workflows_for(k) if v["role"] == "admin" else sorted(set(v.get("cloud_workflows", [])) & CLOUD_WORKFLOW_IDS),
                                 "runninghub_plus": bool(v.get("runninghub_plus")),
                                 "runninghub_configured": bool(v.get("runninghub_key_enc") or RUNNINGHUB_GLOBAL_API_KEY),
                                 "runninghub_private": bool(v.get("runninghub_key_enc")),
@@ -447,6 +470,11 @@ def api_user_action(name, action):
         if not isinstance(enabled, bool):
             return jsonify({"error": "enabled must be true or false"}), 400
         users[name]["runninghub_plus"] = enabled
+    elif action == "set-cloud-workflows":
+        workflows = (request.get_json(silent=True) or {}).get("workflows", [])
+        if not isinstance(workflows, list) or any(workflow not in CLOUD_WORKFLOW_IDS for workflow in workflows):
+            return jsonify({"error": "Invalid Cloud workflow selection."}), 400
+        users[name]["cloud_workflows"] = sorted(set(workflows))
     elif action == "set-runninghub-key":
         body = request.get_json(silent=True) or {}
         key = str(body.get("api_key") or "").strip()
@@ -2997,7 +3025,7 @@ def runninghub_save_loras():
 def runninghub_settings():
     username = session["user"]
     settings = _runninghub_user_settings(username)
-    return jsonify({"configured": settings["configured"], "plus_allowed": settings["plus_allowed"],
+    return jsonify({"configured": settings["configured"], "plus_allowed": settings["plus_allowed"], "cloud_workflows": _cloud_workflows_for(username),
                     "concurrency": settings["concurrency"], "workflow_id": RUNNINGHUB_WORKFLOW_ID,
                     "standard": "default", "plus": "plus"})
 
@@ -3024,6 +3052,7 @@ def runninghub_delete_settings():
 
 
 @app.post("/api/runninghub/jobs")
+@cloud_workflow_required("scail")
 def runninghub_create_job():
     username = session["user"]
     settings = _runninghub_user_settings(username)
@@ -3095,6 +3124,7 @@ def runninghub_create_job():
 
 
 @app.post("/api/runninghub/h3/jobs")
+@cloud_workflow_required("h3")
 def runninghub_create_h3_job():
     username = session["user"]
     settings = _runninghub_user_settings(username)
@@ -3161,6 +3191,7 @@ def runninghub_create_h3_job():
 
 
 @app.post("/api/runninghub/krea2/jobs")
+@cloud_workflow_required("krea2_i2i_hq")
 def runninghub_create_krea2_job():
     username = session["user"]
     settings = _runninghub_user_settings(username)
@@ -3232,6 +3263,7 @@ def _runninghub_public_job(job):
 
 
 @app.get("/api/runninghub/jobs")
+@cloud_workflow_required("jobs")
 def runninghub_list_jobs():
     username = session["user"]
     with RUNNINGHUB_JOBS_LOCK:
@@ -3247,6 +3279,7 @@ def runninghub_list_jobs():
 
 
 @app.get("/api/runninghub/jobs/<job_id>")
+@cloud_workflow_required("jobs")
 def runninghub_get_job(job_id):
     with RUNNINGHUB_JOBS_LOCK:
         job = dict(RUNNINGHUB_JOBS.get(job_id) or {})
@@ -3256,6 +3289,7 @@ def runninghub_get_job(job_id):
 
 
 @app.post("/api/runninghub/jobs/<job_id>/cancel")
+@cloud_workflow_required("jobs")
 def runninghub_cancel_job(job_id):
     username = session["user"]
     with RUNNINGHUB_JOBS_LOCK:

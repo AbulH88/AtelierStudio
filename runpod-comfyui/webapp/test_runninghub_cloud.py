@@ -11,7 +11,8 @@ import app as A
 def users(monkeypatch):
     data = {
         "admin": {"status": "active", "role": "admin", "runninghub_plus": False},
-        "maker": {"status": "active", "role": "user", "runninghub_plus": False},
+        "maker": {"status": "active", "role": "user", "runninghub_plus": False,
+                  "cloud_workflows": ["krea2_i2i_hq", "scail", "h3", "jobs"]},
     }
     monkeypatch.setattr(A, "load_users", lambda: data)
     monkeypatch.setattr(A, "save_users", lambda _users: None)

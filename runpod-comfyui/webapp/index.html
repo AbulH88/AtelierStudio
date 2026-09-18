@@ -3320,7 +3320,7 @@ async function pollEnhance(){
 $('#enhanceCancel').onclick=async()=>{if(!enhanceJobId)return;await fetch('/api/enhance/jobs/'+enhanceJobId+'/cancel',{method:'POST'});pollEnhance();};
 
 // ===== RunningHub Cloud (no Home Agent / local ComfyUI dependency) =====
-let cloudReferenceFile=null,cloudVideoFile=null,cloudReferenceUrl=null,cloudVideoUrl=null,cloudConfigured=false,cloudJobPoll=null,cloudJobs=[];
+let cloudReferenceFile=null,cloudVideoFile=null,cloudReferenceUrl=null,cloudVideoUrl=null,cloudConfigured=false,cloudJobPoll=null,cloudJobs=[],cloudAllowed=new Set();
 let cloudWorkflowKey='scail',h3Mode='i2v',h3ReplaceTarget=null;
 let kreaCloudFile=null,kreaCloudUrl=null,kreaCloudCharacters=[],kreaCloudPresets=[];
 const cloudActiveStates=['waiting','uploading','submitting','queued','running','importing','cancelling'];
@@ -3439,12 +3439,14 @@ async function loadCloudJobs(){
 }
 async function loadCloudSettings(){
   const r=await fetch('/api/runninghub/settings');const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load Cloud settings.');
-  cloudConfigured=!!d.configured;const status=$('#cloudConnection');status.classList.toggle('off',!cloudConfigured);status.textContent=cloudConfigured?'● RunningHub connected':'● Cloud access not assigned';
+  cloudAllowed=new Set(d.cloud_workflows||[]);$$('.cloud-workflow-item[data-cloud-workflow]').forEach(button=>button.classList.toggle('hide',!cloudAllowed.has(button.dataset.cloudWorkflow)));$('#cloudJobsNav').classList.toggle('hide',!cloudAllowed.has('jobs'));$('.cloud-queue-rail').classList.toggle('hide',!cloudAllowed.has('jobs'));const first=['krea2_i2i_hq','scail','h3'].find(id=>cloudAllowed.has(id));if(first&&!cloudAllowed.has(cloudWorkflowKey))selectCloudWorkflow(first);
+  $('#cloudKreaPanel').classList.toggle('hide',!cloudAllowed.has('krea2_i2i_hq')||cloudWorkflowKey!=='krea2_i2i_hq');$('#cloudScailPanel').classList.toggle('hide',!cloudAllowed.has('scail')||cloudWorkflowKey!=='scail');$('#cloudH3Panel').classList.toggle('hide',!cloudAllowed.has('h3')||cloudWorkflowKey!=='h3');
+  cloudConfigured=!!d.configured&&cloudAllowed.size>0;const status=$('#cloudConnection');status.classList.toggle('off',!cloudConfigured);status.textContent=cloudConfigured?'● RunningHub connected':'● No Cloud workflows assigned';
   $('#cloudUsageState').textContent=cloudConfigured?'Cloud access ready · '+d.concurrency+' simultaneous job'+(d.concurrency===1?'':'s'):'Ask an administrator to enable Cloud access.';$('#cloudUsageNote').textContent='Credentials are securely managed by your administrator.';
   $('#cloudPlusOption').classList.toggle('hide',!d.plus_allowed);if(!d.plus_allowed)$('#cloudInstance').value='default';h3Validate();kreaCloudValidate();
   $('#cloudWorkflow').value='Scail 2 · 720 × 1280 · '+(d.workflow_id||'configured');cloudControls();
 }
-async function openCloud(){try{await Promise.all([loadCloudSettings(),loadCloudJobs(),loadKreaCloud()]);}catch(e){$('#cloudError').textContent=String(e.message||e);$('#kreaCloudError').textContent=String(e.message||e);}}
+async function openCloud(){try{await loadCloudSettings();const tasks=[];if(cloudAllowed.has('jobs'))tasks.push(loadCloudJobs());if(cloudAllowed.has('krea2_i2i_hq'))tasks.push(loadKreaCloud());await Promise.all(tasks);}catch(e){$('#cloudError').textContent=String(e.message||e);$('#kreaCloudError').textContent=String(e.message||e);}}
 $('#cloudRun').onclick=async()=>{if($('#cloudRun').disabled)return;const body=new FormData();body.append('reference',cloudReferenceFile);body.append('video',cloudVideoFile);body.append('instance_type',$('#cloudInstance').value);body.append('start_seconds',$('#cloudStartAt').value);body.append('duration_seconds',$('#cloudDuration').value);body.append('select_every_nth',$('#cloudSampling').value);$('#cloudRun').disabled=true;$('#cloudRun').textContent='Submitting to RunningHub…';$('#cloudError').textContent='';try{const r=await fetch('/api/runninghub/jobs',{method:'POST',body});const d=await r.json();if(!r.ok)throw new Error(d.error||'Cloud job could not start.');await loadCloudJobs();if(!cloudJobPoll)cloudJobPoll=setInterval(loadCloudJobs,5000);}catch(e){$('#cloudError').textContent=String(e.message||e);}finally{$('#cloudRun').textContent='✦   Generate on RunningHub';cloudControls();}};
 
 // ===== auth =====
@@ -3491,15 +3493,17 @@ async function openAdmin(){
     acts.push(`<button data-u="${u.username}" data-a="set-runninghub-key">${u.runninghub_private?'Replace':'Assign'} Cloud key</button>`);
     if(u.runninghub_private)acts.push(`<button data-u="${u.username}" data-a="remove-runninghub-key">Use global key</button>`);
     acts.push(`<button class="danger" data-u="${u.username}" data-a="delete">Delete</button>`);
+    const cloudOptions=['krea2_i2i_hq','scail','h3','jobs'].map(id=>`<label style="font-size:11px;color:var(--mut);white-space:nowrap"><input type="checkbox" data-cloud-access="${id}" ${u.cloud_workflows.includes(id)?'checked':''}> ${id==='krea2_i2i_hq'?'Krea2':id==='scail'?'Scail':id==='h3'?'H3':'Jobs'}</label>`).join(' ');
     return `<div class="user-row"><span class="un">${u.username}</span>
       <span class="badge ${u.status}">${u.status}</span>
-      ${u.role==='admin'?'<span class="badge admin">admin</span>':''}<span class="badge ${u.runninghub_configured?'active':'pending'}">${u.runninghub_private?'private cloud key':u.runninghub_configured?'global cloud key':'no cloud key'} · ×${u.runninghub_concurrency}</span>
+      ${u.role==='admin'?'<span class="badge admin">admin</span>':''}<span class="badge ${u.runninghub_configured?'active':'pending'}">${u.runninghub_private?'private cloud key':u.runninghub_configured?'global cloud key':'no cloud key'} · ×${u.runninghub_concurrency}</span><span class="cloud-access" data-cloud-user="${u.username}">${cloudOptions}<button data-u="${u.username}" data-a="set-cloud-workflows">Save Cloud access</button></span>
       <span class="acts">${acts.join('')}</span></div>`;
   }).join('');
-  $$('#usersGrid .acts button').forEach(b=>b.onclick=async()=>{
+  $$('#usersGrid button').forEach(b=>b.onclick=async()=>{
     if(b.dataset.a==='delete'&&!confirm('Delete '+b.dataset.u+'?'))return;
     const options={method:'POST'};
     if(b.dataset.a==='set-runninghub-plus'){options.headers={'Content-Type':'application/json'};options.body=JSON.stringify({enabled:b.dataset.plus==='true'});}
+    if(b.dataset.a==='set-cloud-workflows'){const row=b.closest('.cloud-access');options.headers={'Content-Type':'application/json'};options.body=JSON.stringify({workflows:[...row.querySelectorAll('[data-cloud-access]:checked')].map(x=>x.dataset.cloudAccess)});}
     if(b.dataset.a==='set-runninghub-key'){const key=prompt('RunningHub API key for '+b.dataset.u+' (the value will be encrypted):');if(!key)return;const concurrency=prompt('Maximum simultaneous jobs for this key:','1');if(concurrency===null)return;options.headers={'Content-Type':'application/json'};options.body=JSON.stringify({api_key:key,concurrency:Number(concurrency)});}
     if(b.dataset.a==='remove-runninghub-key'&&!confirm('Remove this private key assignment and use the global key, if configured?'))return;
     const r=await(await fetch(`/api/users/${encodeURIComponent(b.dataset.u)}/${b.dataset.a}`,options)).json();
