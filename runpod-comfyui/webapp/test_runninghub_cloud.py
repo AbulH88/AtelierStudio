@@ -204,6 +204,22 @@ def test_krea_helper_registry_is_admin_only_and_validated(maker_client, admin_cl
     }]}).status_code == 400
 
 
+def test_describe_with_optional_face_reference_appends_identity(maker_client, monkeypatch):
+    calls = []
+    def fake_describe(_image, _params, _model, instruction=None):
+        calls.append(instruction)
+        return "face details" if instruction else "source details"
+    monkeypatch.setattr(A, "describe_image", fake_describe)
+    response = maker_client.post("/api/describe", data={
+        "image": (BytesIO(b"source"), "source.png"),
+        "face_image": (BytesIO(b"face"), "face.png"),
+        "face_note": "keep her red hair",
+    })
+    assert response.status_code == 200
+    assert response.get_json()["prompt"] == "source details\n\nFace identity: face details"
+    assert "keep her red hair" in calls[1]
+
+
 def test_krea_job_rejects_out_of_range_denoise(maker_client, users):
     users["maker"]["runninghub_key_enc"] = A._encrypt_runninghub_key("rh_example_secret_1234567890")
     response = maker_client.post("/api/runninghub/krea2/jobs", data={

@@ -1929,12 +1929,12 @@ def _describe_instruction(p):
     return " ".join(parts)
 
 
-def describe_image(image_b64, params, model=None):
+def describe_image(image_b64, params, model=None, instruction=None):
     if not OPENROUTER_API_KEY:
         raise ValueError("OpenRouter API Key not set.")
     
     model = model or OPENROUTER_MODEL
-    instruction = _describe_instruction(params)
+    instruction = instruction or _describe_instruction(params)
     
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -1972,6 +1972,17 @@ def describe_image(image_b64, params, model=None):
     return choices[0]["message"]["content"].strip()
 
 
+def _face_describe_instruction(note=""):
+    instruction = ("Describe only this adult person's visible face identity in one concise "
+                   "image-generation paragraph: face shape, skin tone and texture, eye color "
+                   "and shape, eyebrows, hair color and style, makeup, lips, and expression. "
+                   "Do not describe body, clothing, pose, background, age, ethnicity, or any "
+                   "text. Output only the description with no heading or bullet points.")
+    if note:
+        instruction += f" Follow this additional face direction: {note}"
+    return instruction
+
+
 @app.get("/api/openrouter/models")
 def get_openrouter_models():
     """Curated short list of vision models (see VISION_MODELS)."""
@@ -1998,7 +2009,13 @@ def _describe_params(src, is_form):
 def api_describe():
     image_b64 = None
     if request.files and "image" in request.files:
-        image_b64 = base64.b64encode(request.files["image"].read()).decode()
+        source = request.files["image"]
+        if not (source.mimetype or "").lower() in {"image/png", "image/jpeg", "image/webp"}:
+            return jsonify({"error": "Choose a PNG, JPG, or WEBP source image."}), 400
+        source_bytes = source.read()
+        if len(source_bytes) > RUNNINGHUB_MAX_IMAGE_BYTES:
+            return jsonify({"error": "Source image exceeds the Cloud upload limit."}), 413
+        image_b64 = base64.b64encode(source_bytes).decode()
         p = _describe_params(request.form, True)
     else:
         body = request.get_json(force=True, silent=True) or {}
@@ -2016,6 +2033,17 @@ def api_describe():
 
     try:
         prompt = describe_image(image_b64, p, p["model"])
+        face = request.files.get("face_image") if request.files else None
+        if face and face.filename:
+            if not (face.mimetype or "").lower() in {"image/png", "image/jpeg", "image/webp"}:
+                return jsonify({"error": "Choose a PNG, JPG, or WEBP face image."}), 400
+            face_bytes = face.read()
+            if len(face_bytes) > RUNNINGHUB_MAX_IMAGE_BYTES:
+                return jsonify({"error": "Face image exceeds the Cloud upload limit."}), 413
+            face_note = (request.form.get("face_note") or "").strip()[:800]
+            face_prompt = describe_image(base64.b64encode(face_bytes).decode(), p, p["model"],
+                                         _face_describe_instruction(face_note))
+            prompt = f"{prompt}\n\nFace identity: {face_prompt}"
         return jsonify({"prompt": prompt})
     except Exception as e:
         return jsonify({"error": f"OpenRouter call failed: {e}"}), 500
