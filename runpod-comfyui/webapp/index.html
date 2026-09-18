@@ -589,6 +589,8 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
   border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer}
 .user-row .acts button:hover{border-color:var(--amber-dim)}
 .user-row .acts .danger{color:var(--rose)}
+.cloud-access-trigger{border:1px solid var(--amber-dim);background:rgba(201,160,96,.08);color:var(--amber);border-radius:8px;padding:7px 10px;font:11px var(--mono);cursor:pointer}.cloud-access-trigger:hover{border-color:var(--amber);background:rgba(201,160,96,.15)}
+.cloud-access-modal{position:fixed;inset:0;z-index:100;background:rgba(5,5,4,.76);backdrop-filter:blur(8px);display:grid;place-items:center;padding:22px}.cloud-access-dialog{width:min(680px,94vw);max-height:90vh;overflow:auto;background:linear-gradient(155deg,#1c1a16,#11100e);border:1px solid var(--amber-dim);border-radius:16px;box-shadow:0 30px 100px #000;padding:28px}.cloud-access-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:18px}.cloud-access-head h2{margin:0;font:36px var(--serif);color:var(--txt)}.cloud-access-user{margin:6px 0 0;color:var(--mut);font:13px var(--mono)}.cloud-access-key{margin:4px 0 0;padding:8px 11px;border:1px solid var(--amber-dim);border-radius:999px;color:var(--amber);font:11px var(--mono);white-space:nowrap}.cloud-access-list{display:grid;gap:10px;margin:18px 0}.cloud-access-option{display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:11px;background:#151411;cursor:pointer}.cloud-access-option:hover{border-color:var(--amber-dim)}.cloud-access-option input{appearance:none;width:42px;height:24px;border:1px solid var(--line2);border-radius:999px;background:#302e29;position:relative;flex:none;cursor:pointer}.cloud-access-option input:after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#a8a39a;transition:.16s}.cloud-access-option input:checked{background:rgba(67,194,138,.22);border-color:var(--good)}.cloud-access-option input:checked:after{left:20px;background:var(--good)}.cloud-access-option b{display:block;font:18px var(--serif);font-weight:500}.cloud-access-option small{display:block;margin-top:3px;color:var(--mut);font-size:12px}.cloud-access-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:16px;border-top:1px solid var(--line)}.cloud-access-actions button{padding:11px 17px;border:1px solid var(--line2);border-radius:8px;background:#1b1916;color:var(--txt);cursor:pointer}.cloud-access-actions .save{background:linear-gradient(110deg,#f8d9a2,#caa36f);border-color:#e9c183;color:#241b11;font-weight:600}.cloud-access-actions button:disabled{opacity:.6;cursor:wait}
 
 /* admin workflow visibility — intentionally distinct from user management */
 .wf-admin{display:grid;gap:22px}
@@ -1777,6 +1779,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
     <div class="admin-saved">● &nbsp; All changes saved</div>
   </div>
 </div>
+<div id="cloudAccessModal" class="cloud-access-modal hide" role="dialog" aria-modal="true" aria-labelledby="cloudAccessTitle"><form id="cloudAccessForm" class="cloud-access-dialog"><div class="cloud-access-head"><div><h2 id="cloudAccessTitle">Cloud access</h2><p id="cloudAccessUser" class="cloud-access-user"></p></div><span id="cloudAccessKey" class="cloud-access-key"></span></div><div class="cloud-access-list"><label class="cloud-access-option"><input type="checkbox" value="krea2_i2i_hq"><span><b>Krea2 Image to Image HQ</b><small>Cloud image refinement</small></span></label><label class="cloud-access-option"><input type="checkbox" value="scail"><span><b>Scail 2 Motion</b><small>Motion-controlled video</small></span></label><label class="cloud-access-option"><input type="checkbox" value="h3"><span><b>MiniMax H3 Ref2V</b><small>Reference-to-video generation</small></span></label><label class="cloud-access-option"><input type="checkbox" value="jobs"><span><b>Cloud Jobs</b><small>View and manage Cloud jobs</small></span></label></div><div class="cloud-access-actions"><button id="cloudAccessCancel" type="button">Cancel</button><button id="cloudAccessSave" class="save" type="submit">Save access</button></div></form></div>
 
 <!-- instagram cookies modal -->
 <div class="imgview" id="igModal" style="cursor:default">
@@ -3493,17 +3496,15 @@ async function openAdmin(){
     acts.push(`<button data-u="${u.username}" data-a="set-runninghub-key">${u.runninghub_private?'Replace':'Assign'} Cloud key</button>`);
     if(u.runninghub_private)acts.push(`<button data-u="${u.username}" data-a="remove-runninghub-key">Use global key</button>`);
     acts.push(`<button class="danger" data-u="${u.username}" data-a="delete">Delete</button>`);
-    const cloudOptions=['krea2_i2i_hq','scail','h3','jobs'].map(id=>`<label style="font-size:11px;color:var(--mut);white-space:nowrap"><input type="checkbox" data-cloud-access="${id}" ${u.cloud_workflows.includes(id)?'checked':''}> ${id==='krea2_i2i_hq'?'Krea2':id==='scail'?'Scail':id==='h3'?'H3':'Jobs'}</label>`).join(' ');
     return `<div class="user-row"><span class="un">${u.username}</span>
       <span class="badge ${u.status}">${u.status}</span>
-      ${u.role==='admin'?'<span class="badge admin">admin</span>':''}<span class="badge ${u.runninghub_configured?'active':'pending'}">${u.runninghub_private?'private cloud key':u.runninghub_configured?'global cloud key':'no cloud key'} · ×${u.runninghub_concurrency}</span><span class="cloud-access" data-cloud-user="${u.username}">${cloudOptions}<button data-u="${u.username}" data-a="set-cloud-workflows">Save Cloud access</button></span>
+      ${u.role==='admin'?'<span class="badge admin">admin</span>':''}<span class="badge ${u.runninghub_configured?'active':'pending'}">${u.runninghub_private?'private cloud key':u.runninghub_configured?'global cloud key':'no cloud key'} · ×${u.runninghub_concurrency}</span><button class="cloud-access-trigger" data-cloud-user="${u.username}" data-cloud-workflows="${u.cloud_workflows.join(',')}" data-cloud-key="${u.runninghub_configured?'Cloud key assigned':'No cloud key assigned'}">Cloud access</button>
       <span class="acts">${acts.join('')}</span></div>`;
   }).join('');
-  $$('#usersGrid button').forEach(b=>b.onclick=async()=>{
+  $$('#usersGrid .acts button').forEach(b=>b.onclick=async()=>{
     if(b.dataset.a==='delete'&&!confirm('Delete '+b.dataset.u+'?'))return;
     const options={method:'POST'};
     if(b.dataset.a==='set-runninghub-plus'){options.headers={'Content-Type':'application/json'};options.body=JSON.stringify({enabled:b.dataset.plus==='true'});}
-    if(b.dataset.a==='set-cloud-workflows'){const row=b.closest('.cloud-access');options.headers={'Content-Type':'application/json'};options.body=JSON.stringify({workflows:[...row.querySelectorAll('[data-cloud-access]:checked')].map(x=>x.dataset.cloudAccess)});}
     if(b.dataset.a==='set-runninghub-key'){const key=prompt('RunningHub API key for '+b.dataset.u+' (the value will be encrypted):');if(!key)return;const concurrency=prompt('Maximum simultaneous jobs for this key:','1');if(concurrency===null)return;options.headers={'Content-Type':'application/json'};options.body=JSON.stringify({api_key:key,concurrency:Number(concurrency)});}
     if(b.dataset.a==='remove-runninghub-key'&&!confirm('Remove this private key assignment and use the global key, if configured?'))return;
     const r=await(await fetch(`/api/users/${encodeURIComponent(b.dataset.u)}/${b.dataset.a}`,options)).json();
@@ -3712,7 +3713,14 @@ async function pickLibraryFolder(kind) {
     backdrop.onclick = event => { if (event.target === backdrop) close(null); };
     panel.onsubmit = event => { event.preventDefault(); const value = select.value === '__new__' ? name.value.trim() : select.value; close(value || null); };
   });
+  $$('.cloud-access-trigger').forEach(button=>button.onclick=()=>openCloudAccessModal(button));
 }
+
+let cloudAccessUser='';
+function openCloudAccessModal(button){cloudAccessUser=button.dataset.cloudUser;const allowed=new Set((button.dataset.cloudWorkflows||'').split(',').filter(Boolean));$('#cloudAccessUser').textContent=cloudAccessUser;$('#cloudAccessKey').textContent=button.dataset.cloudKey;$$('#cloudAccessForm input[type="checkbox"]').forEach(input=>input.checked=allowed.has(input.value));$('#cloudAccessModal').classList.remove('hide');}
+function closeCloudAccessModal(){$('#cloudAccessModal').classList.add('hide');cloudAccessUser='';}
+$('#cloudAccessCancel').onclick=closeCloudAccessModal;$('#cloudAccessModal').onclick=e=>{if(e.target===$('#cloudAccessModal'))closeCloudAccessModal();};
+$('#cloudAccessForm').onsubmit=async e=>{e.preventDefault();if(!cloudAccessUser)return;const save=$('#cloudAccessSave');save.disabled=true;save.textContent='Saving…';try{const workflows=[...$$('#cloudAccessForm input[type="checkbox"]:checked')].map(input=>input.value);const r=await fetch(`/api/users/${encodeURIComponent(cloudAccessUser)}/set-cloud-workflows`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({workflows})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not save Cloud access.');closeCloudAccessModal();await openAdmin();}catch(error){alert(error.message||String(error));}finally{save.disabled=false;save.textContent='Save access';}};
 
 async function moveLibraryItem(kind, key) {
   try {
