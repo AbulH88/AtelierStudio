@@ -1429,7 +1429,6 @@ def reels_folders():
 
 
 @app.post("/api/reels/folder")
-@admin_required
 def reels_folder_create():
     try:
         name = _folder_path(request.get_json(force=True).get("name", ""))
@@ -2308,6 +2307,7 @@ def _run_gen_job(job_id, target, inp, body):
                     muxed.append(base64.b64encode(raw).decode())
                     key = f"gallery/{group}/{ts}_{seed}_{i}.mp4"
                     r2_store.upload_bytes(key, raw)
+                    _set_media_creator(key, inp.get("creator"))
                     try:
                         thumb = _make_video_thumb(raw)
                         if thumb is not None:
@@ -2404,6 +2404,7 @@ def generate():
         return jsonify({"error": "Type a prompt for text mode."}), 400
 
     inp = _build_input(body)
+    inp["creator"] = session.get("user")
     job_id = uuid.uuid4().hex[:12]
     with GEN_JOBS_LOCK:
         # keep only the 10 most recent finished jobs so the dict can't grow forever
@@ -2541,6 +2542,7 @@ def _save_to_gallery(inp, images, seed):
         key = f"gallery/{group}/{ts}_{seed}_{i}.png"
         try:
             r2_store.upload_bytes(key, raw)
+            _set_media_creator(key, inp.get("creator"))
             keys.append(key)
         except Exception:
             continue
@@ -2904,6 +2906,7 @@ def _runninghub_import_result(job, result):
         # Gallery streams cloud media and lazily builds previews.
         key = f"gallery/cloud/{int(time.time())}_{job['id']}.{extension}"
         r2_store.upload(dst, key)
+        _set_media_creator(key, job.get("user"))
     return key
 
 

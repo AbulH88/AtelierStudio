@@ -306,6 +306,10 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 .reel-card .del{background:rgba(217,139,122,.08);color:var(--rose);border:1px solid rgba(217,139,122,.2)!important}
 .reel-card .del:hover{background:rgba(217,139,122,.14)}
 .reel-card .reenhance{background:rgba(231,195,141,.12);color:var(--amber);border:1px solid rgba(231,195,141,.35)}
+.reel-card .creator,.gal-card .creator{font:11px var(--mono);color:var(--faint);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reel-card .rcheck{position:absolute;top:10px;left:10px;z-index:6;width:20px;height:20px;display:none;place-items:center;border:1px solid var(--line2);border-radius:5px;background:rgba(12,12,14,.82)}
+.reel-card:hover .rcheck,.reel-card.selected .rcheck{display:grid}.reel-card.selected{border-color:var(--amber);box-shadow:0 0 0 2px var(--amber-dim)}.rcheck input{margin:0;accent-color:var(--amber);cursor:pointer}
+.reels-grid.compact,.gallery-grid.compact{display:block}.reels-grid.compact .reel-card,.gallery-grid.compact .gal-card{display:flex;align-items:center;min-height:74px;margin-bottom:8px;border-radius:10px}.reels-grid.compact .reel-card img,.gallery-grid.compact .gal-card img{width:82px;height:72px;flex:0 0 82px;object-fit:cover}.reels-grid.compact .reel-card .meta{flex:1;padding:10px 14px}.reels-grid.compact .reel-card .acts{padding:8px;min-width:160px}.reels-grid.compact .reel-card .acts:last-child{display:none}.gallery-grid.compact .gal-card .gmotion,.gallery-grid.compact .gal-card .genhance{position:static;margin:8px;width:120px}.gallery-grid.compact .gal-card .creator{margin-left:12px}.view-switch{margin-left:auto;display:flex;gap:5px}.view-switch button{border:1px solid var(--line);background:var(--ink2);color:var(--mut);border-radius:7px;padding:6px 9px;cursor:pointer}.view-switch button.active{border-color:var(--amber-dim);color:var(--amber);background:rgba(233,184,100,.08)}.creator-filter{background:var(--ink2);border:1px solid var(--line);color:var(--mut);border-radius:18px;padding:6px 10px;font:13px var(--sans);max-width:180px}
 .reels-empty{text-align:center;padding:60px 20px;color:var(--faint)}
 .reels-empty .re-icon{font-size:42px;margin-bottom:12px;opacity:.4}
 .reels-empty p{font-size:14px;color:var(--mut);margin:6px 0 0}
@@ -1655,7 +1659,6 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
       <div class="sb-head">
         <h2>⬗ Reel Library</h2>
         <div class="sb-stats" id="reelStatus"></div>
-        <button id="newFolderBtn">📁 + New Folder</button>
       </div>
       <div class="sb-folders" id="sidebarFolders">
         <!-- JS fills -->
@@ -1690,6 +1693,9 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
             <button class="sort-chip" data-sort="size">Largest</button>
             <button class="sort-chip" data-sort="size_asc">Smallest</button>
           </div>
+          <select id="reelCreatorFilter" class="creator-filter" aria-label="Filter by creator"></select>
+          <label class="select-all-label"><input type="checkbox" id="reelSelectAll"> Select</label>
+          <div class="view-switch" id="reelViewSwitch"><button data-view="tiles" class="active" title="Tile view">▦</button><button data-view="compact" title="Compact view">☰</button></div>
         </div>
       </div>
       <div class="reels-grid" id="reelGrid"></div>
@@ -1701,7 +1707,7 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
 <div id="pageGallery" class="hide">
   <div class="reels-layout">
     <aside class="reels-sidebar">
-      <div class="sb-head"><h2>🖼 Gallery</h2><div class="sb-stats" id="galStatus"></div><button id="newGalleryFolderBtn">📁 + New Folder</button></div>
+      <div class="sb-head"><h2>🖼 Gallery</h2><div class="sb-stats" id="galStatus"></div></div>
       <div class="sb-folders" id="galGroups"></div>
     </aside>
     <div class="reels-content">
@@ -1723,9 +1729,11 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
             <button class="sort-chip" data-sort="name">A–Z</button>
             <button class="sort-chip" data-sort="name_desc">Z–A</button>
           </div>
+          <select id="galCreatorFilter" class="creator-filter" aria-label="Filter by creator"></select>
           <label class="select-all-label" id="galSelectAllLabel" style="margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--mut); cursor: pointer; user-select: none;">
             <input type="checkbox" id="galSelectAll" style="accent-color: var(--amber); cursor: pointer;"> Select All
           </label>
+          <div class="view-switch" id="galViewSwitch"><button data-view="tiles" class="active" title="Tile view">▦</button><button data-view="compact" title="Compact view">☰</button></div>
         </div>
       </div>
       
@@ -3456,16 +3464,16 @@ async function openCloud(){try{await loadCloudSettings();const tasks=[];if(cloud
 $('#cloudRun').onclick=async()=>{if($('#cloudRun').disabled)return;const body=new FormData();body.append('reference',cloudReferenceFile);body.append('video',cloudVideoFile);body.append('instance_type',$('#cloudInstance').value);body.append('start_seconds',$('#cloudStartAt').value);body.append('duration_seconds',$('#cloudDuration').value);body.append('select_every_nth',$('#cloudSampling').value);$('#cloudRun').disabled=true;$('#cloudRun').textContent='Submitting to RunningHub…';$('#cloudError').textContent='';try{const r=await fetch('/api/runninghub/jobs',{method:'POST',body});const d=await r.json();if(!r.ok)throw new Error(d.error||'Cloud job could not start.');await loadCloudJobs();if(!cloudJobPoll)cloudJobPoll=setInterval(loadCloudJobs,5000);}catch(e){$('#cloudError').textContent=String(e.message||e);}finally{$('#cloudRun').textContent='✦   Generate on RunningHub';cloudControls();}};
 
 // ===== auth =====
-let IS_ADMIN=false;
+let IS_ADMIN=false, CURRENT_USER='';
 async function loadMe(){
   try{
     const d=await(await fetch('/api/me')).json();
     if(d.user){
       IS_ADMIN = d.role==='admin';
+      CURRENT_USER = d.user;
       $('#userChip').textContent=d.user+(IS_ADMIN?' · admin':'');
       $('#accountName').textContent=d.user+(IS_ADMIN?' · admin':'');
       $('#navAdmin').classList.toggle('hide', !IS_ADMIN);
-      $('#newFolderBtn').style.display = IS_ADMIN ? '' : 'none';  // only admins create folders
       $('#igBtn').classList.toggle('hide', !IS_ADMIN);            // only admins manage IG login
     }
   }catch(e){}
@@ -3619,6 +3627,23 @@ async function loadWorkflowVisibility(){
 // ===== Reel library (Cloudflare R2) — Sidebar + Content =====
 let _activeFolder = '';
 let _folderCounts = {};
+let _reelSelected = new Set();
+let _reelCreator = 'all';
+let _reelView = localStorage.getItem('atelier_reel_view') || 'tiles';
+let _galCreator = 'all';
+let _galView = localStorage.getItem('atelier_gallery_view') || 'tiles';
+
+function creatorOptions(selectId, items, selected){
+  const select=$(selectId); if(!select)return;
+  const creators=[...new Set(items.map(item=>item.creator||'Unknown / legacy'))].sort((a,b)=>a.localeCompare(b));
+  select.innerHTML=`<option value="all">All media</option>${CURRENT_USER?'<option value="__mine__">My creations</option>':''}${creators.map(c=>`<option value="${_esc(c)}">${_esc(c)}</option>`).join('')}`;
+  select.value=[...select.options].some(option=>option.value===selected)?selected:'all';
+}
+function isCreatorMatch(item, filter){return filter==='all'||(filter==='__mine__'?(item.creator===CURRENT_USER):(item.creator===filter));}
+function setLibraryView(kind, view){
+  if(kind==='reels'){_reelView=view;localStorage.setItem('atelier_reel_view',view);renderReelGrid();}
+  else {_galView=view;localStorage.setItem('atelier_gallery_view',view);renderGallery();}
+}
 
 async function openReels(){
   $('#reelErr').textContent='';
@@ -3651,6 +3676,7 @@ async function loadReelFolders(){
       $$('#sidebarFolders .sb-item').forEach(x => x.classList.toggle('on', x === el));
       loadReels();
     };
+    el.oncontextmenu = e => { e.preventDefault(); openReelFolderMenu(e, el.dataset.folder); };
   });
   $$('#sidebarFolders .sb-del').forEach(b => b.onclick = async (e) => {
     e.stopPropagation();
@@ -3705,7 +3731,7 @@ async function pickLibraryFolder(kind) {
     const root = new Option('Library root', '');
     select.add(root);
     folders.forEach(folder => select.add(new Option(folder, folder)));
-    select.add(new Option('+ New folder…', '__new__'));
+    if(kind==='reels' || IS_ADMIN) select.add(new Option('+ New folder…', '__new__'));
     const name = document.createElement('input');
     name.placeholder = 'New folder name'; name.hidden = true;
     const actions = document.createElement('div'); actions.className = 'picker-actions';
@@ -3718,6 +3744,34 @@ async function pickLibraryFolder(kind) {
     backdrop.onclick = event => { if (event.target === backdrop) close(null); };
     panel.onsubmit = event => { event.preventDefault(); const value = select.value === '__new__' ? name.value.trim() : select.value; close(value || null); };
   });
+}
+
+async function createReelFolder(parent=''){
+  const label=parent?`New subfolder inside "${parent}"`:'New Reel folder';
+  const segment=prompt(label+':'); if(!segment)return null;
+  const name=(parent?parent+'/':'')+segment.trim();
+  const r=await fetch('/api/reels/folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  const d=await r.json(); if(!r.ok||d.error)throw new Error(d.error||'Could not create folder.');
+  await loadReelFolders(); return name;
+}
+
+function openReelFolderMenu(event, folder){
+  document.querySelectorAll('.library-menu').forEach(menu=>menu.remove());
+  const menu=document.createElement('div');menu.className='library-menu';
+  const add=(label,fn,danger=false)=>{const button=document.createElement('button');button.textContent=label;if(danger)button.className='danger';button.onclick=async()=>{menu.remove();try{await fn();}catch(e){alert(e.message||String(e));}};menu.append(button);};
+  add(folder?'Create subfolder…':'Create folder…',()=>createReelFolder(folder));
+  if(IS_ADMIN&&folder)add('Delete folder…',async()=>{if(!confirm(`Delete "${folder}" and its reels?`))return;const r=await fetch('/api/reels/folder/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder})});const d=await r.json();if(d.error)throw new Error(d.error);if(_activeFolder===folder)_activeFolder='';await loadReelFolders();},true);
+  menu.style.left=Math.min(event.clientX,innerWidth-220)+'px';menu.style.top=Math.min(event.clientY,innerHeight-180)+'px';document.body.append(menu);
+  setTimeout(()=>document.addEventListener('click',()=>menu.remove(),{once:true}),0);
+}
+
+function openGalleryFolderMenu(event){
+  document.querySelectorAll('.library-menu').forEach(menu=>menu.remove());
+  const menu=document.createElement('div');menu.className='library-menu';
+  const create=document.createElement('button');create.textContent='Create Gallery folder…';
+  create.onclick=async()=>{menu.remove();const name=prompt('New Gallery folder:');if(!name)return;try{const r=await fetch('/api/gallery/folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||'Could not create folder.');_galGroup=d.folder;await openGallery();}catch(e){alert(e.message||String(e));}};
+  menu.append(create);menu.style.left=Math.min(event.clientX,innerWidth-220)+'px';menu.style.top=Math.min(event.clientY,innerHeight-100)+'px';document.body.append(menu);
+  setTimeout(()=>document.addEventListener('click',()=>menu.remove(),{once:true}),0);
 }
 
 let cloudAccessUser='';
@@ -3740,6 +3794,7 @@ async function moveLibraryItem(kind, key) {
     const folders = await (await fetch(kind === 'reels' ? '/api/reels/folders' : '/api/gallery/groups')).json();
     const existing = kind === 'reels' ? (folders.folders || []) : (folders.groups || []);
     if (folder && !existing.includes(folder)) {
+      if(kind==='gallery'&&!IS_ADMIN) throw new Error('Only an administrator can organize the Gallery.');
       const made = await (await fetch(createEndpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:folder})})).json();
       if (made.error) throw new Error(made.error);
     }
@@ -3749,12 +3804,25 @@ async function moveLibraryItem(kind, key) {
   } catch (error) { alert(error.message || String(error)); }
 }
 
+async function moveSelectedReels(clickedKey){
+  const keys=_reelSelected.has(clickedKey)?[..._reelSelected]:[clickedKey];
+  try{
+    const folder=await pickLibraryFolder('reels'); if(folder===null)return;
+    if(folder&&!((await (await fetch('/api/reels/folders')).json()).folders||[]).includes(folder)){
+      const made=await fetch('/api/reels/folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:folder})});const data=await made.json();if(!made.ok||data.error)throw new Error(data.error||'Could not create folder.');
+    }
+    const r=await fetch('/api/reels/bulk-move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keys,folder})});const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||'Move failed.');
+    _reelSelected.clear();await loadReelFolders();
+  }catch(e){alert(e.message||String(e));}
+}
+
 function openLibraryMenu(event, kind, item) {
   document.querySelectorAll('.library-menu').forEach(menu => menu.remove());
   const menu=document.createElement('div'); menu.className='library-menu';
   const add=(label, action, danger=false)=>{const button=document.createElement('button');button.textContent=label;if(danger)button.className='danger';button.onclick=async()=>{menu.remove();await action();};menu.append(button);};
   add('Open / Preview',()=>openReelPlayer(item.url,item.name));
-  add('Move to folder…',()=>moveLibraryItem(kind,item.key));
+  if(kind==='reels') add(_reelSelected.has(item.key)?`Move selected (${_reelSelected.size})…`:'Move to folder…',()=>moveSelectedReels(item.key));
+  else if(IS_ADMIN) add('Move to folder…',()=>moveLibraryItem(kind,item.key));
   add('Download',async()=>{const d=await(await fetch('/api/reels/save-url?key='+encodeURIComponent(item.key))).json();if(d.url)window.location.href=d.url;});
   add('Enhance',()=>enhanceFromLibrary(item.url,item.name));
   if(kind==='gallery'&&!/\.(mp4|mov|webm)$/i.test(item.name)) add('Use as Motion reference',()=>galToMotionRef(item.url));
@@ -3774,8 +3842,11 @@ function renderReelGrid(){
     size:(a,b)=>b.size_mb-a.size_mb,
     size_asc:(a,b)=>a.size_mb-b.size_mb,
   }[sort] || ((a,b)=>a.name.localeCompare(b.name));
-  const list = _reels.filter(r=>r.name.toLowerCase().includes(q)).sort(cmp);
+  creatorOptions('#reelCreatorFilter',_reels,_reelCreator);
+  const list = _reels.filter(r=>(r.name.toLowerCase().includes(q)&&isCreatorMatch(r,_reelCreator))).sort(cmp);
   $('#reelCount').textContent = list.length + (list.length===1?' reel':' reels') + (q?` of ${_reels.length}`:'');
+  $('#reelGrid').classList.toggle('compact',_reelView==='compact');
+  $$('#reelViewSwitch button').forEach(b=>b.classList.toggle('active',b.dataset.view===_reelView));
 
   if(!_reels.length){
     $('#reelGrid').innerHTML = `<div class="reels-empty" style="grid-column:1/-1">
@@ -3788,9 +3859,10 @@ function renderReelGrid(){
       <div class="re-icon">🔎</div><p>No reels match “${q}”.</p></div>`;
     return;
   }
-  $('#reelGrid').innerHTML = list.map(r => `<div class="reel-card" data-key="${r.key}" data-url="${r.url}" data-name="${r.name}">
+  $('#reelGrid').innerHTML = list.map(r => `<div class="reel-card${_reelSelected.has(r.key)?' selected':''}" data-key="${r.key}" data-url="${r.url}" data-name="${r.name}">
+    <label class="rcheck"><input type="checkbox" data-key="${r.key}" ${_reelSelected.has(r.key)?'checked':''}></label>
     <img src="${r.thumb_url}" loading="lazy" data-url="${r.url}" data-name="${r.name}" style="cursor:pointer" alt="Reel preview">
-    <div class="meta"><div class="nm" title="${r.name}">${r.name}</div><div class="sz">${r.size_mb} MB</div></div>
+    <div class="meta"><div class="nm" title="${r.name}">${r.name}</div><div class="sz">${r.size_mb} MB</div><div class="creator">by ${_esc(r.creator||'Unknown / legacy')}</div></div>
     <div class="acts"><button class="use" data-key="${r.key}">→ Frame</button>
       <button class="usemotion" data-url="${r.url}" data-name="${r.name}">→ Motion</button></div>
     <div class="acts" style="padding-top:0"><button class="reenhance" data-url="${r.url}" data-name="${r.name}">✦ Enhance locally</button></div>
@@ -3803,6 +3875,8 @@ function renderReelGrid(){
     const d=await(await fetch('/api/reels/save-url?key='+encodeURIComponent(b.dataset.key))).json();
     if(d.url)window.location.href=d.url;});
   $$('#reelGrid .reel-card').forEach(card=>card.oncontextmenu=e=>{e.preventDefault();openLibraryMenu(e,'reels',card.dataset);});
+  $$('#reelGrid .rcheck input').forEach(cb=>cb.onclick=e=>{e.stopPropagation();if(cb.checked)_reelSelected.add(cb.dataset.key);else _reelSelected.delete(cb.dataset.key);renderReelGrid();});
+  const selectAll=$('#reelSelectAll'); if(selectAll){selectAll.checked=list.length>0&&list.every(r=>_reelSelected.has(r.key));selectAll.disabled=!list.length;}
 }
 
 $('#clearReelSearch').onclick = () => {
@@ -3816,17 +3890,9 @@ $('#reelSearch').oninput = () => {
 };
 
 
-$('#newFolderBtn').onclick=async()=>{
-  const name=prompt('New folder name:');if(!name)return;
-  await fetch('/api/reels/folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
-  _activeFolder = name.trim();
-  await loadReelFolders();
-};
-$('#newGalleryFolderBtn').onclick=async()=>{
-  const name=prompt('New folder name:');if(!name)return;
-  const d=await(await fetch('/api/gallery/folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})})).json();
-  if(d.error){alert(d.error);return;} _galGroup=d.folder; await openGallery();
-};
+$('#reelCreatorFilter').onchange=e=>{_reelCreator=e.target.value;renderReelGrid();};
+$('#reelSelectAll').onchange=e=>{$$('#reelGrid .reel-card').forEach(card=>e.target.checked?_reelSelected.add(card.dataset.key):_reelSelected.delete(card.dataset.key));renderReelGrid();};
+$$('#reelViewSwitch button').forEach(button=>button.onclick=()=>{setLibraryView('reels',button.dataset.view);$$('#reelViewSwitch button').forEach(b=>b.classList.toggle('active',b===button));});
 $('#reelDlBtn').onclick=async()=>{
   const url=$('#reelUrl').value.trim();$('#reelErr').textContent='';
   if(!url){$('#reelErr').textContent='Paste a reel URL.';return;}
@@ -4143,6 +4209,11 @@ async function openGallery(){
       _galSelected.clear();
       loadGallery();
     };
+    el.oncontextmenu=event=>{
+      if(!IS_ADMIN)return;
+      event.preventDefault();
+      openGalleryFolderMenu(event);
+    };
   });
 
   $$('#galGroups .sb-dl').forEach(b => b.onclick = async (e) => {
@@ -4219,9 +4290,10 @@ async function loadGallery(){
 
 function renderGallery() {
   const q = _galSearch.trim().toLowerCase();
+  creatorOptions('#galCreatorFilter',_galImages,_galCreator);
   
   let list = _galImages.filter(im => {
-    return im.name.toLowerCase().includes(q) || im.key.toLowerCase().includes(q);
+    return (im.name.toLowerCase().includes(q) || im.key.toLowerCase().includes(q)) && isCreatorMatch(im,_galCreator);
   });
   
   if (_galSort === 'newest') {
@@ -4235,6 +4307,8 @@ function renderGallery() {
   }
   
   $('#galCount').textContent = list.length + (list.length === 1 ? ' item' : ' items') + (q ? ` of ${_galImages.length}` : '');
+  $('#galGrid').classList.toggle('compact',_galView==='compact');
+  $$('#galViewSwitch button').forEach(b=>b.classList.toggle('active',b.dataset.view===_galView));
 
   if (!list.length) {
     $('#galGrid').innerHTML = '<div class="reels-empty" style="grid-column:1/-1"><div class="re-icon">🖼</div><p>No matching items found.</p></div>';
@@ -4256,6 +4330,7 @@ function renderGallery() {
     return `<div class="gal-card${selClass}" data-key="${im.key}" data-url="${im.url}" data-name="${im.name}" data-index="${idx}">
       <div class="gcheck"><input type="checkbox" ${checked} data-key="${im.key}"></div>
       ${media}
+      <div class="creator">by ${_esc(im.creator||'Unknown / legacy')}</div>
       ${motionBtn}
     </div>`;
   }).join('');
@@ -4377,6 +4452,9 @@ $('#galBulkCancelBtn').onclick = () => {
   });
   updateBulkBar();
 };
+
+$('#galCreatorFilter').onchange=e=>{_galCreator=e.target.value;renderGallery();};
+$$('#galViewSwitch button').forEach(button=>button.onclick=()=>setLibraryView('gallery',button.dataset.view));
 
 $('#galBulkDelBtn').onclick = async () => {
   const cnt = _galSelected.size;
