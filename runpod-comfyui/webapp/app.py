@@ -1929,7 +1929,7 @@ def _describe_instruction(p):
     return " ".join(parts)
 
 
-def describe_image(image_b64, params, model=None, instruction=None):
+def describe_images(images_b64, params, model=None, instruction=None):
     if not OPENROUTER_API_KEY:
         raise ValueError("OpenRouter API Key not set.")
     
@@ -1941,23 +1941,16 @@ def describe_image(image_b64, params, model=None, instruction=None):
         "Content-Type": "application/json",
     }
     
+    content = [{"type": "text", "text": instruction}]
+    content.extend({"type": "image_url", "image_url": {
+        "url": f"data:image/jpeg;base64,{image_b64}"}}
+        for image_b64 in images_b64)
     payload = {
         "model": model,
         "messages": [
             {
                 "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": instruction
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{image_b64}"
-                        }
-                    }
-                ]
+                "content": content
             }
         ]
     }
@@ -1972,6 +1965,10 @@ def describe_image(image_b64, params, model=None, instruction=None):
     return choices[0]["message"]["content"].strip()
 
 
+def describe_image(image_b64, params, model=None, instruction=None):
+    return describe_images([image_b64], params, model, instruction)
+
+
 def _face_describe_instruction(note=""):
     instruction = ("Describe only this adult person's visible face identity in one concise "
                    "image-generation paragraph: face shape, skin tone and texture, eye color "
@@ -1981,6 +1978,41 @@ def _face_describe_instruction(note=""):
     if note:
         instruction += f" Follow this additional face direction: {note}"
     return instruction
+
+
+CHARACTER_SOURCE_OPTIONS = {
+    "pose": "pose and body position",
+    "expression": "facial expression and body language",
+    "outfit": "outfit and accessories",
+    "background": "background, setting, and composition",
+    "lighting": "lighting, camera angle, lens feel, and photographic style",
+    "hair_makeup": "hair styling and makeup only",
+}
+
+
+def _character_locked_describe_instruction(profile, borrow, note=""):
+    allowed = [CHARACTER_SOURCE_OPTIONS[key] for key in borrow if key in CHARACTER_SOURCE_OPTIONS]
+    borrowed = ", ".join(allowed) if allowed else "no visual attributes"
+    instruction = (
+        "Write one flowing image-generation prompt. The following selected character profile is "
+        "the sole authority for the subject's identity and must be stated naturally at the start "
+        f"of the prompt: {profile}. Inspect the source image only to borrow these explicitly "
+        f"enabled attributes: {borrowed}. Do not copy, infer, or describe the source person's "
+        "face, facial features, identity, age, ethnicity, body identity, skin tone, or hair and "
+        "makeup unless hair and makeup is one of the enabled attributes. Do not replace or "
+        "contradict the selected character profile. Keep the selected character as the sole person "
+        "in the scene. Output only the final prompt with no heading, labels, explanation, or bullets.")
+    if note:
+        instruction += f" Additional direction: {note}"
+    return instruction
+
+
+def _character_profile_instruction():
+    return ("Describe only this adult character's persistent visual identity in one short, "
+            "editable image-generation profile: face shape, skin appearance, eye color, hair "
+            "color and style, makeup, lips, and signature accessories. Do not describe pose, "
+            "clothing, background, lighting, age, ethnicity, or body. Output only the profile, "
+            "with no title, heading, or bullets.")
 
 
 @app.get("/api/openrouter/models")
@@ -2032,6 +2064,22 @@ def api_describe():
         return jsonify({"error": "No image file or frame session/name provided."}), 400
 
     try:
+        character_locked = request.form.get("character_locked") == "true" if request.files else False
+        if character_locked:
+            character = _resolve_runninghub_lora(request.form.get("character_id", ""),
+                                                 request.form.get("version_id", ""))
+            if not character:
+                return jsonify({"error": "Choose an available Cloud character and version first."}), 400
+            profile = character.get("identity_profile", "").strip()
+            if not profile:
+                return jsonify({"error": "This character version has no identity profile yet. Ask an administrator to save one."}), 400
+            borrow = [item.strip() for item in request.form.getlist("borrow")]
+            prompt = describe_image(image_b64, p, p["model"],
+                                    _character_locked_describe_instruction(
+                                        profile, borrow,
+                                        (request.form.get("custom_instruction") or "").strip()[:1200]))
+            return jsonify({"prompt": prompt})
+
         prompt = describe_image(image_b64, p, p["model"])
         face = request.files.get("face_image") if request.files else None
         if face and face.filename:
@@ -2685,9 +2733,13 @@ def _normalize_runninghub_loras(raw):
             seen_versions.add(version_id)
             is_default = bool((version or {}).get("default")) and not default_seen
             default_seen = default_seen or is_default
+            identity_profile = str((version or {}).get("identity_profile") or "").strip()
+            if len(identity_profile) > 2000:
+                raise ValueError(f"The identity profile for {name} / {label} is too long.")
             versions.append({"id": version_id, "label": label, "filename": filename,
                              "enabled": bool((version or {}).get("enabled", True)), "default": is_default,
-                             "preview_url": str((version or {}).get("preview_url") or "").strip()})
+                             "preview_url": str((version or {}).get("preview_url") or "").strip(),
+                             "identity_profile": identity_profile})
         if not versions:
             raise ValueError(f"{name} needs at least one version.")
         if not default_seen:
@@ -2708,7 +2760,8 @@ def _resolve_runninghub_lora(character_id, version_id):
     if not version:
         return None
     return {"character_id": character_id, "character_name": character["name"],
-            "version_id": version_id, "version_label": version["label"], "filename": version["filename"]}
+            "version_id": version_id, "version_label": version["label"], "filename": version["filename"],
+            "identity_profile": version.get("identity_profile", "")}
 
 
 def _load_runninghub_jobs():
@@ -3163,6 +3216,26 @@ def runninghub_save_loras():
     with RUNNINGHUB_LORAS_LOCK:
         _save_runninghub_loras(data)
     return jsonify({"ok": True, "characters": data})
+
+
+@app.post("/api/admin/runninghub/loras/identity-profile")
+@admin_required
+def runninghub_generate_identity_profile():
+    face = request.files.get("image")
+    if not face or not face.filename:
+        return jsonify({"error": "Add a face reference image first."}), 400
+    if (face.mimetype or "").lower() not in {"image/png", "image/jpeg", "image/webp"}:
+        return jsonify({"error": "Choose a PNG, JPG, or WEBP face reference."}), 400
+    image_bytes = face.read()
+    if len(image_bytes) > RUNNINGHUB_MAX_IMAGE_BYTES:
+        return jsonify({"error": "Face reference exceeds the Cloud upload limit."}), 413
+    try:
+        params = _describe_params(request.form, True)
+        profile = describe_image(base64.b64encode(image_bytes).decode(), params, params["model"],
+                                 _character_profile_instruction())
+        return jsonify({"identity_profile": profile})
+    except Exception as e:
+        return jsonify({"error": f"OpenRouter call failed: {e}"}), 500
 
 
 @app.get("/api/runninghub/settings")

@@ -141,6 +141,14 @@ def test_krea_lora_registry_normalizes_paths_and_one_default():
     assert [v["default"] for v in data[0]["versions"]] == [True, False]
 
 
+def test_krea_character_identity_profile_is_kept_per_version():
+    data = A._normalize_runninghub_loras([{"id": "sophie", "name": "Sophie", "versions": [
+        {"id": "v1", "label": "V1", "filename": "Sophie-v1.safetensors",
+         "identity_profile": "burgundy waves, brown eyes, glossy nude lips"},
+    ]}])
+    assert data[0]["versions"][0]["identity_profile"] == "burgundy waves, brown eyes, glossy nude lips"
+
+
 def test_krea_submit_maps_published_nodes_and_enabled_realism_helpers(monkeypatch):
     seen = {}
 
@@ -218,6 +226,36 @@ def test_describe_with_optional_face_reference_appends_identity(maker_client, mo
     assert response.status_code == 200
     assert response.get_json()["prompt"] == "source details\n\nFace identity: face details"
     assert "keep her red hair" in calls[1]
+
+
+def test_character_locked_describe_uses_profile_and_only_enabled_source_attributes(maker_client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(A, "_load_runninghub_loras", lambda: [{"id": "sophie", "name": "Sophie", "enabled": True,
+        "versions": [{"id": "v1", "label": "V1", "filename": "Sophie-v1.safetensors", "enabled": True,
+                      "identity_profile": "long wavy burgundy hair, warm brown eyes, silver cross necklace"}]}])
+    monkeypatch.setattr(A, "describe_image", lambda _image, _params, _model, instruction=None:
+                        (calls.append(instruction) or "locked final prompt"))
+    response = maker_client.post("/api/describe", data={
+        "image": (BytesIO(b"source"), "source.png"), "character_locked": "true",
+        "character_id": "sophie", "version_id": "v1", "borrow": ["pose", "background", "lighting"],
+    })
+    assert response.status_code == 200
+    assert response.get_json()["prompt"] == "locked final prompt"
+    assert "long wavy burgundy hair" in calls[0]
+    assert "pose and body position" in calls[0]
+    assert "background, setting, and composition" in calls[0]
+    assert "outfit and accessories" not in calls[0]
+    assert "Do not copy" in calls[0]
+
+
+def test_identity_profile_generation_is_admin_only(maker_client, admin_client, monkeypatch):
+    monkeypatch.setattr(A, "describe_image", lambda *_args: "brown eyes, wavy hair, soft makeup")
+    assert maker_client.post("/api/admin/runninghub/loras/identity-profile", data={
+        "image": (BytesIO(b"face"), "face.png")}).status_code == 403
+    response = admin_client.post("/api/admin/runninghub/loras/identity-profile", data={
+        "image": (BytesIO(b"face"), "face.png")})
+    assert response.status_code == 200
+    assert response.get_json()["identity_profile"] == "brown eyes, wavy hair, soft makeup"
 
 
 def test_krea_job_rejects_out_of_range_denoise(maker_client, users):
