@@ -146,14 +146,11 @@ RUNNINGHUB_KREA2_PROMPT_NODE = 5
 RUNNINGHUB_KREA2_RESIZE_NODE = 13
 RUNNINGHUB_KREA2_LORA_NODE = 46
 RUNNINGHUB_KREA2_BASE_SAMPLER_NODE = 4
-# These are installed in the published Cloud Krea2 workflow. They are a fixed
-# realism pair, deliberately not user-editable: the Cloud panel only controls
-# whether the pair is sent for a job.
-RUNNINGHUB_KREA2_REALISM_HELPERS = (
-    "realism_engine_krea2_v3.1.safetensors",
-    "RealisticSnapshotKrea2.safetensors",
+# Default entries for the administrator-managed Cloud Krea2 helper registry.
+RUNNINGHUB_KREA2_DEFAULT_HELPERS = (
+    {"filename": "realism_engine_krea2_v3.1.safetensors", "enabled": True, "strength": 0.60},
+    {"filename": "RealisticSnapshotKrea2.safetensors", "enabled": True, "strength": 0.60},
 )
-RUNNINGHUB_KREA2_REALISM_HELPER_STRENGTH = 0.60
 WORKFLOW_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # So the app can start ComfyUI for you when it's not running (only used when
@@ -2568,8 +2565,10 @@ def _save_to_gallery(inp, images, seed):
 RUNNINGHUB_JOBS_FILE = os.path.join(HERE, "runninghub_jobs.json")
 RUNNINGHUB_UPLOAD_DIR = os.path.join(HERE, "runninghub_uploads")
 RUNNINGHUB_LORAS_FILE = os.path.join(HERE, "runninghub_loras.json")
+RUNNINGHUB_KREA2_HELPERS_FILE = os.path.join(HERE, "runninghub_krea2_helpers.json")
 RUNNINGHUB_JOBS_LOCK = threading.Lock()
 RUNNINGHUB_LORAS_LOCK = threading.Lock()
+RUNNINGHUB_KREA2_HELPERS_LOCK = threading.Lock()
 RUNNINGHUB_ACTIVE_STATUSES = {"waiting", "uploading", "submitting", "queued", "running", "importing", "cancelling"}
 RUNNINGHUB_TERMINAL_STATUSES = {"done", "failed", "cancelled"}
 os.makedirs(RUNNINGHUB_UPLOAD_DIR, exist_ok=True)
@@ -2596,6 +2595,44 @@ def _save_runninghub_loras(data):
     with open(tmp, "w", encoding="utf-8") as f:
         _json.dump(data, f, indent=2)
     os.replace(tmp, RUNNINGHUB_LORAS_FILE)
+
+
+def _normalize_runninghub_krea2_helpers(raw):
+    if not isinstance(raw, list):
+        raise ValueError("Helpers must be a list.")
+    clean, seen = [], set()
+    for item in raw:
+        filename = str((item or {}).get("filename") or "").strip().replace("\\", "/")
+        if filename.lower().startswith("models/loras/"):
+            filename = filename[len("models/loras/"):]
+        if (not filename or "/" in filename or not filename.lower().endswith(".safetensors")
+                or filename.lower() in seen):
+            raise ValueError("Each helper needs a unique .safetensors filename.")
+        try:
+            strength = float((item or {}).get("strength", 0.60))
+        except (TypeError, ValueError):
+            raise ValueError(f"{filename} needs a numeric strength.")
+        if not math.isfinite(strength) or not 0 <= strength <= 2:
+            raise ValueError(f"{filename} strength must be from 0 to 2.")
+        seen.add(filename.lower())
+        clean.append({"filename": filename, "enabled": bool((item or {}).get("enabled", True)),
+                      "strength": round(strength, 2)})
+    return clean
+
+
+def _load_runninghub_krea2_helpers():
+    try:
+        raw = _json.load(open(RUNNINGHUB_KREA2_HELPERS_FILE, encoding="utf-8"))
+        return _normalize_runninghub_krea2_helpers(raw)
+    except (OSError, ValueError, TypeError):
+        return [dict(item) for item in RUNNINGHUB_KREA2_DEFAULT_HELPERS]
+
+
+def _save_runninghub_krea2_helpers(data):
+    tmp = RUNNINGHUB_KREA2_HELPERS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        _json.dump(data, f, indent=2)
+    os.replace(tmp, RUNNINGHUB_KREA2_HELPERS_FILE)
 
 
 def _normalize_runninghub_loras(raw):
@@ -2836,12 +2873,13 @@ def _runninghub_submit_h3(api_key, job, uploads):
 
 def _runninghub_submit_krea2(api_key, job, image_name):
     loras = [{"name": job["krea_lora_filename"], "on": True, "sm": 1, "sc": 1, "triggers": []}]
-    if job.get("krea_realism_helpers", True):
-        loras.extend({"name": helper, "on": True,
-                      "sm": RUNNINGHUB_KREA2_REALISM_HELPER_STRENGTH,
-                      "sc": RUNNINGHUB_KREA2_REALISM_HELPER_STRENGTH,
-                      "triggers": []}
-                     for helper in RUNNINGHUB_KREA2_REALISM_HELPERS)
+    helpers = job.get("krea_helpers")
+    # Preserve a queued job from the previous one-switch release if one exists.
+    if helpers is None and job.get("krea_realism_helpers", True):
+        helpers = [dict(item) for item in RUNNINGHUB_KREA2_DEFAULT_HELPERS]
+    for helper in helpers or []:
+        loras.append({"name": helper["filename"], "on": True,
+                      "sm": helper["strength"], "sc": helper["strength"], "triggers": []})
     lora_state = _json.dumps({"version": 1, "sep": ", ", "cacheMode": "last", "loras": loras},
                              separators=(",", ":"))
     nodes = [
@@ -3059,6 +3097,32 @@ def runninghub_loras():
         if versions:
             public.append({**character, "versions": versions})
     return jsonify({"characters": public})
+
+
+@app.get("/api/runninghub/krea2/helpers")
+def runninghub_krea2_helpers():
+    with RUNNINGHUB_KREA2_HELPERS_LOCK:
+        helpers = _load_runninghub_krea2_helpers()
+    return jsonify({"helpers": [item for item in helpers if item["enabled"]]})
+
+
+@app.get("/api/admin/runninghub/krea2/helpers")
+@admin_required
+def runninghub_krea2_helpers_admin():
+    with RUNNINGHUB_KREA2_HELPERS_LOCK:
+        return jsonify({"helpers": _load_runninghub_krea2_helpers()})
+
+
+@app.put("/api/admin/runninghub/krea2/helpers")
+@admin_required
+def runninghub_krea2_helpers_save():
+    try:
+        helpers = _normalize_runninghub_krea2_helpers((request.get_json(force=True) or {}).get("helpers"))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    with RUNNINGHUB_KREA2_HELPERS_LOCK:
+        _save_runninghub_krea2_helpers(helpers)
+    return jsonify({"helpers": helpers})
 
 
 @app.put("/api/runninghub/loras")
@@ -3288,7 +3352,6 @@ def runninghub_create_krea2_job():
     image = request.files.get("image")
     prompt = (request.form.get("prompt") or "").strip()
     preset_key = (request.form.get("resolution_key") or "").strip()
-    realism_helpers = (request.form.get("realism_helpers", "true") or "").strip().lower() not in {"0", "false", "off", "no"}
     try:
         denoise = float(request.form.get("denoise", "0.60"))
     except (TypeError, ValueError):
@@ -3302,6 +3365,30 @@ def runninghub_create_krea2_job():
     preset = next((p for p in RES_PRESETS if p["key"] == preset_key), None)
     if not preset:
         return jsonify({"error": "Choose a supported Krea2 resolution."}), 400
+    try:
+        submitted_helpers = _json.loads(request.form.get("helpers", "[]"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Helper LoRAs must be valid data."}), 400
+    if not isinstance(submitted_helpers, list):
+        return jsonify({"error": "Helper LoRAs must be a list."}), 400
+    with RUNNINGHUB_KREA2_HELPERS_LOCK:
+        available_helpers = {item["filename"].lower(): item
+                             for item in _load_runninghub_krea2_helpers() if item["enabled"]}
+    helpers = []
+    for raw in submitted_helpers:
+        filename = str((raw or {}).get("filename") or "").strip()
+        if not filename or not bool((raw or {}).get("enabled", True)):
+            continue
+        managed = available_helpers.get(filename.lower())
+        if not managed:
+            return jsonify({"error": "A selected helper LoRA is no longer available."}), 400
+        try:
+            strength = float((raw or {}).get("strength", managed["strength"]))
+        except (TypeError, ValueError):
+            return jsonify({"error": f"{managed['filename']} needs a numeric strength."}), 400
+        if not math.isfinite(strength) or not 0 <= strength <= 2:
+            return jsonify({"error": f"{managed['filename']} strength must be from 0 to 2."}), 400
+        helpers.append({"filename": managed["filename"], "strength": round(strength, 2)})
     lora = _resolve_runninghub_lora((request.form.get("character_id") or "").strip(),
                                     (request.form.get("version_id") or "").strip())
     if not lora:
@@ -3321,7 +3408,7 @@ def runninghub_create_krea2_job():
            "key_concurrency": settings["concurrency"], "krea_image_path": image_path,
            "krea_image_type": image.mimetype, "krea_prompt": prompt, "krea_resolution_key": preset_key,
            "krea_width": preset["width"], "krea_height": preset["height"], "krea_denoise": denoise,
-           "krea_realism_helpers": realism_helpers,
+           "krea_helpers": helpers,
            "krea_character_id": lora["character_id"], "krea_character_name": lora["character_name"],
            "krea_version_id": lora["version_id"], "krea_version_label": lora["version_label"],
            "krea_lora_filename": lora["filename"], "estimated_total_seconds": None}

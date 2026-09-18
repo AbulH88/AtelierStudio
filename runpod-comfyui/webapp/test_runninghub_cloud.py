@@ -190,6 +190,20 @@ def test_krea_submit_omits_realism_helpers_when_disabled(monkeypatch):
     assert state["loras"] == [{"name": "Sophie-v3.safetensors", "on": True, "sm": 1, "sc": 1, "triggers": []}]
 
 
+def test_krea_helper_registry_is_admin_only_and_validated(maker_client, admin_client, monkeypatch):
+    saved = []
+    monkeypatch.setattr(A, "_save_runninghub_krea2_helpers", lambda helpers: saved.extend(helpers))
+    assert maker_client.get("/api/admin/runninghub/krea2/helpers").status_code == 403
+    response = admin_client.put("/api/admin/runninghub/krea2/helpers", json={"helpers": [{
+        "filename": "helper.safetensors", "enabled": True, "strength": 0.75
+    }]})
+    assert response.status_code == 200
+    assert saved == [{"filename": "helper.safetensors", "enabled": True, "strength": 0.75}]
+    assert admin_client.put("/api/admin/runninghub/krea2/helpers", json={"helpers": [{
+        "filename": "not-a-model.txt", "enabled": True, "strength": 0.6
+    }]}).status_code == 400
+
+
 def test_krea_job_rejects_out_of_range_denoise(maker_client, users):
     users["maker"]["runninghub_key_enc"] = A._encrypt_runninghub_key("rh_example_secret_1234567890")
     response = maker_client.post("/api/runninghub/krea2/jobs", data={
