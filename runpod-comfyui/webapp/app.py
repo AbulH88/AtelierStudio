@@ -3074,9 +3074,33 @@ def _runninghub_cancel(api_key, task_id):
 def _runninghub_import_result(job, result):
     outputs = result.get("results") or []
     wanted = ("png", "jpg", "jpeg", "webp") if _runninghub_workflow_key(job) in {"krea2_i2i_hq", "krea2_t2i"} else ("mp4", "mov", "webm")
-    output = next((o for o in outputs if str(o.get("outputType", "")).lower() in wanted and o.get("url")), None)
-    if not output:
+    matching = [o for o in outputs if str(o.get("outputType", "")).lower() in wanted and o.get("url")]
+    if not matching:
         raise RuntimeError("RunningHub finished but returned no downloadable result.")
+    if job.get("workflow_key") == "krea2_t2i":
+        character = re.sub(r'[\\/:*?"<>|]+', "-", str(job.get("krea_character_name") or "Character")).strip(" .")
+        stamp = time.strftime("%Y-%m-%d %H-%M-%S", time.localtime(job.get("created_at") or time.time()))
+        folder = f"{character or 'Character'} · {stamp}"
+        r2_store.create_folder(f"gallery/{folder}")
+        keys = []
+        with tempfile.TemporaryDirectory(prefix="atelier-rh-") as td:
+            for index, output in enumerate(matching, 1):
+                extension = str(output.get("outputType", "png")).lower()
+                dst = os.path.join(td, f"cloud-result-{index}.{extension}")
+                response = requests.get(output["url"], stream=True, timeout=900)
+                response.raise_for_status()
+                with open(dst, "wb") as f:
+                    for chunk in response.iter_content(65536):
+                        if chunk:
+                            f.write(chunk)
+                if os.path.getsize(dst) < 1024:
+                    raise RuntimeError("RunningHub returned an empty result file.")
+                key = f"gallery/{folder}/{index:02d}.{extension}"
+                r2_store.upload(dst, key)
+                _set_media_creator(key, job.get("user"))
+                keys.append(key)
+        return {"gallery_key": keys[0], "gallery_keys": keys, "gallery_folder": folder}
+    output = matching[0]
     with tempfile.TemporaryDirectory(prefix="atelier-rh-") as td:
         extension = str(output.get("outputType", wanted[0])).lower()
         dst = os.path.join(td, "cloud-result." + extension)
@@ -3092,7 +3116,7 @@ def _runninghub_import_result(job, result):
         key = f"gallery/cloud/{int(time.time())}_{job['id']}.{extension}"
         r2_store.upload(dst, key)
         _set_media_creator(key, job.get("user"))
-    return key
+    return {"gallery_key": key}
 
 
 def _runninghub_cleanup_uploads(job):
@@ -3180,8 +3204,8 @@ def _runninghub_run(job_id):
                 _runninghub_update(job_id, status="importing", message="Saving completed video to Gallery…", **changes)
                 with RUNNINGHUB_JOBS_LOCK:
                     completed_job = dict(RUNNINGHUB_JOBS[job_id])
-                gallery_key = _runninghub_import_result(completed_job, result)
-                _runninghub_update(job_id, status="done", message="Saved to Gallery.", gallery_key=gallery_key, **changes)
+                imported = _runninghub_import_result(completed_job, result)
+                _runninghub_update(job_id, status="done", message="Saved to Gallery.", **imported, **changes)
                 return
             elif state in ("CANCEL", "CANCELLED", "CANCELED"):
                 _runninghub_update(job_id, status="cancelled", message="Cloud job cancelled.", **changes)
@@ -3623,8 +3647,8 @@ def runninghub_create_krea2_t2i_job():
         submitted_helpers = _json.loads(request.form.get("helpers", "[]"))
     except (TypeError, ValueError):
         return jsonify({"error": "Batch, seed, or helper LoRAs are invalid."}), 400
-    if not 1 <= batch_size <= 4 or seed < 0:
-        return jsonify({"error": "Batch must be from 1 to 4 and seed must be positive."}), 400
+    if not 1 <= batch_size <= 16 or seed < 0:
+        return jsonify({"error": "Batch must be from 1 to 16 and seed must be positive."}), 400
     lora = _resolve_runninghub_lora((request.form.get("character_id") or "").strip(),
                                     (request.form.get("version_id") or "").strip())
     if not lora:

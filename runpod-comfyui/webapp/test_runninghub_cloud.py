@@ -12,7 +12,7 @@ def users(monkeypatch):
     data = {
         "admin": {"status": "active", "role": "admin", "runninghub_plus": False},
         "maker": {"status": "active", "role": "user", "runninghub_plus": False,
-                  "cloud_workflows": ["krea2_i2i_hq", "scail", "h3", "jobs"]},
+                  "cloud_workflows": ["krea2_i2i_hq", "krea2_t2i", "scail", "h3", "jobs"]},
     }
     monkeypatch.setattr(A, "load_users", lambda: data)
     monkeypatch.setattr(A, "save_users", lambda _users: None)
@@ -213,6 +213,14 @@ def test_krea_t2i_submit_maps_prompt_seed_batch_and_helpers(monkeypatch):
     assert values[(10, "batch_size")] == "2"
     assert values[(98, "seed")] == "42"
     assert json.loads(values[(117, "LoraLoaderState")])["loras"][1]["name"] == "detail.safetensors"
+
+
+def test_krea_t2i_rejects_batch_outside_one_to_sixteen(maker_client, monkeypatch):
+    monkeypatch.setattr(A, "_runninghub_user_settings", lambda _user: {"configured": True})
+    response = maker_client.post("/api/runninghub/krea2-t2i/jobs", data={
+        "prompt": "portrait", "resolution_key": A.RES_PRESETS[0]["key"], "batch_size": "17", "seed": "0"})
+    assert response.status_code == 400
+    assert "1 to 16" in response.get_json()["error"]
 
 
 def test_krea_helper_registry_is_admin_only_and_validated(maker_client, admin_client, monkeypatch):
