@@ -288,6 +288,39 @@ def _decrypt_runninghub_key(ciphertext):
         return ""
 
 
+RUNNINGHUB_GLOBAL_SETTINGS_FILE = os.path.join(HERE, "runninghub_global_settings.json")
+RUNNINGHUB_GLOBAL_SETTINGS_LOCK = threading.Lock()
+
+
+def _load_runninghub_global_settings():
+    try:
+        with open(RUNNINGHUB_GLOBAL_SETTINGS_FILE, encoding="utf-8") as f:
+            data = _json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def _save_runninghub_global_settings(data):
+    tmp = RUNNINGHUB_GLOBAL_SETTINGS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        _json.dump(data, f, indent=2)
+    os.replace(tmp, RUNNINGHUB_GLOBAL_SETTINGS_FILE)
+
+
+def _runninghub_global_settings():
+    """Admin-managed state overrides the legacy environment fallback."""
+    with RUNNINGHUB_GLOBAL_SETTINGS_LOCK:
+        state = _load_runninghub_global_settings()
+    if state.get("disabled"):
+        return {"key": "", "concurrency": RUNNINGHUB_GLOBAL_CONCURRENCY, "source": "none"}
+    managed = _decrypt_runninghub_key(state.get("key_enc", ""))
+    if managed:
+        return {"key": managed, "concurrency": max(1, int(state.get("concurrency", 1) or 1)), "source": "managed"}
+    return {"key": RUNNINGHUB_GLOBAL_API_KEY, "concurrency": RUNNINGHUB_GLOBAL_CONCURRENCY,
+            "source": "environment" if RUNNINGHUB_GLOBAL_API_KEY else "none"}
+
+
 def _mask_runninghub_key(key):
     return "••••••••" + key[-4:] if len(key) >= 4 else "••••••••"
 
@@ -440,10 +473,11 @@ def api_me():
 @admin_required
 def api_users():
     users = load_users()
+    global_key = _runninghub_global_settings()["key"]
     return jsonify({"users": [{"username": k, "role": v["role"], "status": v["status"],
                                 "cloud_workflows": _cloud_workflows_for(k) if v["role"] == "admin" else sorted(set(v.get("cloud_workflows", [])) & CLOUD_WORKFLOW_IDS),
                                 "runninghub_plus": bool(v.get("runninghub_plus")),
-                                "runninghub_configured": bool(v.get("runninghub_key_enc") or RUNNINGHUB_GLOBAL_API_KEY),
+                                "runninghub_configured": bool(v.get("runninghub_key_enc") or global_key),
                                 "runninghub_private": bool(v.get("runninghub_key_enc")),
                                 "runninghub_concurrency": max(1, int(v.get("runninghub_concurrency", RUNNINGHUB_GLOBAL_CONCURRENCY) or 1))}
                               for k, v in sorted(users.items())]})
@@ -2634,12 +2668,13 @@ def _runninghub_update(job_id, **changes):
 def _runninghub_user_settings(username):
     rec = load_users().get(username, {})
     private_key = _decrypt_runninghub_key(rec.get("runninghub_key_enc", ""))
-    key = private_key or RUNNINGHUB_GLOBAL_API_KEY
+    global_settings = _runninghub_global_settings()
+    key = private_key or global_settings["key"]
     return {
         "configured": bool(key),
         "plus_allowed": bool(rec.get("runninghub_plus")),
         "source": "private" if private_key else "global" if key else "none",
-        "concurrency": max(1, int(rec.get("runninghub_concurrency", 1 if private_key else RUNNINGHUB_GLOBAL_CONCURRENCY) or 1)),
+        "concurrency": max(1, int(rec.get("runninghub_concurrency", 1 if private_key else global_settings["concurrency"]) or 1)),
         "key_enc": _encrypt_runninghub_key(key) if key else "",
         "key_fingerprint": hashlib.sha256(key.encode("utf-8")).hexdigest() if key else "",
     }
@@ -3049,6 +3084,39 @@ def runninghub_delete_settings():
     users[session["user"]].pop("runninghub_key_enc", None)
     save_users(users)
     return jsonify({"ok": True})
+
+
+@app.get("/api/runninghub/global-key")
+@admin_required
+def runninghub_global_key_status():
+    settings = _runninghub_global_settings()
+    key = settings["key"]
+    return jsonify({"configured": bool(key), "masked": _mask_runninghub_key(key) if key else "",
+                    "concurrency": settings["concurrency"], "source": settings["source"]})
+
+
+@app.put("/api/runninghub/global-key")
+@admin_required
+def runninghub_global_key_set():
+    body = request.get_json(force=True)
+    key = str(body.get("api_key") or "").strip()
+    try:
+        concurrency = max(1, min(100, int(body.get("concurrency") or 1)))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Concurrency must be between 1 and 100."}), 400
+    if len(key) < 16:
+        return jsonify({"error": "Enter a valid RunningHub API key."}), 400
+    with RUNNINGHUB_GLOBAL_SETTINGS_LOCK:
+        _save_runninghub_global_settings({"key_enc": _encrypt_runninghub_key(key), "concurrency": concurrency})
+    return jsonify({"ok": True, "configured": True, "masked": _mask_runninghub_key(key), "concurrency": concurrency})
+
+
+@app.delete("/api/runninghub/global-key")
+@admin_required
+def runninghub_global_key_delete():
+    with RUNNINGHUB_GLOBAL_SETTINGS_LOCK:
+        _save_runninghub_global_settings({"disabled": True})
+    return jsonify({"ok": True, "configured": False})
 
 
 @app.post("/api/runninghub/jobs")
