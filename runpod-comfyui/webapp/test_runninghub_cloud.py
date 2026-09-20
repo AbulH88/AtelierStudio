@@ -372,3 +372,31 @@ def test_active_workflow_detection_is_scoped_per_user_and_workflow(monkeypatch):
     with A.RUNNINGHUB_JOBS_LOCK:
         assert A._runninghub_has_active_locked("maker", "h3") is True
         assert A._runninghub_has_active_locked("maker", "scail") is False
+
+
+def test_gallery_character_browser_groups_timestamped_batches_newest_first(maker_client, monkeypatch):
+    monkeypatch.setattr(A.r2_store, "list_dirs", lambda _prefix: [
+        "NerdyGirl · 2026-09-19 12-33-12",
+        "NerdyGirl · 2026-09-20 08-01-02",
+        "OtherGirl · 2026-09-19 23-59-59",
+    ])
+    monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {
+        "job": {"gallery_folder": "NerdyGirl · 2026-09-20 08-01-02",
+                "gallery_keys": ["gallery/NerdyGirl · 2026-09-20 08-01-02/01.png",
+                                 "gallery/NerdyGirl · 2026-09-20 08-01-02/02.png"]}
+    })
+    characters = maker_client.get("/api/gallery/characters").get_json()["characters"]
+    assert [item["name"] for item in characters] == ["NerdyGirl", "OtherGirl"]
+    batches = maker_client.get("/api/gallery/batches?character=NerdyGirl").get_json()["batches"]
+    assert [item["folder"] for item in batches] == [
+        "NerdyGirl · 2026-09-20 08-01-02", "NerdyGirl · 2026-09-19 12-33-12"]
+    assert batches[0]["count"] == 2
+
+
+def test_gallery_media_sorts_by_batch_creation_time_not_filename(maker_client, monkeypatch):
+    monkeypatch.setattr(A.r2_store, "list_objs", lambda _prefix: [
+        {"key": "gallery/NerdyGirl · 2026-09-19 12-33-12/z.png", "name": "z.png", "url": "z"},
+        {"key": "gallery/NerdyGirl · 2026-09-20 08-01-02/a.png", "name": "a.png", "url": "a"},
+    ])
+    images = maker_client.get("/api/gallery/list").get_json()["images"]
+    assert [item["name"] for item in images] == ["a.png", "z.png"]

@@ -93,9 +93,16 @@ def list_objs(prefix, media_route="/api/media"):
         key = o["key"]
         if key.endswith("/.keep"):
             continue
-        out.append({"key": key, "name": key.split("/")[-1],
-                    "size_mb": round(o["size"] / 1e6, 2),
-                    "url": f"{media_route}?key={quote(key, safe='')}"})
+        item = {"key": key, "name": key.split("/")[-1],
+                "size_mb": round(o["size"] / 1e6, 2),
+                "url": f"{media_route}?key={quote(key, safe='')}"}
+        # Worker versions expose this under different names. Preserve it when
+        # present so callers can sort real media chronologically.
+        for field in ("uploaded", "lastModified", "last_modified", "created_at"):
+            if o.get(field) is not None:
+                item["created_at"] = o[field]
+                break
+        out.append(item)
     return out
 
 

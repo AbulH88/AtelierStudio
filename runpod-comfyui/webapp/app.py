@@ -3772,6 +3772,91 @@ def gallery_groups():
         return jsonify({"error": f"{type(e).__name__}: {e}", "groups": []}), 200
 
 
+_GALLERY_BATCH_RE = re.compile(
+    r"^(?P<character>.+?)\s+·\s+(?P<stamp>\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2})$")
+
+
+def _gallery_batch_parts(folder):
+    """Return the character and sortable timestamp encoded in a cloud batch folder."""
+    match = _GALLERY_BATCH_RE.fullmatch(folder or "")
+    if not match:
+        return None
+    stamp = match.group("stamp")
+    return {"character": match.group("character"), "stamp": stamp,
+            "sort_key": stamp.replace("-", "").replace(" ", "").replace(":", "")}
+
+
+def _gallery_item_sort_key(item):
+    """Use R2 time where available, otherwise the batch-folder timestamp."""
+    created = item.get("created_at")
+    if created is not None:
+        return str(created)
+    folder = item.get("key", "")[len("gallery/"):].split("/", 1)[0]
+    batch = _gallery_batch_parts(folder)
+    return batch["sort_key"] if batch else ""
+
+
+def _gallery_batch_job_index():
+    """Completed cloud-job metadata supplies previews/counts without R2 scans."""
+    with RUNNINGHUB_JOBS_LOCK:
+        jobs = [dict(job) for job in RUNNINGHUB_JOBS.values()]
+    index = {}
+    for job in jobs:
+        folder = job.get("gallery_folder")
+        if not folder:
+            continue
+        keys = job.get("gallery_keys") or ([job["gallery_key"]] if job.get("gallery_key") else [])
+        index[folder] = {"count": len(keys), "preview_key": keys[0] if keys else ""}
+    return index
+
+
+@app.get("/api/gallery/characters")
+def gallery_characters():
+    """Lightweight character navigation from direct Gallery folder prefixes."""
+    try:
+        characters = {}
+        for folder in r2_store.list_dirs("gallery/"):
+            batch = _gallery_batch_parts(folder) or {"character": folder, "sort_key": ""}
+            rec = characters.setdefault(batch["character"], {"name": batch["character"],
+                                                              "batch_count": 0, "latest": ""})
+            rec["batch_count"] += 1
+            rec["latest"] = max(rec["latest"], batch["sort_key"])
+        return jsonify({"characters": sorted(characters.values(),
+                                               key=lambda item: (item["latest"], item["name"].lower()),
+                                               reverse=True)})
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}", "characters": []}), 200
+
+
+@app.get("/api/gallery/batches")
+def gallery_batches():
+    """List one character's batch folders without loading their images."""
+    from urllib.parse import quote
+    character = (request.args.get("character") or "").strip()
+    if not character:
+        return jsonify({"error": "Character required.", "batches": []}), 400
+    try:
+        job_index = _gallery_batch_job_index()
+        batches = []
+        for folder in r2_store.list_dirs("gallery/"):
+            parsed = _gallery_batch_parts(folder)
+            if (parsed["character"] if parsed else folder) != character:
+                continue
+            meta = job_index.get(folder, {})
+            preview_key = meta.get("preview_key", "")
+            batches.append({
+                "folder": folder,
+                "label": parsed["stamp"] if parsed else folder,
+                "sort_key": parsed["sort_key"] if parsed else "",
+                "count": meta.get("count"),
+                "preview_url": f"/api/media?key={quote(preview_key, safe='')}" if preview_key else "",
+            })
+        batches.sort(key=lambda item: (item["sort_key"], item["folder"].lower()), reverse=True)
+        return jsonify({"batches": batches})
+    except Exception as e:
+        return jsonify({"error": f"{type(e).__name__}: {e}", "batches": []}), 200
+
+
 @app.get("/api/gallery/list")
 def gallery_list():
     from urllib.parse import quote
@@ -3785,7 +3870,7 @@ def gallery_list():
             stem, _ext = os.path.splitext(im["key"][len("gallery/"):])
             thumb_key = "thumbs/" + stem + ".webp"
             im["thumb_url"] = f"/api/media?key={quote(thumb_key, safe='')}"
-    imgs.sort(key=lambda x: x["name"], reverse=True)   # newest first
+    imgs.sort(key=lambda x: (_gallery_item_sort_key(x), x["name"]), reverse=True)
     return jsonify({"images": _enrich_media_creator(imgs)})
 
 

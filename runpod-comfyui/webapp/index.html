@@ -359,6 +359,11 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
 
 /* gallery */
 .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+.gallery-batch-card{min-height:154px;padding:16px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(145deg,var(--panel),var(--ink2));color:var(--txt);text-align:left;cursor:pointer;transition:.2s;position:relative;overflow:hidden}
+.gallery-batch-card:hover{border-color:var(--amber-dim);transform:translateY(-2px);box-shadow:0 14px 32px -18px #000}
+.gallery-batch-card .batch-icon{font-size:28px;display:block;margin-bottom:18px}.gallery-batch-card .batch-name{font:600 14px var(--sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gallery-batch-card .batch-meta{font:11px var(--mono);color:var(--faint);margin-top:6px}
+.gallery-batch-card .batch-preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.19;pointer-events:none}.gallery-batch-card .batch-preview~span,.gallery-batch-card .batch-preview~div{position:relative}
+.gallery-crumb{font:inherit;color:var(--amber);border:0;background:transparent;padding:0;cursor:pointer}.gallery-crumb:hover{text-decoration:underline}.gallery-crumb-sep{margin:0 8px;color:var(--faint)}
 .gal-card{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--panel);transition:all .2s ease}
 .gal-card img{width:100%;display:block;cursor:zoom-in}
 .gal-card .gdel{position:absolute;top:7px;right:7px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line2);
@@ -4211,8 +4216,10 @@ $('#stopGen').onclick=async()=>{
 };
 
 // ===== Gallery =====
+let _galCharacter='';
 let _galGroup='';
 let _galImages=[];
+let _galBatches=[];
 let _galSelected=new Set();
 let _galSearch='';
 let _galSort='newest';
@@ -4220,114 +4227,86 @@ let _lastSelectedKey=null;
 
 function _galName(g){return g==='misc'?'Misc':g.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());}
 
+function _galTime(item){
+  if(item.created_at!==undefined&&item.created_at!==null)return String(item.created_at);
+  const folder=(item.key||item.folder||'').replace(/^gallery\//,'').split('/')[0];
+  const match=folder.match(/·\s+(\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2})$/);
+  return match?match[1].replace(/[- :]/g,''):'';
+}
+
+function _galTitle(){
+  const title=$('#galGroupTitle');
+  if(!_galCharacter){title.textContent='All Images';return;}
+  if(!_galGroup){title.textContent=_galName(_galCharacter);return;}
+  title.innerHTML=`<button class="gallery-crumb" type="button" id="galBackToCharacter">${_esc(_galName(_galCharacter))}</button><span class="gallery-crumb-sep">/</span>${_esc(_galName(_galGroup))}`;
+  $('#galBackToCharacter').onclick=()=>{_galGroup='';_galSelected.clear();loadGallery();};
+}
+
 async function openGallery(){
   $('#galStatus').textContent='';
   _galSelected.clear();
   updateBulkBar();
-  let d={}; try{ d=await(await fetch('/api/gallery/groups')).json(); }catch(e){}
+  let d={}; try{ d=await(await fetch('/api/gallery/characters')).json(); }catch(e){}
   if(d.error)$('#galStatus').textContent=d.error;
-  const groups=['',...(d.groups||[])];
-  $('#galGroups').innerHTML=groups.map(g=>{
-    const name = g ? _galName(g) : 'All Images';
-    const active = g === _galGroup ? ' on' : '';
-    const dlBtn = g ? `<span class="sb-dl" data-dlgroup="${g}" title="Download group (zip)">↓</span>` : '';
-    const delBtn = (IS_ADMIN && g) ? `<span class="sb-del" data-delgroup="${g}" title="Delete group">✕</span>` : '';
-    return `<div class="sb-item${active}" data-g="${g}">
-      <span class="sb-icon">${g?'👤':'🖼'}</span><span class="sb-label">${name}</span>
-      ${dlBtn}${delBtn}
+  const characters=['',...(d.characters||[]).map(item=>item.name)];
+  $('#galGroups').innerHTML=characters.map(name=>{
+    const active = name === _galCharacter ? ' on' : '';
+    const detail=(d.characters||[]).find(item=>item.name===name);
+    return `<div class="sb-item${active}" data-character="${_esc(name)}">
+      <span class="sb-icon">${name?'👤':'🖼'}</span><span class="sb-label">${name?_esc(_galName(name)):'All Images'}</span>
+      ${detail?`<span class="sb-count">${detail.batch_count}</span>`:''}
     </div>`;
   }).join('');
 
   $$('#galGroups .sb-item').forEach(el=>{
-    el.onclick=(e)=>{
-      // Only select group if not clicking download/delete buttons
-      if(e.target.classList.contains('sb-dl') || e.target.classList.contains('sb-del')) return;
-      _galGroup=el.dataset.g;
+    el.onclick=()=>{
+      _galCharacter=el.dataset.character;
+      _galGroup='';
       $$('#galGroups .sb-item').forEach(x=>x.classList.toggle('on',x===el));
       _galSelected.clear();
       loadGallery();
     };
-    el.oncontextmenu=event=>{
-      if(!IS_ADMIN)return;
-      event.preventDefault();
-      openGalleryFolderMenu(event);
-    };
-  });
-
-  $$('#galGroups .sb-dl').forEach(b => b.onclick = async (e) => {
-    e.stopPropagation();
-    const group = b.dataset.dlgroup;
-    try {
-      $('#galStatus').textContent = 'Fetching group list...';
-      const d = await(await fetch('/api/gallery/list?group=' + encodeURIComponent(group))).json();
-      const imgs = d.images || [];
-      if (!imgs.length) {
-        alert("This group has no images.");
-        $('#galStatus').textContent = '';
-        return;
-      }
-      const keys = imgs.map(im => im.key);
-      
-      $('#galStatus').textContent = 'Zipping group...';
-      const r = await fetch('/api/gallery/bulk-download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keys })
-      });
-      if (!r.ok) throw new Error("Server error " + r.status);
-      const blob = await r.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `gallery_group_${group}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      $('#galStatus').textContent = '';
-    } catch (e) {
-      alert("Group download failed: " + e);
-      $('#galStatus').textContent = '';
-    }
-  });
-
-  $$('#galGroups .sb-del').forEach(b => b.onclick = async (e) => {
-    e.stopPropagation();
-    const group = b.dataset.delgroup;
-    if (!confirm(`Are you sure you want to delete the group "${_galName(group)}" and all images in it?`)) return;
-    try {
-      const r = await fetch('/api/gallery/delete-group', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ group })
-      });
-      const d = await r.json();
-      if (d.ok) {
-        if (_galGroup === group) _galGroup = '';
-        for (const k of _galSelected) {
-          if (k.startsWith(`gallery/${group}/`)) {
-            _galSelected.delete(k);
-          }
-        }
-        await openGallery();
-      }
-    } catch (e) {
-      alert("Delete group failed: " + e);
-    }
   });
 
   await loadGallery();
 }
 
 async function loadGallery(){
-  $('#galGroupTitle').textContent=_galGroup?_galName(_galGroup):'All Images';
+  _galTitle();
+  if(_galCharacter&&!_galGroup){
+    const d=await(await fetch('/api/gallery/batches?character='+encodeURIComponent(_galCharacter))).json();
+    _galBatches=d.batches||[];
+    _galImages=[];
+    renderGallery();
+    return;
+  }
   const d=await(await fetch('/api/gallery/list?group='+encodeURIComponent(_galGroup))).json();
   _galImages=d.images||[];
+  _galBatches=[];
   renderGallery();
 }
 
 function renderGallery() {
   const q = _galSearch.trim().toLowerCase();
+  const isBatchView=Boolean(_galCharacter&&!_galGroup);
+  $('#galCreatorFilter').style.display=isBatchView?'none':'';
+  $('#galSelectAllLabel').style.display=isBatchView?'none':'flex';
+  if(isBatchView){
+    let batches=_galBatches.filter(batch=>batch.label.toLowerCase().includes(q));
+    if(_galSort==='oldest')batches.sort((a,b)=>a.sort_key.localeCompare(b.sort_key));
+    else if(_galSort==='name')batches.sort((a,b)=>a.label.localeCompare(b.label));
+    else if(_galSort==='name_desc')batches.sort((a,b)=>b.label.localeCompare(a.label));
+    else batches.sort((a,b)=>b.sort_key.localeCompare(a.sort_key));
+    $('#galCount').textContent=batches.length+(batches.length===1?' batch':' batches');
+    $('#galGrid').classList.remove('compact');
+    $('#galGrid').innerHTML=batches.length?batches.map(batch=>`<button class="gallery-batch-card" type="button" data-folder="${_esc(batch.folder)}">
+      ${batch.preview_url?`<img class="batch-preview" src="${batch.preview_url}" alt="">`:''}
+      <span class="batch-icon">📁</span><div class="batch-name">${_esc(batch.label)}</div><div class="batch-meta">${batch.count===null?'Open batch':`${batch.count} image${batch.count===1?'':'s'}`}</div>
+    </button>`).join(''):'<div class="reels-empty" style="grid-column:1/-1"><div class="re-icon">📂</div><p>No batches for this character yet.</p></div>';
+    $$('#galGrid .gallery-batch-card').forEach(card=>card.onclick=()=>{_galGroup=card.dataset.folder;_galSelected.clear();loadGallery();});
+    updateBulkBar();
+    return;
+  }
   creatorOptions('#galCreatorFilter',_galImages,_galCreator);
   
   let list = _galImages.filter(im => {
@@ -4335,9 +4314,9 @@ function renderGallery() {
   });
   
   if (_galSort === 'newest') {
-    list.sort((a, b) => b.name.localeCompare(a.name));
+    list.sort((a, b) => _galTime(b).localeCompare(_galTime(a)) || b.name.localeCompare(a.name));
   } else if (_galSort === 'oldest') {
-    list.sort((a, b) => a.name.localeCompare(b.name));
+    list.sort((a, b) => _galTime(a).localeCompare(_galTime(b)) || a.name.localeCompare(b.name));
   } else if (_galSort === 'name') {
     list.sort((a, b) => a.name.localeCompare(b.name));
   } else if (_galSort === 'name_desc') {
