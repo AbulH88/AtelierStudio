@@ -17,6 +17,24 @@ def test_cloud_shell_contains_workflow_navigation_and_shared_queue():
     assert "Cloud Queue" in HTML
 
 
+def test_cloud_jobs_opens_a_full_history_workspace_with_real_usage_columns():
+    assert 'id="cloudJobsNav" data-cloud-workflow="jobs"' in HTML
+    assert 'id="cloudJobsPanel"' in HTML
+    assert 'id="cloudQueueViewAll"' in HTML
+    assert '>My Jobs<' in HTML
+    assert '>All Jobs<' in HTML
+    assert '>RunningHub Task ID<' in HTML
+    assert '>RH Coins<' in HTML
+    assert "view:'history'" in HTML
+
+
+def test_recent_cloud_jobs_label_runtime_and_coin_usage():
+    assert "cloudFormatRuntime(job.runtime)" in HTML
+    assert "cloudCoinText(job.rh_coins)" in HTML
+    assert "queue-row-meta" in HTML
+    assert "queue-row-tail" not in HTML
+
+
 def test_h3_reference_modes_and_upload_limits_are_exposed():
     assert 'data-mode="i2v"' in HTML
     assert 'data-mode="omni"' in HTML

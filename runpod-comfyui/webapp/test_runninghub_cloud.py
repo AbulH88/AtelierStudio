@@ -313,6 +313,52 @@ def test_job_list_keeps_active_and_compact_recent_history(maker_client, monkeypa
     assert job_ids == ["running", "done-new", "failed", "done-old"]
 
 
+def test_job_history_supports_my_and_all_scope_with_real_usage(maker_client, monkeypatch):
+    monkeypatch.setattr(A, "_schedule_runninghub_usage_backfill", lambda _jobs: None)
+    monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {
+        "mine": {"id": "mine", "user": "maker", "workflow_key": "krea2_i2i_hq",
+                 "task_id": "rh-100", "status": "done", "created_at": 3,
+                 "runtime": "71", "rh_coins": "8", "key_enc": "secret"},
+        "other": {"id": "other", "user": "admin", "workflow_key": "scail",
+                  "task_id": "rh-200", "status": "done", "created_at": 2,
+                  "runtime": "585", "rh_coins": "64"},
+    })
+    mine = maker_client.get("/api/runninghub/jobs?view=history&scope=my").get_json()
+    assert [job["id"] for job in mine["jobs"]] == ["mine"]
+    assert mine["known_coin_total"] == 8
+    assert mine["jobs"][0]["runtime"] == "71"
+    assert "key_enc" not in mine["jobs"][0]
+
+    all_jobs = maker_client.get("/api/runninghub/jobs?view=history&scope=all").get_json()
+    assert [job["id"] for job in all_jobs["jobs"]] == ["mine", "other"]
+    assert all_jobs["known_coin_total"] == 72
+
+
+def test_job_history_filters_searches_and_paginates(maker_client, monkeypatch):
+    monkeypatch.setattr(A, "_schedule_runninghub_usage_backfill", lambda _jobs: None)
+    monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {
+        "one": {"id": "one", "user": "maker", "workflow_key": "h3", "task_id": "task-alpha",
+                "status": "done", "created_at": 1, "rh_coins": "4"},
+        "two": {"id": "two", "user": "maker", "workflow_key": "h3", "task_id": "task-beta",
+                "status": "running", "created_at": 2},
+        "three": {"id": "three", "user": "maker", "workflow_key": "scail", "task_id": "task-gamma",
+                  "status": "failed", "created_at": 3},
+    })
+    response = maker_client.get("/api/runninghub/jobs?view=history&workflow=h3&status=active&q=beta&page=1&per_page=1")
+    body = response.get_json()
+    assert response.status_code == 200
+    assert [job["id"] for job in body["jobs"]] == ["two"]
+    assert body["total"] == 1
+    assert body["total_pages"] == 1
+
+
+def test_runninghub_usage_changes_only_keeps_reported_real_values():
+    assert A._runninghub_usage_changes({"usage": {
+        "consumeCoins": "12.5", "taskCostTime": "81", "consumeMoney": "ignored"
+    }}) == {"rh_coins": "12.5", "runtime": "81"}
+    assert A._runninghub_usage_changes({"usage": {"consumeCoins": None, "taskCostTime": ""}}) == {}
+
+
 def test_dispatch_serializes_jobs_with_same_key(monkeypatch):
     started = []
     class Thread:

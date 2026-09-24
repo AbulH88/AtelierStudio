@@ -2804,6 +2804,8 @@ def _load_runninghub_jobs():
 
 
 RUNNINGHUB_JOBS = _load_runninghub_jobs()
+RUNNINGHUB_USAGE_BACKFILL_LOCK = threading.Lock()
+RUNNINGHUB_USAGE_BACKFILL_ACTIVE = set()
 
 
 def _save_runninghub_jobs():
@@ -3062,6 +3064,56 @@ def _runninghub_query(api_key, task_id):
     return data
 
 
+def _runninghub_usage_changes(result):
+    """Return only real usage values reported by RunningHub."""
+    usage = result.get("usage") or {}
+    changes = {}
+    coins = usage.get("consumeCoins")
+    runtime = usage.get("taskCostTime")
+    if coins not in (None, ""):
+        changes["rh_coins"] = coins
+    if runtime not in (None, ""):
+        changes["runtime"] = runtime
+    return changes
+
+
+def _runninghub_backfill_usage(job_id):
+    """Read missing terminal usage once; never resubmit or mutate a provider task."""
+    try:
+        with RUNNINGHUB_JOBS_LOCK:
+            job = dict(RUNNINGHUB_JOBS.get(job_id) or {})
+        if (not job or job.get("status") not in RUNNINGHUB_TERMINAL_STATUSES
+                or not job.get("task_id") or job.get("rh_coins") not in (None, "")):
+            return
+        api_key = _decrypt_runninghub_key(job.get("key_enc", ""))
+        if not api_key:
+            return
+        changes = _runninghub_usage_changes(_runninghub_query(api_key, job["task_id"]))
+        if changes:
+            _runninghub_update(job_id, **changes)
+    except Exception:
+        # Usage backfill is best effort; the persisted job must remain visible.
+        pass
+    finally:
+        with RUNNINGHUB_USAGE_BACKFILL_LOCK:
+            RUNNINGHUB_USAGE_BACKFILL_ACTIVE.discard(job_id)
+
+
+def _schedule_runninghub_usage_backfill(jobs, limit=5):
+    scheduled = []
+    with RUNNINGHUB_USAGE_BACKFILL_LOCK:
+        for job in jobs:
+            job_id = job.get("id")
+            if (len(scheduled) >= limit or not job_id or job_id in RUNNINGHUB_USAGE_BACKFILL_ACTIVE
+                    or job.get("status") not in RUNNINGHUB_TERMINAL_STATUSES
+                    or not job.get("task_id") or job.get("rh_coins") not in (None, "")):
+                continue
+            RUNNINGHUB_USAGE_BACKFILL_ACTIVE.add(job_id)
+            scheduled.append(job_id)
+    for job_id in scheduled:
+        threading.Thread(target=_runninghub_backfill_usage, args=(job_id,), daemon=True).start()
+
+
 def _runninghub_cancel(api_key, task_id):
     response = requests.post(
         "https://www.runninghub.ai/task/openapi/cancel",
@@ -3201,8 +3253,7 @@ def _runninghub_run(job_id):
                 return
             result = _runninghub_query(api_key, task_id)
             state = str(result.get("status") or "").upper()
-            usage = result.get("usage") or {}
-            changes = {"rh_coins": usage.get("consumeCoins"), "runtime": usage.get("taskCostTime")}
+            changes = _runninghub_usage_changes(result)
             if state in ("QUEUED", "PENDING"):
                 _runninghub_update(job_id, status="queued", message="Queued on RunningHub.", **changes)
             elif state in ("RUNNING", "PROCESSING"):
@@ -3710,12 +3761,67 @@ def _runninghub_public_job(job):
     return safe
 
 
+def _runninghub_coin_number(value):
+    try:
+        number = float(value)
+        return number if math.isfinite(number) else None
+    except (TypeError, ValueError):
+        return None
+
+
 @app.get("/api/runninghub/jobs")
 @cloud_workflow_required("jobs")
 def runninghub_list_jobs():
     username = session["user"]
     with RUNNINGHUB_JOBS_LOCK:
-        user_jobs = [dict(j) for j in RUNNINGHUB_JOBS.values() if j.get("user") == username]
+        all_jobs = [dict(j) for j in RUNNINGHUB_JOBS.values()]
+    view = (request.args.get("view") or "rail").strip().lower()
+    if view not in {"rail", "history"}:
+        return jsonify({"error": "View must be rail or history."}), 400
+    if view == "history":
+        scope = (request.args.get("scope") or "my").strip().lower()
+        if scope not in {"my", "all"}:
+            return jsonify({"error": "Scope must be my or all."}), 400
+        try:
+            page = int(request.args.get("page", 1))
+            per_page = int(request.args.get("per_page", 20))
+        except (TypeError, ValueError):
+            return jsonify({"error": "Page values must be whole numbers."}), 400
+        if page < 1 or per_page < 1 or per_page > 100:
+            return jsonify({"error": "Page must be positive and per_page must be from 1 to 100."}), 400
+        workflow = (request.args.get("workflow") or "").strip()
+        status = (request.args.get("status") or "").strip().lower()
+        query = (request.args.get("q") or "").strip().lower()
+        if workflow and workflow not in {"scail", "h3", "krea2_i2i_hq", "krea2_t2i"}:
+            return jsonify({"error": "Unknown Cloud workflow filter."}), 400
+        jobs = all_jobs if scope == "all" else [j for j in all_jobs if j.get("user") == username]
+        if workflow:
+            jobs = [j for j in jobs if _runninghub_workflow_key(j) == workflow]
+        if status:
+            if status == "active":
+                jobs = [j for j in jobs if j.get("status") in RUNNINGHUB_ACTIVE_STATUSES]
+            elif status == "completed":
+                jobs = [j for j in jobs if j.get("status") == "done"]
+            elif status in {"failed", "cancelled"}:
+                jobs = [j for j in jobs if j.get("status") == status]
+            else:
+                return jsonify({"error": "Unknown Cloud job status filter."}), 400
+        if query:
+            jobs = [j for j in jobs if query in " ".join(str(j.get(k) or "").lower()
+                    for k in ("id", "task_id", "user"))]
+        jobs.sort(key=lambda j: j.get("created_at", 0), reverse=True)
+        total = len(jobs)
+        known_coins = [_runninghub_coin_number(j.get("rh_coins")) for j in jobs]
+        known_coin_total = round(sum(v for v in known_coins if v is not None), 4)
+        start = (page - 1) * per_page
+        page_jobs = jobs[start:start + per_page]
+        _schedule_runninghub_usage_backfill(page_jobs)
+        return jsonify({"jobs": [_runninghub_public_job(j) for j in page_jobs], "page": page,
+                        "per_page": per_page, "total": total,
+                        "total_pages": math.ceil(total / per_page) if total else 0,
+                        "known_coin_total": known_coin_total})
+
+    user_jobs = [j for j in all_jobs if j.get("user") == username]
     user_jobs.sort(key=lambda j: j.get("created_at", 0), reverse=True)
     # Cloud is a live work surface, not an archive. Keep every active task
     # visible plus a compact recent history for the queue rail.
