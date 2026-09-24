@@ -43,3 +43,45 @@ def test_job_proxy_records_owner_and_rejects_other_user(client, monkeypatch):
     assert client.get("/api/enhance/jobs/" + "a" * 32).status_code == 404
     assert client.post("/api/enhance/jobs/" + "a" * 32 + "/cancel").status_code == 404
     assert client.get("/api/enhance/jobs/" + "a" * 32 + "/result").status_code == 404
+
+
+def test_image_job_uses_media_field(client, monkeypatch):
+    captured = {}
+
+    class Upstream:
+        status_code = 202
+        content = b'{"id":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","status":"queued"}'
+        headers = {"Content-Type": "application/json"}
+        def json(self):
+            return json.loads(self.content)
+
+    def agent(method, path, **kwargs):
+        captured.update(kwargs)
+        return Upstream()
+
+    monkeypatch.setattr(studio, "_enhance_agent", agent)
+    response = client.post(
+        "/api/enhance/jobs",
+        data={"media": (io.BytesIO(b"image"), "portrait.png"), "options": "{}"},
+    )
+    assert response.status_code == 202
+    assert captured["files"]["media"][0] == "portrait.png"
+
+
+def test_result_proxy_preserves_image_content_type(client, monkeypatch):
+    class Upstream:
+        status_code = 200
+        content = b""
+        headers = {
+            "Content-Type": "image/png",
+            "Content-Disposition": 'inline; filename="portrait_DLSS5.png"',
+        }
+        def iter_content(self, _size):
+            yield b"png"
+
+    studio.ENHANCE_JOB_OWNERS["c" * 32] = "owner"
+    monkeypatch.setattr(studio, "_enhance_agent", lambda *args, **kwargs: Upstream())
+    response = client.get("/api/enhance/jobs/" + "c" * 32 + "/result")
+    assert response.status_code == 200
+    assert response.content_type == "image/png"
+    assert "portrait_DLSS5.png" in response.headers["Content-Disposition"]

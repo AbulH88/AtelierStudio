@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import shutil
@@ -17,9 +18,13 @@ RUNNER = Path(__file__).with_name("enhance_runner.py")
 LOCK = threading.Lock()
 JOBS: dict[str, dict] = {}
 ACTIVE: dict[str, object | None] = {"process": None, "job": None}
-ALLOWED_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm"}
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".tif", ".tiff"}
+ALLOWED_EXTENSIONS = VIDEO_EXTENSIONS | IMAGE_EXTENSIONS
 ALLOWED_RIFE = {"rife47.pth", "rife49.pth", "rife417.pth", "rife426.pth",
                 "sudo_rife4_269.662_testV1_scale1.pth"}
+NR_STYLES = {"Default", "Natural", "Cinematic"}
+DLSS_SCALES = {0.25, 0.5, 0.75, 1.0}
 
 
 def _comfy_root() -> Path:
@@ -62,7 +67,46 @@ def capabilities() -> dict:
     }
 
 
+def _number(raw: dict, name: str, default: float, minimum: float, maximum: float) -> float:
+    value = raw.get(name, default)
+    if isinstance(value, bool):
+        raise ValueError(f"Invalid {name}")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid {name}") from exc
+    if not math.isfinite(number) or not minimum <= number <= maximum:
+        raise ValueError(f"Invalid {name}")
+    return number
+
+
+def _integer(raw: dict, name: str, default: int, minimum: int, maximum: int) -> int:
+    value = raw.get(name, default)
+    if isinstance(value, bool):
+        raise ValueError(f"Invalid {name}")
+    try:
+        number = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid {name}") from exc
+    if number != value and str(number) != str(value):
+        raise ValueError(f"Invalid {name}")
+    if not minimum <= number <= maximum:
+        raise ValueError(f"Invalid {name}")
+    return number
+
+
+def media_kind(filename: str) -> str:
+    suffix = Path(filename or "").suffix.lower()
+    if suffix in VIDEO_EXTENSIONS:
+        return "video"
+    if suffix in IMAGE_EXTENSIONS:
+        return "image"
+    raise ValueError("Unsupported media format")
+
+
 def validate_options(raw: dict) -> dict:
+    if not isinstance(raw, dict):
+        raise ValueError("Enhancement options must be an object")
     interpolation = str(raw.get("interpolation", "off"))
     upscaler = str(raw.get("upscaler", "off"))
     if interpolation not in {"off", "rife", "dlssg"}:
@@ -78,8 +122,40 @@ def validate_options(raw: dict) -> dict:
         raise ValueError("Unsupported enhancement setting")
     if interpolation == "off" and upscaler == "off":
         raise ValueError("Enable interpolation or upscaling")
-    return {"interpolation": interpolation, "upscaler": upscaler, "rife_model": model,
-            "multiplier": multiplier, "fps": fps, "scale": scale, "quality": quality}
+    nr_style = str(raw.get("nr_style", "Default"))
+    if nr_style not in NR_STYLES:
+        raise ValueError("Unknown DLSS5 style")
+    nr_passes = _integer(raw, "nr_passes", 2, 1, 4)
+    mask_feather = _integer(raw, "mask_feather", 0, 0, 128)
+    automatic_mask = raw.get("automatic_mask", False)
+    if not isinstance(automatic_mask, bool):
+        raise ValueError("Invalid automatic_mask")
+    dlss_scale = _number(raw, "dlss_scale", 1.0, 0.25, 1.0)
+    if dlss_scale not in DLSS_SCALES:
+        raise ValueError("Unsupported DLSS5 output scale")
+    return {
+        "interpolation": interpolation, "upscaler": upscaler,
+        "rife_model": model, "multiplier": multiplier, "fps": fps,
+        "scale": scale, "quality": quality, "nr_passes": nr_passes,
+        "nr_style": nr_style,
+        "nr_intensity": _number(raw, "nr_intensity", 1.0, 0.0, 2.0),
+        "local_tone_strength": _number(raw, "local_tone_strength", 1.0, 0.0, 2.0),
+        "local_structure_strength": _number(raw, "local_structure_strength", 1.5, 0.0, 2.0),
+        "skin_structure_strength": _number(raw, "skin_structure_strength", -1.0, -1.0, 2.0),
+        "automatic_mask": automatic_mask,
+        "nr_color_strength": _number(raw, "nr_color_strength", 1.0, 0.0, 1.0),
+        "tone_preservation": _number(raw, "tone_preservation", 0.0, 0.0, 1.0),
+        "face_skin_protection": _number(raw, "face_skin_protection", 0.0, 0.0, 1.0),
+        "grain_preservation": _number(raw, "grain_preservation", 0.0, 0.0, 1.0),
+        "mask_feather": mask_feather, "dlss_scale": dlss_scale,
+    }
+
+
+def validate_media_options(kind: str, options: dict) -> None:
+    if kind == "image" and options["interpolation"] != "off":
+        raise ValueError("Frame interpolation is available only for videos")
+    if kind == "image" and options["upscaler"] != "dlss":
+        raise ValueError("Images currently require DLSS5 Neural Rendering")
 
 
 def create_job(upload, options: dict) -> dict:
@@ -92,14 +168,15 @@ def create_job(upload, options: dict) -> dict:
                 raise ValueError(f"{engine} is not available on this Home Agent")
         if options["interpolation"] == "rife" and options["rife_model"] not in _models():
             raise ValueError("Selected RIFE checkpoint is not installed")
-        suffix = Path(upload.filename or "video.mp4").suffix.lower()
-        if suffix not in ALLOWED_EXTENSIONS:
-            raise ValueError("Unsupported video format")
+        kind = media_kind(upload.filename or "")
+        validate_media_options(kind, options)
+        suffix = Path(upload.filename or "media").suffix.lower()
         job_id = uuid.uuid4().hex
         folder = ROOT / job_id
         folder.mkdir(parents=True, exist_ok=False)
         source = folder / ("source" + suffix)
         upload.save(source)
+        options = {**options, "media_kind": kind}
         job = {"id": job_id, "status": "queued", "progress": 0.0, "message": "Queued",
                "created": time.time(), "options": options, "source": str(source), "result": None,
                "error": None}
@@ -113,10 +190,22 @@ def _run(job: dict) -> None:
     folder = Path(job["source"]).parent
     opts = job["options"]
     cmd = [_runner_python(), str(RUNNER), "--input", job["source"], "--output-dir", str(folder),
+           "--media-kind", opts["media_kind"],
            "--interpolation", opts["interpolation"], "--rife-model", opts["rife_model"],
            "--multiplier", str(opts["multiplier"]), "--fps", opts["fps"],
            "--upscaler", opts["upscaler"], "--scale", str(opts["scale"]),
-           "--quality", str(opts["quality"])]
+           "--quality", str(opts["quality"]), "--nr-passes", str(opts["nr_passes"]),
+           "--nr-style", opts["nr_style"], "--nr-intensity", str(opts["nr_intensity"]),
+           "--local-tone-strength", str(opts["local_tone_strength"]),
+           "--local-structure-strength", str(opts["local_structure_strength"]),
+           "--skin-structure-strength", str(opts["skin_structure_strength"]),
+           "--automatic-mask", "1" if opts["automatic_mask"] else "0",
+           "--nr-color-strength", str(opts["nr_color_strength"]),
+           "--tone-preservation", str(opts["tone_preservation"]),
+           "--face-skin-protection", str(opts["face_skin_protection"]),
+           "--grain-preservation", str(opts["grain_preservation"]),
+           "--mask-feather", str(opts["mask_feather"]),
+           "--dlss-scale", str(opts["dlss_scale"])]
     try:
         if job["status"] == "cancelled":
             return
@@ -138,7 +227,7 @@ def _run(job: dict) -> None:
                 continue
             if "result" in event:
                 job["result"] = event["result"]
-            if str(event.get("message", "")).startswith(("Starting RTX VSR", "Starting DLSS enhancement")):
+            if str(event.get("message", "")).startswith(("Starting RTX VSR", "Starting DLSS5")):
                 second_stage = True
             if "progress" in event:
                 value = float(event["progress"])
@@ -155,7 +244,10 @@ def _run(job: dict) -> None:
             raise RuntimeError("Enhancement processor failed: " + " | ".join(recent_lines[-5:])[-1200:])
         job.update(status="done", progress=1.0, message="Complete")
     except Exception as exc:
-        job.update(status="failed", error=str(exc), message="Enhancement failed")
+        error = str(exc)
+        for private in (str(folder), str(_enhancer_root()), str(_comfy_root())):
+            error = error.replace(private, "[local runtime]")
+        job.update(status="failed", error=error[-1600:], message="Enhancement failed")
     finally:
         with LOCK:
             ACTIVE["process"] = None
@@ -178,4 +270,11 @@ def cancel_job(job_id: str) -> bool:
     if process and process.poll() is None:
         subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True)
     job.update(status="cancelled", message="Cancelled", error=None)
+    source = Path(job["source"])
+    for path in source.parent.iterdir():
+        if path != source and path.is_file():
+            try:
+                path.unlink()
+            except OSError:
+                pass
     return True

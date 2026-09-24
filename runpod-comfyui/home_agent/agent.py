@@ -203,9 +203,9 @@ def enhance_capabilities():
 def enhance_submit():
     if not authed():
         return jsonify({"error": "unauthorized"}), 401
-    upload = request.files.get("video")
+    upload = request.files.get("media") or request.files.get("video")
     if not upload:
-        return jsonify({"error": "Choose a video"}), 400
+        return jsonify({"error": "Choose an image or video"}), 400
     try:
         options = enhance_service.validate_options(json.loads(request.form.get("options", "{}")))
         return jsonify(enhance_service.create_job(upload, options)), 202
@@ -239,8 +239,7 @@ def enhance_result(job_id):
     folder = os.path.realpath(os.path.dirname(job.get("source", ""))) if job else ""
     if not job or job.get("status") != "done" or not path or os.path.dirname(path) != folder or not os.path.isfile(path):
         return jsonify({"error": "result unavailable"}), 404
-    return send_file(path, mimetype="video/mp4", as_attachment=False,
-                     download_name=os.path.basename(path))
+    return send_file(path, as_attachment=False, download_name=os.path.basename(path))
 
 
 @app.post("/start")

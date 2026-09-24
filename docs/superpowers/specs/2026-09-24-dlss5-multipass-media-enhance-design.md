@@ -78,7 +78,9 @@ The existing **Video enhancement** engine option is renamed from the generic
 When selected, the following primary controls appear:
 
 - **Neural passes:** integer selection from 1 through 4; default 2.
-- **Output scale:** Source/1x, 1.25x, 1.5x, 1.75x, or 2x; default Source/1x.
+- **Neural resolution:** Source/100%, 75%, 50%, or 25%; default Source/100%.
+  These are the exact scales supported by the installed Visual Enhancer v9
+  feature-18 runtime. Enlargement remains available through RTX VSR.
 - **Style:** Default, Natural, or Cinematic; default Default.
 - **Intensity:** 0.00 through 2.00; default 1.00.
 
@@ -137,7 +139,7 @@ The allowlisted job request adds:
 - `face_skin_protection`: float 0.00-1.00.
 - `grain_preservation`: float 0.00-1.00.
 - `mask_feather`: integer 0-128.
-- `dlss_scale`: one of 1.0, 1.25, 1.5, 1.75, or 2.0.
+- `dlss_scale`: one of 1.0, 0.75, 0.5, or 0.25.
 
 Arbitrary runtime arguments, executable paths, output paths, and model files are
 not accepted from the browser.

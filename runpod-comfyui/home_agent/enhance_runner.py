@@ -62,15 +62,48 @@ def run_rtx_vsr(source: Path, output_dir: Path, scale: float, quality: int) -> P
     return Path(result.output_path)
 
 
-def run_dlss(source: Path, output_dir: Path, scale: float) -> Path:
+def _neural_kwargs(args: argparse.Namespace) -> dict:
+    return {
+        "nr_style": args.nr_style,
+        "nr_intensity": args.nr_intensity,
+        "nr_passes": args.nr_passes,
+        "local_tone_strength": args.local_tone_strength,
+        "local_structure_strength": args.local_structure_strength,
+        "skin_structure_strength": args.skin_structure_strength,
+        "nr_color_strength": args.nr_color_strength,
+        "tone_preservation": args.tone_preservation,
+        "face_skin_protection": args.face_skin_protection,
+        "grain_preservation": args.grain_preservation,
+        "mask_feather": args.mask_feather,
+        "automatic_mask": bool(args.automatic_mask),
+        "upscaling_factor": args.dlss_scale,
+    }
+
+
+def _require_feature_evidence(result, requested_passes: int) -> None:
+    status = getattr(result, "bridge_status", None) or {}
+    try:
+        applied_passes = int(status.get("nr_passes", 0))
+        evaluations = int(status.get("feature_evaluations", 0))
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("DLSS5 returned malformed feature-18 diagnostics") from exc
+    if applied_passes != requested_passes or evaluations < requested_passes:
+        raise RuntimeError(
+            "DLSS5 completed without verified feature-18 multipass evidence "
+            f"(requested {requested_passes}, applied {applied_passes}, evaluations {evaluations})"
+        )
+    count = getattr(result, "nr_count_evidence", None)
+    if count is not None and int(count) < 1:
+        raise RuntimeError("DLSS5 returned no feature-18 frame evidence")
+
+
+def run_dlss_video(source: Path, output_dir: Path, args: argparse.Namespace) -> Path:
     enhancer_root()
     from src.neural_rendering.video.batch import convert_videos
     from src.neural_rendering.video.models import ConversionOptions
 
     options = ConversionOptions(
-        nr_style="Default", nr_intensity=1.0, nr_passes=1,
-        local_tone_strength=1.0, local_structure_strength=1.5,
-        skin_structure_strength=0.0, upscaling_factor=1.0,
+        **_neural_kwargs(args),
         codec="H.264 (NVIDIA NVENC)", container="MP4",
         quality="Auto (Default)", rename_mode="Custom", custom_suffix="_DLSS",
     )
@@ -78,7 +111,30 @@ def run_dlss(source: Path, output_dir: Path, scale: float) -> Path:
     if not result.successes:
         detail = result.failures[0].error if result.failures else "DLSS produced no output"
         raise RuntimeError(detail)
-    return Path(result.successes[0].result.output_path)
+    converted = result.successes[0].result
+    _require_feature_evidence(converted, args.nr_passes)
+    return Path(converted.output_path)
+
+
+def run_dlss_image(source: Path, output_dir: Path, args: argparse.Namespace) -> Path:
+    enhancer_root()
+    from src.neural_rendering.image.batch import convert_images
+    from src.neural_rendering.image.models import ImageConversionOptions
+
+    options = ImageConversionOptions(
+        **_neural_kwargs(args), output_format="PNG", quality=95,
+        preserve_metadata=True, rename_mode="Custom", custom_suffix="_DLSS5",
+    )
+    result = convert_images(
+        [str(source)], options, progress=progress, output_dir=output_dir,
+        generate_previews=False, create_zip=False,
+    )
+    if not result.successes:
+        detail = result.failures[0].error if result.failures else "DLSS5 produced no output"
+        raise RuntimeError(detail)
+    converted = result.successes[0]
+    _require_feature_evidence(converted, args.nr_passes)
+    return Path(converted.output_path)
 
 
 def run_rife(source: Path, output_dir: Path, model: str, multiplier: int) -> Path:
@@ -113,6 +169,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--media-kind", choices=("image", "video"), default="video")
     parser.add_argument("--interpolation", choices=("off", "rife", "dlssg"), default="off")
     parser.add_argument("--rife-model", default="rife49.pth")
     parser.add_argument("--multiplier", type=int, choices=(2, 4), default=2)
@@ -120,10 +177,27 @@ def main() -> int:
     parser.add_argument("--upscaler", choices=("off", "dlss", "rtx_vsr"), default="off")
     parser.add_argument("--scale", type=float, choices=(1.0, 1.5, 2.0, 3.0, 4.0), default=2.0)
     parser.add_argument("--quality", type=int, choices=(1, 2, 3, 4), default=3)
+    parser.add_argument("--nr-passes", type=int, choices=(1, 2, 3, 4), default=2)
+    parser.add_argument("--nr-style", choices=("Default", "Natural", "Cinematic"), default="Default")
+    parser.add_argument("--nr-intensity", type=float, default=1.0)
+    parser.add_argument("--local-tone-strength", type=float, default=1.0)
+    parser.add_argument("--local-structure-strength", type=float, default=1.5)
+    parser.add_argument("--skin-structure-strength", type=float, default=-1.0)
+    parser.add_argument("--automatic-mask", type=int, choices=(0, 1), default=0)
+    parser.add_argument("--nr-color-strength", type=float, default=1.0)
+    parser.add_argument("--tone-preservation", type=float, default=0.0)
+    parser.add_argument("--face-skin-protection", type=float, default=0.0)
+    parser.add_argument("--grain-preservation", type=float, default=0.0)
+    parser.add_argument("--mask-feather", type=int, default=0)
+    parser.add_argument("--dlss-scale", type=float, choices=(0.25, 0.5, 0.75, 1.0), default=1.0)
     args = parser.parse_args()
     source, output_dir = Path(args.input).resolve(), Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     current = source
+    if args.media_kind == "image" and args.interpolation != "off":
+        raise ValueError("Frame interpolation is available only for videos")
+    if args.media_kind == "image" and args.upscaler != "dlss":
+        raise ValueError("Images currently require DLSS5 Neural Rendering")
     if args.interpolation == "rife":
         progress(.01, "Starting RIFE")
         current = run_rife(current, output_dir, args.rife_model, args.multiplier)
@@ -131,8 +205,11 @@ def main() -> int:
         progress(.01, "Starting DLSSG")
         current = run_dlssg(current, output_dir, args.fps)
     if args.upscaler == "dlss":
-        progress(.5 if args.interpolation != "off" else .01, "Starting DLSS enhancement")
-        current = run_dlss(current, output_dir, args.scale)
+        progress(.5 if args.interpolation != "off" else .01,
+                 f"Starting DLSS5 ({args.nr_passes} neural passes)")
+        current = (run_dlss_image if args.media_kind == "image" else run_dlss_video)(
+            current, output_dir, args
+        )
     elif args.upscaler == "rtx_vsr":
         progress(.5 if args.interpolation != "off" else .01, "Starting RTX VSR")
         current = run_rtx_vsr(current, output_dir, args.scale, args.quality)

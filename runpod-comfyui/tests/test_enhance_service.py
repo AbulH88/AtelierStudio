@@ -31,6 +31,45 @@ def test_options_accept_separate_engines():
     assert options["upscaler"] == "rtx_vsr"
 
 
+def test_dlss5_options_have_mod_style_defaults():
+    options = enhance_service.validate_options({"interpolation": "off", "upscaler": "dlss"})
+    assert options["nr_passes"] == 2
+    assert options["nr_style"] == "Default"
+    assert options["dlss_scale"] == 1.0
+    assert options["local_structure_strength"] == 1.5
+    assert enhance_service.validate_options({"interpolation": "off", "upscaler": "dlss", "dlss_scale": .75})["dlss_scale"] == .75
+
+
+@pytest.mark.parametrize("field,value", [
+    ("nr_passes", 0), ("nr_passes", 5), ("nr_style", "Invented"),
+    ("nr_intensity", 2.1), ("local_tone_strength", -0.1),
+    ("local_structure_strength", 2.1), ("skin_structure_strength", -1.1),
+    ("nr_color_strength", 1.1), ("tone_preservation", -0.1),
+    ("face_skin_protection", 1.1), ("grain_preservation", 1.1),
+    ("mask_feather", 129), ("dlss_scale", 1.3), ("automatic_mask", "yes"),
+])
+def test_dlss5_options_reject_invalid_values(field, value):
+    with pytest.raises(ValueError):
+        enhance_service.validate_options({"interpolation": "off", "upscaler": "dlss", field: value})
+
+
+@pytest.mark.parametrize("name,kind", [
+    ("portrait.png", "image"), ("portrait.JPEG", "image"),
+    ("clip.mp4", "video"), ("clip.MKV", "video"),
+])
+def test_media_kind(name, kind):
+    assert enhance_service.media_kind(name) == kind
+
+
+def test_image_rejects_interpolation_and_non_dlss_engine():
+    rife = enhance_service.validate_options({"interpolation": "rife", "upscaler": "dlss"})
+    with pytest.raises(ValueError, match="only for videos"):
+        enhance_service.validate_media_options("image", rife)
+    vsr = enhance_service.validate_options({"interpolation": "off", "upscaler": "rtx_vsr"})
+    with pytest.raises(ValueError, match="require DLSS5"):
+        enhance_service.validate_media_options("image", vsr)
+
+
 def test_enhancer_python_is_copied_runtime(monkeypatch, tmp_path):
     python = tmp_path / "bin" / "python-3.13.15-embed-amd64" / "python.exe"
     python.parent.mkdir(parents=True)

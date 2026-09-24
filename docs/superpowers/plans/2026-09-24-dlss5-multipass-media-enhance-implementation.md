@@ -251,8 +251,8 @@ focused command.
 4. Process the same video with RIFE 2x followed by DLSS5 at two passes. Confirm
    doubled output FPS, unchanged duration, synchronized audio, and correct stage
    order.
-5. Test 1.25x or 1.5x DLSS5 output scale and confirm displayed and actual output
-   dimensions agree.
+5. Test 75% DLSS5 neural resolution and confirm displayed and actual output
+   dimensions agree; test enlargement separately through RTX VSR.
 6. Cancel once during RIFE and once during DLSS5. Confirm no partial output is
    published and the next job starts normally.
 7. Run one existing DLSSG job and one RTX VSR job to prove no regression.

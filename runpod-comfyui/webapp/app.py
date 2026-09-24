@@ -1164,11 +1164,12 @@ def enhance_capabilities():
 
 @app.post("/api/enhance/jobs")
 def enhance_submit():
-    video = request.files.get("video")
-    if not video:
-        return jsonify({"error": "Choose a video"}), 400
+    media = request.files.get("media") or request.files.get("video")
+    if not media:
+        return jsonify({"error": "Choose an image or video"}), 400
     try:
-        files = {"video": (video.filename, video.stream, video.mimetype or "video/mp4")}
+        files = {"media": (media.filename, media.stream,
+                           media.mimetype or "application/octet-stream")}
         r = _enhance_agent("POST", "/enhance/jobs", files=files,
                            data={"options": request.form.get("options", "{}")}, timeout=300)
         if r.status_code in (200, 202):
@@ -1215,8 +1216,14 @@ def enhance_job_result(job_id):
         if upstream.status_code != 200:
             return Response(upstream.content, status=upstream.status_code,
                             content_type=upstream.headers.get("Content-Type", "application/json"))
-        response = Response(upstream.iter_content(1024 * 1024), content_type="video/mp4")
-        response.headers["Content-Disposition"] = f'inline; filename="enhanced-{job_id[:8]}.mp4"'
+        response = Response(
+            upstream.iter_content(1024 * 1024),
+            content_type=upstream.headers.get("Content-Type", "application/octet-stream"),
+        )
+        disposition = upstream.headers.get("Content-Disposition")
+        response.headers["Content-Disposition"] = (
+            disposition or f'inline; filename="enhanced-{job_id[:8]}"'
+        )
         return response
     except Exception as exc:
         return jsonify({"error": str(exc)}), 502
