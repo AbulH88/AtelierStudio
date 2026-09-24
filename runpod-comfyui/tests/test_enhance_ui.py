@@ -15,7 +15,8 @@ def test_enhance_accepts_images_and_videos():
 def test_dlss5_primary_controls_and_defaults():
     assert "DLSS5 · Neural Rendering" in HTML
     assert 'id="enhanceNrPasses"' in HTML
-    assert '<option value="2" selected>2 passes · recommended</option>' in HTML
+    assert '<option value="1" selected>1 pass · recommended</option>' in HTML
+    assert '<option value="2">2 passes · experimental</option>' in HTML
     assert 'id="enhanceDlssScale"' in HTML
     assert '<option value="1" selected>Source · 100%</option>' in HTML
     assert '<option value="0.75">75% · faster</option>' in HTML
@@ -39,3 +40,15 @@ def test_ui_submits_media_and_native_multipass_options():
     assert "dlss_scale:+$('#enhanceDlssScale').value" in HTML
     assert "RIFE ${$('#enhanceMultiplier').value}×" in HTML
     assert "DLSS5 ×${$('#enhanceNrPasses').value}" in HTML
+    assert "dlss_enabled:$('#enhanceUpscale').checked" in HTML
+    assert "rtx_vsr_enabled:enhanceMediaKind==='video'&&$('#enhanceRtxEnabled').checked" in HTML
+    assert "multipass_protection:$('#enhanceMultipassProtection').checked" in HTML
+
+
+def test_rtx_super_resolution_is_an_independent_video_stage():
+    assert 'id="enhanceRtxEnabled" type="checkbox"' in HTML
+    assert 'id="enhanceRtxFields" class="hide"' in HTML
+    assert "RTX Super Resolution" in HTML
+    assert "Runs last · videos only" in HTML
+    assert "enhanceExpectedSize" in HTML
+    assert "RTX SUPER RES ${$('#enhanceScale').value}×" in HTML

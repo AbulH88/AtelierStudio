@@ -25,6 +25,11 @@ ALLOWED_RIFE = {"rife47.pth", "rife49.pth", "rife417.pth", "rife426.pth",
                 "sudo_rife4_269.662_testV1_scale1.pth"}
 NR_STYLES = {"Default", "Natural", "Cinematic"}
 DLSS_SCALES = {0.25, 0.5, 0.75, 1.0}
+MULTIPASS_LIMITS = {
+    2: (0.70, 1.00, 0.35),
+    3: (0.55, 0.90, 0.50),
+    4: (0.45, 0.80, 0.60),
+}
 
 
 def _comfy_root() -> Path:
@@ -108,11 +113,19 @@ def validate_options(raw: dict) -> dict:
     if not isinstance(raw, dict):
         raise ValueError("Enhancement options must be an object")
     interpolation = str(raw.get("interpolation", "off"))
-    upscaler = str(raw.get("upscaler", "off"))
     if interpolation not in {"off", "rife", "dlssg"}:
         raise ValueError("Unknown interpolation engine")
-    if upscaler not in {"off", "dlss", "rtx_vsr"}:
+    legacy_upscaler = str(raw.get("upscaler", "off"))
+    if legacy_upscaler not in {"off", "dlss", "rtx_vsr"}:
         raise ValueError("Unknown upscale engine")
+    if "dlss_enabled" in raw or "rtx_vsr_enabled" in raw:
+        dlss_enabled = raw.get("dlss_enabled", False)
+        rtx_vsr_enabled = raw.get("rtx_vsr_enabled", False)
+        if not isinstance(dlss_enabled, bool) or not isinstance(rtx_vsr_enabled, bool):
+            raise ValueError("Invalid enhancement stage toggle")
+    else:
+        dlss_enabled = legacy_upscaler == "dlss"
+        rtx_vsr_enabled = legacy_upscaler == "rtx_vsr"
     model = str(raw.get("rife_model", "rife49.pth"))
     if model not in ALLOWED_RIFE:
         raise ValueError("Unknown RIFE model")
@@ -120,23 +133,30 @@ def validate_options(raw: dict) -> dict:
     fps, scale, quality = str(raw.get("fps", "60")), float(raw.get("scale", 2)), int(raw.get("quality", 3))
     if multiplier not in {2, 4} or fps not in {"50", "60"} or scale not in {1, 1.5, 2, 3, 4} or quality not in {1, 2, 3, 4}:
         raise ValueError("Unsupported enhancement setting")
-    if interpolation == "off" and upscaler == "off":
+    if interpolation == "off" and not dlss_enabled and not rtx_vsr_enabled:
         raise ValueError("Enable interpolation or upscaling")
     nr_style = str(raw.get("nr_style", "Default"))
     if nr_style not in NR_STYLES:
         raise ValueError("Unknown DLSS5 style")
-    nr_passes = _integer(raw, "nr_passes", 2, 1, 4)
+    nr_passes = _integer(raw, "nr_passes", 1, 1, 4)
     mask_feather = _integer(raw, "mask_feather", 0, 0, 128)
     automatic_mask = raw.get("automatic_mask", False)
     if not isinstance(automatic_mask, bool):
         raise ValueError("Invalid automatic_mask")
+    multipass_protection = raw.get("multipass_protection", True)
+    if not isinstance(multipass_protection, bool):
+        raise ValueError("Invalid multipass_protection")
     dlss_scale = _number(raw, "dlss_scale", 1.0, 0.25, 1.0)
     if dlss_scale not in DLSS_SCALES:
         raise ValueError("Unsupported DLSS5 output scale")
-    return {
-        "interpolation": interpolation, "upscaler": upscaler,
+    options = {
+        "interpolation": interpolation,
+        "dlss_enabled": dlss_enabled, "rtx_vsr_enabled": rtx_vsr_enabled,
+        "upscaler": ("both" if dlss_enabled and rtx_vsr_enabled else
+                     "dlss" if dlss_enabled else "rtx_vsr" if rtx_vsr_enabled else "off"),
         "rife_model": model, "multiplier": multiplier, "fps": fps,
         "scale": scale, "quality": quality, "nr_passes": nr_passes,
+        "multipass_protection": multipass_protection,
         "nr_style": nr_style,
         "nr_intensity": _number(raw, "nr_intensity", 1.0, 0.0, 2.0),
         "local_tone_strength": _number(raw, "local_tone_strength", 1.0, 0.0, 2.0),
@@ -149,12 +169,34 @@ def validate_options(raw: dict) -> dict:
         "grain_preservation": _number(raw, "grain_preservation", 0.0, 0.0, 1.0),
         "mask_feather": mask_feather, "dlss_scale": dlss_scale,
     }
+    return apply_multipass_protection(options)
+
+
+def apply_multipass_protection(options: dict) -> dict:
+    """Add the effective shared settings sent to the native multipass cascade."""
+    protected = dict(options)
+    intensity = float(options["nr_intensity"])
+    structure = float(options["local_structure_strength"])
+    face = float(options["face_skin_protection"])
+    if options.get("multipass_protection") and int(options["nr_passes"]) > 1:
+        intensity_cap, structure_cap, face_floor = MULTIPASS_LIMITS[int(options["nr_passes"])]
+        intensity = min(intensity, intensity_cap)
+        structure = min(structure, structure_cap)
+        face = max(face, face_floor)
+    protected.update(
+        effective_nr_intensity=intensity,
+        effective_local_structure_strength=structure,
+        effective_face_skin_protection=face,
+    )
+    return protected
 
 
 def validate_media_options(kind: str, options: dict) -> None:
     if kind == "image" and options["interpolation"] != "off":
         raise ValueError("Frame interpolation is available only for videos")
-    if kind == "image" and options["upscaler"] != "dlss":
+    if kind == "image" and options["rtx_vsr_enabled"]:
+        raise ValueError("RTX Super Resolution is available only for videos")
+    if kind == "image" and not options["dlss_enabled"]:
         raise ValueError("Images currently require DLSS5 Neural Rendering")
 
 
@@ -163,7 +205,12 @@ def create_job(upload, options: dict) -> dict:
         if ACTIVE["job"]:
             raise RuntimeError("Local GPU is busy with another enhancement")
         available = capabilities()
-        for engine in (options["interpolation"], options["upscaler"]):
+        engines = [options["interpolation"]]
+        if options["dlss_enabled"]:
+            engines.append("dlss")
+        if options["rtx_vsr_enabled"]:
+            engines.append("rtx_vsr")
+        for engine in engines:
             if engine != "off" and not available[engine]["available"]:
                 raise ValueError(f"{engine} is not available on this Home Agent")
         if options["interpolation"] == "rife" and options["rife_model"] not in _models():
@@ -193,16 +240,19 @@ def _run(job: dict) -> None:
            "--media-kind", opts["media_kind"],
            "--interpolation", opts["interpolation"], "--rife-model", opts["rife_model"],
            "--multiplier", str(opts["multiplier"]), "--fps", opts["fps"],
-           "--upscaler", opts["upscaler"], "--scale", str(opts["scale"]),
+           "--dlss-enabled", "1" if opts["dlss_enabled"] else "0",
+           "--rtx-vsr-enabled", "1" if opts["rtx_vsr_enabled"] else "0",
+           "--scale", str(opts["scale"]),
            "--quality", str(opts["quality"]), "--nr-passes", str(opts["nr_passes"]),
-           "--nr-style", opts["nr_style"], "--nr-intensity", str(opts["nr_intensity"]),
+           "--nr-style", opts["nr_style"],
+           "--nr-intensity", str(opts["effective_nr_intensity"]),
            "--local-tone-strength", str(opts["local_tone_strength"]),
-           "--local-structure-strength", str(opts["local_structure_strength"]),
+           "--local-structure-strength", str(opts["effective_local_structure_strength"]),
            "--skin-structure-strength", str(opts["skin_structure_strength"]),
            "--automatic-mask", "1" if opts["automatic_mask"] else "0",
            "--nr-color-strength", str(opts["nr_color_strength"]),
            "--tone-preservation", str(opts["tone_preservation"]),
-           "--face-skin-protection", str(opts["face_skin_protection"]),
+           "--face-skin-protection", str(opts["effective_face_skin_protection"]),
            "--grain-preservation", str(opts["grain_preservation"]),
            "--mask-feather", str(opts["mask_feather"]),
            "--dlss-scale", str(opts["dlss_scale"])]
@@ -216,8 +266,10 @@ def _run(job: dict) -> None:
             ACTIVE["process"] = process
         assert process.stdout
         recent_lines = []
-        second_stage = False
-        two_stages = opts["interpolation"] != "off" and opts["upscaler"] != "off"
+        stage_count = (int(opts["interpolation"] != "off") + int(opts["dlss_enabled"]) +
+                       int(opts["rtx_vsr_enabled"]))
+        stage_index = -1
+        last_stage = ""
         for line in process.stdout:
             recent_lines.append(line.strip())
             recent_lines = recent_lines[-12:]
@@ -227,12 +279,15 @@ def _run(job: dict) -> None:
                 continue
             if "result" in event:
                 job["result"] = event["result"]
-            if str(event.get("message", "")).startswith(("Starting RTX VSR", "Starting DLSS5")):
-                second_stage = True
+            message = str(event.get("message", ""))
+            if message.startswith(("Starting RIFE", "Starting DLSSG", "Starting DLSS5", "Starting RTX VSR")):
+                if message != last_stage:
+                    stage_index += 1
+                    last_stage = message
             if "progress" in event:
                 value = float(event["progress"])
-                if two_stages and event.get("message") != "Complete":
-                    value = (.5 + value * .5) if second_stage else (value * .5)
+                if stage_count > 1 and message != "Complete":
+                    value = (max(0, stage_index) + value) / stage_count
                 job["progress"] = max(job["progress"], min(1.0, value))
             if event.get("message"):
                 job["message"] = str(event["message"])

@@ -31,13 +31,50 @@ def test_options_accept_separate_engines():
     assert options["upscaler"] == "rtx_vsr"
 
 
+def test_options_accept_dlss_and_rtx_vsr_together():
+    options = enhance_service.validate_options({
+        "interpolation": "off", "dlss_enabled": True, "rtx_vsr_enabled": True,
+    })
+    assert options["dlss_enabled"] is True
+    assert options["rtx_vsr_enabled"] is True
+    assert options["upscaler"] == "both"
+
+
 def test_dlss5_options_have_mod_style_defaults():
     options = enhance_service.validate_options({"interpolation": "off", "upscaler": "dlss"})
-    assert options["nr_passes"] == 2
+    assert options["nr_passes"] == 1
     assert options["nr_style"] == "Default"
     assert options["dlss_scale"] == 1.0
     assert options["local_structure_strength"] == 1.5
     assert enhance_service.validate_options({"interpolation": "off", "upscaler": "dlss", "dlss_scale": .75})["dlss_scale"] == .75
+
+
+@pytest.mark.parametrize("passes,intensity,structure,face", [
+    (1, 1.0, 1.5, 0.0),
+    (2, 0.70, 1.00, 0.35),
+    (3, 0.55, 0.90, 0.50),
+    (4, 0.45, 0.80, 0.60),
+])
+def test_multipass_protection_applies_safe_effective_limits(passes, intensity, structure, face):
+    options = enhance_service.validate_options({
+        "interpolation": "off", "dlss_enabled": True, "nr_passes": passes,
+        "nr_intensity": 1.0, "local_structure_strength": 1.5,
+        "face_skin_protection": 0.0,
+    })
+    assert options["effective_nr_intensity"] == intensity
+    assert options["effective_local_structure_strength"] == structure
+    assert options["effective_face_skin_protection"] == face
+
+
+def test_raw_multipass_preserves_user_settings():
+    options = enhance_service.validate_options({
+        "interpolation": "off", "dlss_enabled": True, "nr_passes": 4,
+        "multipass_protection": False, "nr_intensity": 1.2,
+        "local_structure_strength": 1.7, "face_skin_protection": 0.1,
+    })
+    assert options["effective_nr_intensity"] == 1.2
+    assert options["effective_local_structure_strength"] == 1.7
+    assert options["effective_face_skin_protection"] == 0.1
 
 
 @pytest.mark.parametrize("field,value", [
@@ -47,6 +84,7 @@ def test_dlss5_options_have_mod_style_defaults():
     ("nr_color_strength", 1.1), ("tone_preservation", -0.1),
     ("face_skin_protection", 1.1), ("grain_preservation", 1.1),
     ("mask_feather", 129), ("dlss_scale", 1.3), ("automatic_mask", "yes"),
+    ("multipass_protection", "yes"),
 ])
 def test_dlss5_options_reject_invalid_values(field, value):
     with pytest.raises(ValueError):
@@ -66,8 +104,11 @@ def test_image_rejects_interpolation_and_non_dlss_engine():
     with pytest.raises(ValueError, match="only for videos"):
         enhance_service.validate_media_options("image", rife)
     vsr = enhance_service.validate_options({"interpolation": "off", "upscaler": "rtx_vsr"})
-    with pytest.raises(ValueError, match="require DLSS5"):
+    with pytest.raises(ValueError, match="only for videos"):
         enhance_service.validate_media_options("image", vsr)
+    both = enhance_service.validate_options({"interpolation": "off", "dlss_enabled": True, "rtx_vsr_enabled": True})
+    with pytest.raises(ValueError, match="only for videos"):
+        enhance_service.validate_media_options("image", both)
 
 
 def test_enhancer_python_is_copied_runtime(monkeypatch, tmp_path):

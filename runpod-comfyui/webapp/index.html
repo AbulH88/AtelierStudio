@@ -1582,16 +1582,18 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
   </section>
   <aside class="enhance-settings">
     <h2>Enhance Settings</h2><div id="enhanceGpu" class="enhance-gpu">● Checking local GPU…</div>
-    <div class="enhance-section" id="enhanceInterpolationSection"><label><input id="enhanceInterpolate" type="checkbox" checked> Frame interpolation</label>
+    <div class="enhance-section" id="enhanceInterpolationSection"><label><input id="enhanceInterpolate" type="checkbox"> Frame interpolation</label>
       <div class="enhance-field"><span>Engine</span><select id="enhanceInterpEngine"><option value="rife">RIFE · optical flow</option><option value="dlssg">DLSSG · NVIDIA</option></select></div>
       <div id="enhanceRifeFields"><div class="enhance-field"><span>RIFE model</span><select id="enhanceRifeModel"></select></div>
         <div class="enhance-field"><span>Frame multiplier</span><select id="enhanceMultiplier"><option value="2">2×</option><option value="4">4×</option></select></div></div>
       <div id="enhanceDlssgFields" class="hide"><div class="enhance-field"><span>Output FPS</span><select id="enhanceFps"><option value="50">50 fps</option><option value="60" selected>60 fps</option></select></div></div>
     </div>
     <div class="enhance-section"><label><input id="enhanceUpscale" type="checkbox" checked> Media enhancement</label>
-      <div class="enhance-field"><span>Engine</span><select id="enhanceUpscaleEngine"><option value="dlss">DLSS5 · Neural Rendering</option><option value="rtx_vsr">RTX VSR · super resolution</option></select></div>
       <div id="enhanceDlssFields">
-        <div class="enhance-field"><span>Neural passes</span><select id="enhanceNrPasses"><option value="1">1 pass</option><option value="2" selected>2 passes · recommended</option><option value="3">3 passes</option><option value="4">4 passes</option></select></div>
+        <div class="enhance-field"><span>Engine</span><select disabled><option>DLSS5 · Neural Rendering</option></select></div>
+        <div class="enhance-field"><span>Neural passes</span><select id="enhanceNrPasses"><option value="1" selected>1 pass · recommended</option><option value="2">2 passes · experimental</option><option value="3">3 passes · experimental</option><option value="4">4 passes · experimental</option></select></div>
+        <label id="enhanceMultipassProtectionRow" class="enhance-check hide"><input id="enhanceMultipassProtection" type="checkbox" checked> Multipass protection</label>
+        <div id="enhanceMultipassEffective" class="hint hide" style="margin:-7px 0 12px;color:var(--faint);font-size:12px"></div>
         <div class="enhance-field"><span>Neural resolution</span><select id="enhanceDlssScale"><option value="1" selected>Source · 100%</option><option value="0.75">75% · faster</option><option value="0.5">50% · faster</option><option value="0.25">25% · fastest</option></select></div>
         <div class="enhance-field"><span>Style</span><select id="enhanceNrStyle"><option>Default</option><option>Natural</option><option>Cinematic</option></select></div>
         <div class="enhance-field"><span>Intensity <output id="enhanceNrIntensityValue">1.00</output></span><input id="enhanceNrIntensity" type="range" min="0" max="2" step="0.05" value="1"></div>
@@ -1607,8 +1609,14 @@ body[data-mode="krea2carousel"] #resPresetField>.lab{font-size:0}body[data-mode=
           <div class="enhance-field"><span>Mask feather <output id="enhanceFeatherValue">0</output></span><input id="enhanceFeather" type="range" min="0" max="128" step="1" value="0"></div>
         </details>
       </div>
-      <div id="enhanceScaleField" class="hide enhance-field"><span>Output scale</span><select id="enhanceScale"><option value="1">1×</option><option value="1.5">1.5×</option><option value="2" selected>2×</option><option value="3">3×</option><option value="4">4×</option></select></div>
-      <div id="enhanceQualityField" class="hide enhance-field"><span>RTX VSR quality</span><select id="enhanceQuality"><option value="1">1 · Low</option><option value="2">2 · Medium</option><option value="3" selected>3 · High</option><option value="4">4 · Ultra</option></select></div>
+    </div>
+    <div class="enhance-section" id="enhanceRtxSection"><label><input id="enhanceRtxEnabled" type="checkbox"> RTX Super Resolution</label>
+      <div id="enhanceRtxFields" class="hide">
+        <div id="enhanceScaleField" class="enhance-field"><span>Output scale</span><select id="enhanceScale"><option value="1.5">1.5×</option><option value="2" selected>2×</option><option value="3">3×</option><option value="4">4×</option></select></div>
+        <div id="enhanceExpectedSize" class="hint" style="margin:-7px 0 12px;color:var(--faint);font-size:12px">Select a video to calculate output size</div>
+        <div id="enhanceQualityField" class="enhance-field"><span>Quality</span><select id="enhanceQuality"><option value="1">Low · 1</option><option value="2">Medium · 2</option><option value="3" selected>High · 3</option><option value="4">Ultra · 4</option></select></div>
+        <div class="hint" style="color:var(--faint);font-size:12px">Runs last · videos only</div>
+      </div>
     </div>
     <button id="enhanceRun" class="enhance-run" disabled>✦ &nbsp; Enhance Video</button>
     <div class="enhance-foot">Local GPU required. Processing time depends on clip length, resolution, and selected engines.</div>
@@ -3302,7 +3310,7 @@ $$('#nav .navitem').forEach(b=>b.onclick=()=>showPage(b.dataset.page));
 
 // ===== local image / video enhancement =====
 let enhanceFile=null, enhanceUrl=null, enhanceJobId=null, enhancePoll=null, enhanceAvailable=false;
-let enhanceMediaKind='video', enhanceCapabilities={};
+let enhanceMediaKind='video', enhanceCapabilities={}, enhanceSourceWidth=0, enhanceSourceHeight=0;
 function enhanceIsImage(file){return !!file&&(file.type.startsWith('image/')||/\.(png|jpe?g|webp|avif|tiff?)$/i.test(file.name||''));}
 function enhanceRangeValues(){
   [['enhanceNrIntensity','enhanceNrIntensityValue',2],['enhanceTone','enhanceToneValue',2],
@@ -3316,28 +3324,39 @@ function enhanceRangeValues(){
 function enhanceControls(){
   const image=enhanceMediaKind==='image';
   $('#enhanceInterpolationSection').classList.toggle('hide',image);
-  $('#enhanceUpscale').disabled=image;
-  if(image){$('#enhanceUpscale').checked=true;$('#enhanceUpscaleEngine').value='dlss';}
-  const dlss=$('#enhanceUpscaleEngine').value==='dlss';
-  $$('#enhanceUpscaleEngine option').forEach(o=>o.disabled=(image&&o.value!=='dlss')||!enhanceCapabilities[o.value]?.available);
+  $('#enhanceUpscale').disabled=image||enhanceCapabilities.dlss?.available===false;
+  if(image)$('#enhanceUpscale').checked=true;
+  const dlss=$('#enhanceUpscale').checked;
+  $('#enhanceRtxSection').classList.toggle('hide',image);
+  $('#enhanceRtxEnabled').disabled=image||enhanceCapabilities.rtx_vsr?.available===false;
+  if(image)$('#enhanceRtxEnabled').checked=false;
+  const rtx=!image&&$('#enhanceRtxEnabled').checked;
   $('#enhanceRifeFields').classList.toggle('hide',image||$('#enhanceInterpEngine').value!=='rife');
   $('#enhanceDlssgFields').classList.toggle('hide',image||$('#enhanceInterpEngine').value!=='dlssg');
   $('#enhanceDlssFields').classList.toggle('hide',!dlss);
-  $('#enhanceQualityField').classList.toggle('hide',dlss);
-  $('#enhanceScaleField').classList.toggle('hide',dlss);
+  $('#enhanceRtxFields').classList.toggle('hide',!rtx);
+  const passes=+$('#enhanceNrPasses').value;
+  const protectedPasses=passes>1&&$('#enhanceMultipassProtection').checked;
+  $('#enhanceMultipassProtectionRow').classList.toggle('hide',!dlss||passes===1);
+  $('#enhanceMultipassEffective').classList.toggle('hide',!dlss||!protectedPasses);
+  const limits={2:[.70,1,.35],3:[.55,.9,.5],4:[.45,.8,.6]};
+  if(protectedPasses){const l=limits[passes];$('#enhanceMultipassEffective').textContent=`Protected output · intensity ≤ ${l[0].toFixed(2)} · structure ≤ ${l[1].toFixed(2)} · face protection ≥ ${l[2].toFixed(2)}`;}
+  const scale=+$('#enhanceScale').value;
+  $('#enhanceExpectedSize').textContent=enhanceSourceWidth?`${scale}× · ${Math.round(enhanceSourceWidth*scale)} × ${Math.round(enhanceSourceHeight*scale)}`:'Select a video to calculate output size';
   const stages=[];
   if(!image&&$('#enhanceInterpolate').checked){
     stages.push($('#enhanceInterpEngine').value==='rife'?`RIFE ${$('#enhanceMultiplier').value}×`:`DLSSG ${$('#enhanceFps').value} FPS`);
   }
-  if($('#enhanceUpscale').checked){stages.push(dlss?`DLSS5 ×${$('#enhanceNrPasses').value}`:`RTX VSR ${$('#enhanceScale').value}×`);}
+  if(dlss)stages.push(`DLSS5 ×${$('#enhanceNrPasses').value}`);
+  if(rtx)stages.push(`RTX SUPER RES ${$('#enhanceScale').value}×`);
   if(enhanceFile)stages.push('EXPORT');
   $('#enhancePipeline').textContent=stages.length?stages.join('  →  '):'SELECT MEDIA TO BUILD PIPELINE';
   $('#enhanceRun').innerHTML=`✦ &nbsp; Enhance ${image?'Image':'Video'}`;
-  const noStage=image?!dlss:(!$('#enhanceInterpolate').checked&&!$('#enhanceUpscale').checked);
+  const noStage=image?!dlss:(!$('#enhanceInterpolate').checked&&!dlss&&!rtx);
   $('#enhanceRun').disabled=!enhanceFile||!enhanceAvailable||!!enhanceJobId||noStage;
   enhanceRangeValues();
 }
-['enhanceInterpolate','enhanceInterpEngine','enhanceMultiplier','enhanceFps','enhanceUpscale','enhanceUpscaleEngine','enhanceScale','enhanceNrPasses','enhanceDlssScale','enhanceNrStyle','enhanceAutomaticMask'].forEach(id=>$('#'+id).onchange=enhanceControls);
+['enhanceInterpolate','enhanceInterpEngine','enhanceMultiplier','enhanceFps','enhanceUpscale','enhanceRtxEnabled','enhanceScale','enhanceQuality','enhanceNrPasses','enhanceMultipassProtection','enhanceDlssScale','enhanceNrStyle','enhanceAutomaticMask'].forEach(id=>$('#'+id).onchange=enhanceControls);
 ['enhanceNrIntensity','enhanceTone','enhanceStructure','enhanceSkin','enhanceColor','enhancePreserveTone','enhanceFaceProtect','enhanceGrain','enhanceFeather'].forEach(id=>$('#'+id).oninput=enhanceControls);
 async function loadEnhanceCapabilities(){
   try{
@@ -3350,9 +3369,7 @@ async function loadEnhanceCapabilities(){
     $('#enhanceRifeModel').innerHTML=models.map(m=>`<option value="${m}">${m.replace('.pth','')}</option>`).join('');
     if(d.rife?.default)$('#enhanceRifeModel').value=d.rife.default;
     $$('#enhanceInterpEngine option').forEach(o=>o.disabled=!d[o.value]?.available);
-    $$('#enhanceUpscaleEngine option').forEach(o=>o.disabled=!d[o.value]?.available);
     if($('#enhanceInterpEngine').selectedOptions[0]?.disabled)$('#enhanceInterpEngine').value=d.rife?.available?'rife':'dlssg';
-    if($('#enhanceUpscaleEngine').selectedOptions[0]?.disabled)$('#enhanceUpscaleEngine').value=d.dlss?.available?'dlss':'rtx_vsr';
   }catch(e){enhanceAvailable=false;$('#enhanceGpu').textContent='● Local GPU unavailable';$('#enhanceGpu').classList.add('offline');}
   enhanceControls();
 }
@@ -3364,9 +3381,12 @@ function selectEnhanceFile(file){
   const image=enhanceMediaKind==='image';
   $('#enhanceBefore').classList.toggle('hide',image);$('#enhanceAfter').classList.toggle('hide',image);
   $('#enhanceBeforeImage').classList.toggle('hide',!image);$('#enhanceAfterImage').classList.toggle('hide',!image);
+  enhanceSourceWidth=enhanceSourceHeight=0;
   if(image){
+    $('#enhanceBeforeImage').onload=()=>{enhanceSourceWidth=$('#enhanceBeforeImage').naturalWidth;enhanceSourceHeight=$('#enhanceBeforeImage').naturalHeight;enhanceControls();};
     $('#enhanceBeforeImage').src=enhanceUrl;$('#enhanceAfterImage').removeAttribute('src');
   }else{
+    $('#enhanceBefore').onloadedmetadata=()=>{enhanceSourceWidth=$('#enhanceBefore').videoWidth;enhanceSourceHeight=$('#enhanceBefore').videoHeight;enhanceControls();};
     $('#enhanceBefore').src=enhanceUrl;$('#enhanceAfter').removeAttribute('src');$('#enhanceAfter').load();
   }
   $('#enhanceEmpty').classList.add('hide');$('#enhanceSourceMeta').textContent=file.name+' · '+(file.size/1048576).toFixed(1)+' MB';
@@ -3384,7 +3404,8 @@ $('#enhanceRun').onclick=async()=>{
   enhanceControls();if($('#enhanceRun').disabled)return;
   const options={interpolation:$('#enhanceInterpolate').checked?$('#enhanceInterpEngine').value:'off',
     rife_model:$('#enhanceRifeModel').value||'rife49.pth',multiplier:+$('#enhanceMultiplier').value,fps:$('#enhanceFps').value,
-    upscaler:$('#enhanceUpscale').checked?$('#enhanceUpscaleEngine').value:'off',scale:+$('#enhanceScale').value,quality:+$('#enhanceQuality').value,
+    dlss_enabled:$('#enhanceUpscale').checked,rtx_vsr_enabled:enhanceMediaKind==='video'&&$('#enhanceRtxEnabled').checked,
+    multipass_protection:$('#enhanceMultipassProtection').checked,scale:+$('#enhanceScale').value,quality:+$('#enhanceQuality').value,
     nr_passes:+$('#enhanceNrPasses').value,nr_style:$('#enhanceNrStyle').value,nr_intensity:+$('#enhanceNrIntensity').value,
     local_tone_strength:+$('#enhanceTone').value,local_structure_strength:+$('#enhanceStructure').value,
     skin_structure_strength:+$('#enhanceSkin').value,automatic_mask:$('#enhanceAutomaticMask').checked,

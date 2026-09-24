@@ -174,10 +174,11 @@ def main() -> int:
     parser.add_argument("--rife-model", default="rife49.pth")
     parser.add_argument("--multiplier", type=int, choices=(2, 4), default=2)
     parser.add_argument("--fps", choices=("50", "60"), default="60")
-    parser.add_argument("--upscaler", choices=("off", "dlss", "rtx_vsr"), default="off")
+    parser.add_argument("--dlss-enabled", type=int, choices=(0, 1), default=0)
+    parser.add_argument("--rtx-vsr-enabled", type=int, choices=(0, 1), default=0)
     parser.add_argument("--scale", type=float, choices=(1.0, 1.5, 2.0, 3.0, 4.0), default=2.0)
     parser.add_argument("--quality", type=int, choices=(1, 2, 3, 4), default=3)
-    parser.add_argument("--nr-passes", type=int, choices=(1, 2, 3, 4), default=2)
+    parser.add_argument("--nr-passes", type=int, choices=(1, 2, 3, 4), default=1)
     parser.add_argument("--nr-style", choices=("Default", "Natural", "Cinematic"), default="Default")
     parser.add_argument("--nr-intensity", type=float, default=1.0)
     parser.add_argument("--local-tone-strength", type=float, default=1.0)
@@ -196,7 +197,9 @@ def main() -> int:
     current = source
     if args.media_kind == "image" and args.interpolation != "off":
         raise ValueError("Frame interpolation is available only for videos")
-    if args.media_kind == "image" and args.upscaler != "dlss":
+    if args.media_kind == "image" and args.rtx_vsr_enabled:
+        raise ValueError("RTX Super Resolution is available only for videos")
+    if args.media_kind == "image" and not args.dlss_enabled:
         raise ValueError("Images currently require DLSS5 Neural Rendering")
     if args.interpolation == "rife":
         progress(.01, "Starting RIFE")
@@ -204,14 +207,13 @@ def main() -> int:
     elif args.interpolation == "dlssg":
         progress(.01, "Starting DLSSG")
         current = run_dlssg(current, output_dir, args.fps)
-    if args.upscaler == "dlss":
-        progress(.5 if args.interpolation != "off" else .01,
-                 f"Starting DLSS5 ({args.nr_passes} neural passes)")
+    if args.dlss_enabled:
+        progress(.01, f"Starting DLSS5 ({args.nr_passes} neural passes)")
         current = (run_dlss_image if args.media_kind == "image" else run_dlss_video)(
             current, output_dir, args
         )
-    elif args.upscaler == "rtx_vsr":
-        progress(.5 if args.interpolation != "off" else .01, "Starting RTX VSR")
+    if args.rtx_vsr_enabled:
+        progress(.01, "Starting RTX VSR")
         current = run_rtx_vsr(current, output_dir, args.scale, args.quality)
     if current == source:
         target = output_dir / f"{source.stem}_enhanced{source.suffix}"
