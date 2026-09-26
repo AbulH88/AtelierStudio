@@ -1954,7 +1954,7 @@ def _describe_instruction(p):
     return " ".join(parts)
 
 
-def describe_images(images_b64, params, model=None, instruction=None):
+def describe_images(images_b64, params, model=None, instruction=None, mime_type="image/jpeg"):
     if not OPENROUTER_API_KEY:
         raise ValueError("OpenRouter API Key not set.")
     
@@ -1968,7 +1968,7 @@ def describe_images(images_b64, params, model=None, instruction=None):
     
     content = [{"type": "text", "text": instruction}]
     content.extend({"type": "image_url", "image_url": {
-        "url": f"data:image/jpeg;base64,{image_b64}"}}
+        "url": f"data:{mime_type};base64,{image_b64}"}}
         for image_b64 in images_b64)
     payload = {
         "model": model,
@@ -1990,8 +1990,8 @@ def describe_images(images_b64, params, model=None, instruction=None):
     return choices[0]["message"]["content"].strip()
 
 
-def describe_image(image_b64, params, model=None, instruction=None):
-    return describe_images([image_b64], params, model, instruction)
+def describe_image(image_b64, params, model=None, instruction=None, mime_type="image/jpeg"):
+    return describe_images([image_b64], params, model, instruction, mime_type)
 
 
 def _face_describe_instruction(note=""):
@@ -2122,7 +2122,8 @@ def runninghub_build_h3_talking_prompt():
         description, script, audio_direction, music, duration)
     try:
         prompt = describe_image(
-            base64.b64encode(source_bytes).decode(), {}, model, instruction)
+            base64.b64encode(source_bytes).decode(), {}, model, instruction,
+            mime_type=image.mimetype.lower())
     except Exception as exc:
         return jsonify({"error": f"H3 prompt generation failed: {exc}"}), 502
     if not _valid_h3_talking_prompt(prompt, script):
@@ -3256,6 +3257,34 @@ def _runninghub_cancel(api_key, task_id):
     return data
 
 
+def _runninghub_normalize_talking_video(path):
+    """Guarantee the delivered Talking MP4 when a workflow revision rounds 1 MP differently."""
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_streams", "-of", "json", path],
+        capture_output=True, text=True, timeout=60, check=True)
+    streams = _json.loads(probe.stdout).get("streams") or []
+    video = next((item for item in streams if item.get("codec_type") == "video"), None)
+    if not video:
+        raise RuntimeError("RunningHub returned a video file without a video stream.")
+    if not any(item.get("codec_type") == "audio" for item in streams):
+        raise RuntimeError("RunningHub returned a Talking video without generated audio.")
+    if (path.lower().endswith(".mp4") and video.get("width") == 720
+            and video.get("height") == 1280 and video.get("avg_frame_rate") == "24/1"
+            and video.get("codec_name") == "h264"):
+        return path
+    normalized = os.path.join(os.path.dirname(path), "talking-720x1280.mp4")
+    result = subprocess.run([
+        "ffmpeg", "-v", "error", "-y", "-i", path,
+        "-map", "0:v:0", "-map", "0:a:0", "-vf",
+        "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,fps=24",
+        "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", normalized,
+    ], capture_output=True, text=True, timeout=900)
+    if result.returncode != 0 or not os.path.exists(normalized):
+        raise RuntimeError("Could not prepare the 720 × 1280 Talking video for Gallery.")
+    return normalized
+
+
 def _runninghub_import_result(job, result):
     outputs = result.get("results") or []
     wanted = ("png", "jpg", "jpeg", "webp") if _runninghub_workflow_key(job) in {"krea2_i2i_hq", "krea2_t2i"} else ("mp4", "mov", "webm")
@@ -3298,6 +3327,9 @@ def _runninghub_import_result(job, result):
         if os.path.getsize(dst) < 1024:
             raise RuntimeError("RunningHub returned an empty result file.")
         # Gallery streams cloud media and lazily builds previews.
+        if _runninghub_workflow_key(job) == "h3_talking":
+            dst = _runninghub_normalize_talking_video(dst)
+            extension = "mp4"
         key = f"gallery/cloud/{int(time.time())}_{job['id']}.{extension}"
         r2_store.upload(dst, key)
         _set_media_creator(key, job.get("user"))

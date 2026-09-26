@@ -1,6 +1,8 @@
 """Focused RunningHub Cloud contract tests; all HTTP is mocked."""
 import base64
 import json
+import shutil
+import subprocess
 from io import BytesIO
 
 import pytest
@@ -143,8 +145,9 @@ def test_talking_prompt_uses_selected_model_and_strict_i2va_contract(maker_clien
         "non_diegetic_music: N/A"
     )
 
-    def fake_describe(image_b64, params, model=None, instruction=None):
-        seen.update(image_b64=image_b64, params=params, model=model, instruction=instruction)
+    def fake_describe(image_b64, params, model=None, instruction=None, mime_type=None):
+        seen.update(image_b64=image_b64, params=params, model=model,
+                    instruction=instruction, mime_type=mime_type)
         return generated
 
     monkeypatch.setattr(A, "describe_image", fake_describe)
@@ -161,6 +164,7 @@ def test_talking_prompt_uses_selected_model_and_strict_i2va_contract(maker_clien
     assert response.status_code == 200
     assert response.get_json()["prompt"] == generated
     assert seen["model"] == "qwen/qwen3.8-27b"
+    assert seen["mime_type"] == "image/png"
     assert seen["image_b64"] == base64.b64encode(b"source-image").decode()
     instruction = seen["instruction"]
     assert "openai/gpt-6-luna" not in instruction
@@ -216,6 +220,24 @@ def test_talking_prompt_rejects_malformed_or_changed_script(maker_client, monkey
     })
     assert response.status_code == 502
     assert "valid h3 prompt" in response.get_json()["error"].lower()
+
+
+def test_h3_talking_image_reaches_openrouter_with_its_real_media_type(monkeypatch):
+    seen = {}
+
+    class Response:
+        def raise_for_status(self):
+            pass
+        def json(self):
+            return {"choices": [{"message": {"content": "prompt"}}]}
+
+    monkeypatch.setattr(A, "OPENROUTER_API_KEY", "server-key")
+    monkeypatch.setattr(A.requests, "post", lambda url, **kwargs: (
+        seen.update(url=url, payload=kwargs["json"]) or Response()))
+    assert A.describe_image("c291cmNl", {}, "openai/gpt-6-luna", "instruction",
+                            mime_type="image/png") == "prompt"
+    content = seen["payload"]["messages"][0]["content"]
+    assert content[1]["image_url"]["url"] == "data:image/png;base64,c291cmNl"
 
 
 def test_h3_talking_submit_maps_only_confirmed_nodes(monkeypatch):
@@ -342,6 +364,25 @@ def test_h3_talking_dispatch_uploads_submits_imports_usage_and_cleans(monkeypatc
     assert A.RUNNINGHUB_JOBS["talk"]["status"] == "done"
     assert A.RUNNINGHUB_JOBS["talk"]["rh_coins"] == "21"
     assert A.RUNNINGHUB_JOBS["talk"]["runtime"] == "94"
+
+
+def test_h3_talking_normalizes_provider_video_to_exact_portrait_output(tmp_path):
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        pytest.skip("ffmpeg and ffprobe are required for the production video output")
+    source = tmp_path / "provider.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=c=red:s=736x1312:r=30",
+                    "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", "0.4",
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+                    str(source)], check=True, capture_output=True)
+    output = A._runninghub_normalize_talking_video(str(source))
+    assert output != str(source)
+    metadata = json.loads(subprocess.run([
+        "ffprobe", "-v", "error", "-show_streams", "-of", "json", output,
+    ], check=True, capture_output=True, text=True).stdout)
+    video = next(item for item in metadata["streams"] if item["codec_type"] == "video")
+    assert (video["width"], video["height"], video["avg_frame_rate"], video["codec_name"]) == (
+        720, 1280, "24/1", "h264")
+    assert any(item["codec_type"] == "audio" for item in metadata["streams"])
 
 
 def test_krea_lora_registry_normalizes_paths_and_one_default():
