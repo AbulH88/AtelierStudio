@@ -37,16 +37,24 @@ The page exposes only the controls needed for this specialized workflow:
 3. **Spoken script** — the exact dialogue to be spoken.
 4. **Audio direction** — voice, accent, pace, volume, delivery, ambience, breathing, and sound effects.
 5. **Background music** — optional direction or an explicit no-music choice.
-6. **Duration** — numeric whole-second input, minimum `5`, maximum `15`, default `10`.
-7. **Generate H3 Prompt** — analyzes the source image and user fields, then creates the structured prompt.
-8. **Final H3 Prompt** — editable text area containing the generated prompt.
-9. **Generate Video** — submits the image, final prompt, and duration to RunningHub.
+6. **AI model** — a two-option selector with GPT-6 Luna selected by default.
+7. **Duration** — numeric whole-second input, minimum `5`, maximum `15`, default `10`.
+8. **Generate H3 Prompt** — analyzes the source image and user fields, then creates the structured prompt.
+9. **Final H3 Prompt** — editable text area containing the generated prompt.
+10. **Generate Video** — submits the image, final prompt, and duration to RunningHub.
 
 The Generate Video button remains disabled until an image, valid duration, and non-empty final prompt are present.
 
 ## AI Prompt Builder
 
-The server uses the existing administrator-configured vision model and embeds the Atelier `h3-prompt-writing` I2VA rules into its system instruction. A local Codex skill is not invoked at runtime; its validated format and constraints become the app's prompt-building contract.
+The server calls the selected model through the administrator-configured OpenRouter credential and embeds the Atelier `h3-prompt-writing` I2VA rules into its system instruction. A local Codex skill is not invoked at runtime; its validated format and constraints become the app's prompt-building contract.
+
+The selector contains exactly two image-capable OpenRouter models:
+
+- **GPT-6 Luna** — `openai/gpt-6-luna`; default.
+- **Qwen 3.8 27B** — `qwen/qwen3.8-27b`; alternative.
+
+The server accepts only these model IDs for this endpoint. It does not trust arbitrary browser-supplied model names, and the OpenRouter API key is never exposed to the browser. Both models receive the same H3 system instruction and output contract.
 
 The builder receives:
 
@@ -137,6 +145,7 @@ UI tests cover:
 - New navigation item and independent permission entry.
 - Image upload and portrait preview.
 - Custom description, spoken script, audio, and music fields.
+- Two-model selector with GPT-6 Luna as the default and Qwen as the alternative.
 - Integer duration limits from 5 through 15.
 - Generate Prompt and editable final-prompt states.
 - Generate Video validation and submission route.
