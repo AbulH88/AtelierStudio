@@ -1,4 +1,5 @@
 """Focused RunningHub Cloud contract tests; all HTTP is mocked."""
+import base64
 import json
 from io import BytesIO
 
@@ -12,7 +13,7 @@ def users(monkeypatch):
     data = {
         "admin": {"status": "active", "role": "admin", "runninghub_plus": False},
         "maker": {"status": "active", "role": "user", "runninghub_plus": False,
-                  "cloud_workflows": ["krea2_i2i_hq", "krea2_t2i", "scail", "h3", "jobs"]},
+                  "cloud_workflows": ["krea2_i2i_hq", "krea2_t2i", "scail", "h3", "h3_talking", "jobs"]},
     }
     monkeypatch.setattr(A, "load_users", lambda: data)
     monkeypatch.setattr(A, "save_users", lambda _users: None)
@@ -130,6 +131,91 @@ def test_h3_submit_maps_confirmed_nodes_and_clears_unused_samples(monkeypatch):
 
 def test_h3_defaults_to_standard_instance():
     assert A.RUNNINGHUB_H3_INSTANCE == "default"
+
+
+def test_talking_prompt_uses_selected_model_and_strict_i2va_contract(maker_client, monkeypatch):
+    seen = {}
+    script = "Hello, world!\nএই কথাটি ঠিক রাখুন।"
+    generated = (
+        "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\n"
+        "integrated_multimodal_description: [Shot 1] (S1) speaks <d>[English/Bengali] " + script + "</d>\n\n"
+        "overall_soundscape: Quiet room tone.\n\n"
+        "non_diegetic_music: N/A"
+    )
+
+    def fake_describe(image_b64, params, model=None, instruction=None):
+        seen.update(image_b64=image_b64, params=params, model=model, instruction=instruction)
+        return generated
+
+    monkeypatch.setattr(A, "describe_image", fake_describe)
+    response = maker_client.post("/api/runninghub/h3-talking/prompt", data={
+        "image": (BytesIO(b"source-image"), "speaker.png"),
+        "description": "She smiles and gestures gently in one stable shot.",
+        "script": script,
+        "audio_direction": "Warm Bengali accent, calm pace, quiet room tone.",
+        "music": "No music",
+        "duration": "12",
+        "model": "qwen/qwen3.8-27b",
+    })
+
+    assert response.status_code == 200
+    assert response.get_json()["prompt"] == generated
+    assert seen["model"] == "qwen/qwen3.8-27b"
+    assert seen["image_b64"] == base64.b64encode(b"source-image").decode()
+    instruction = seen["instruction"]
+    assert "openai/gpt-6-luna" not in instruction
+    assert "12 seconds" in instruction
+    assert "She smiles and gestures gently" in instruction
+    assert "Warm Bengali accent" in instruction
+    assert "No music" in instruction
+    assert script in instruction
+    assert "Never shorten, paraphrase, translate, correct, or invent dialogue" in instruction
+    assert "integrated_multimodal_description" in instruction
+    assert instruction.index("integrated_multimodal_description") < instruction.index("overall_soundscape") < instruction.index("non_diegetic_music")
+
+
+@pytest.mark.parametrize("data,error", [
+    ({"model": "not/allowed", "duration": "10", "script": "Hi"}, "model"),
+    ({"model": "openai/gpt-6-luna", "duration": "10.5", "script": "Hi"}, "whole number"),
+    ({"model": "openai/gpt-6-luna", "duration": "4", "script": "Hi"}, "5 to 15"),
+    ({"model": "openai/gpt-6-luna", "script": "Hi"}, "required"),
+])
+def test_talking_prompt_rejects_invalid_model_or_duration_without_ai_call(maker_client, monkeypatch, data, error):
+    monkeypatch.setattr(A, "describe_image", lambda *_args, **_kwargs: pytest.fail("AI must not be called"))
+    response = maker_client.post("/api/runninghub/h3-talking/prompt", data={
+        **data, "image": (BytesIO(b"source-image"), "speaker.png")
+    })
+    assert response.status_code == 400
+    assert error.lower() in response.get_json()["error"].lower()
+
+
+def test_talking_prompt_requires_supported_image(maker_client, monkeypatch):
+    monkeypatch.setattr(A, "describe_image", lambda *_args, **_kwargs: pytest.fail("AI must not be called"))
+    missing = maker_client.post("/api/runninghub/h3-talking/prompt", data={
+        "model": "openai/gpt-6-luna", "duration": "10", "script": "Hi"
+    })
+    unsupported = maker_client.post("/api/runninghub/h3-talking/prompt", data={
+        "image": (BytesIO(b"source-image"), "speaker.gif"),
+        "model": "openai/gpt-6-luna", "duration": "10", "script": "Hi"
+    })
+    assert missing.status_code == 400
+    assert unsupported.status_code == 400
+
+
+@pytest.mark.parametrize("generated", [
+    "A plain paragraph with no H3 sections.",
+    ("For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\n"
+     "integrated_multimodal_description: [Shot 1] (S1) speaks <d>[English] Changed words</d>\n\n"
+     "overall_soundscape: Room tone.\n\nnon_diegetic_music: N/A"),
+])
+def test_talking_prompt_rejects_malformed_or_changed_script(maker_client, monkeypatch, generated):
+    monkeypatch.setattr(A, "describe_image", lambda *_args, **_kwargs: generated)
+    response = maker_client.post("/api/runninghub/h3-talking/prompt", data={
+        "image": (BytesIO(b"source-image"), "speaker.png"),
+        "model": "openai/gpt-6-luna", "duration": "10", "script": "Exact words."
+    })
+    assert response.status_code == 502
+    assert "valid h3 prompt" in response.get_json()["error"].lower()
 
 
 def test_krea_lora_registry_normalizes_paths_and_one_default():

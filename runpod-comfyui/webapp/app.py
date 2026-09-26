@@ -139,6 +139,14 @@ RUNNINGHUB_H3_AUDIO_NODES = (48, 14, 15)
 RUNNINGHUB_H3_PROMPT_NODE = 263
 RUNNINGHUB_H3_ASPECT_NODE = 252
 RUNNINGHUB_H3_DURATION_NODE = 259
+RUNNINGHUB_H3_TALKING_WORKFLOW_ID = os.environ.get(
+    "RUNNINGHUB_H3_TALKING_WORKFLOW_ID", "2103082156684087297")
+RUNNINGHUB_H3_TALKING_INSTANCE = os.environ.get("RUNNINGHUB_H3_TALKING_INSTANCE", "default")
+RUNNINGHUB_H3_TALKING_MODELS = {
+    "openai/gpt-6-luna": "GPT-6 Luna",
+    "qwen/qwen3.8-27b": "Qwen 3.8 27B",
+}
+RUNNINGHUB_H3_TALKING_DEFAULT_MODEL = "openai/gpt-6-luna"
 RUNNINGHUB_KREA2_WORKFLOW_ID = os.environ.get("RUNNINGHUB_KREA2_WORKFLOW_ID", "2100309003213901825")
 RUNNINGHUB_KREA2_INSTANCE = os.environ.get("RUNNINGHUB_KREA2_INSTANCE", "default")
 RUNNINGHUB_KREA2_IMAGE_NODE = 33
@@ -407,7 +415,7 @@ def admin_required(fn):
     return w
 
 
-CLOUD_WORKFLOW_IDS = {"krea2_i2i_hq", "krea2_t2i", "scail", "h3", "jobs"}
+CLOUD_WORKFLOW_IDS = {"krea2_i2i_hq", "krea2_t2i", "scail", "h3", "h3_talking", "jobs"}
 
 
 def _cloud_workflows_for(username):
@@ -2027,6 +2035,96 @@ def _character_profile_instruction():
             "color and style, makeup, lips, and signature accessories. Do not describe pose, "
             "clothing, background, lighting, age, ethnicity, or body. Output only the profile, "
             "with no title, heading, or bullets.")
+
+
+def _parse_h3_talking_duration(value):
+    if value is None or str(value).strip() == "":
+        raise ValueError("Duration is required.")
+    raw = str(value).strip()
+    if not re.fullmatch(r"\d+", raw):
+        raise ValueError("Duration must be a whole number of seconds.")
+    duration = int(raw)
+    if not 5 <= duration <= 15:
+        raise ValueError("Duration must be from 5 to 15 seconds.")
+    return duration
+
+
+def _h3_talking_instruction(description, script, audio_direction, music, duration):
+    return f"""Create one production-ready MiniMax H3 I2VA prompt from the supplied source image and directions.
+
+The target video lasts exactly {duration} seconds. Treat the uploaded image as the actual first frame. Preserve the visible person's identity, face, clothing, composition, objects, lighting, and spatial relationships unless the custom description explicitly requests a change. Prefer one continuous, stable portrait talking shot unless the custom description requests a cut. Fit every action, gesture, delivery beat, and any requested cut inside {duration} seconds.
+
+Use this exact first line:
+For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.
+
+After a blank line, output exactly these three sections in this order:
+integrated_multimodal_description: [Shot 1] ...
+overall_soundscape: ...
+non_diegetic_music: ...
+
+Use the stable speaker ID (S1). Put the dialogue exactly once inside <d>[Language] ...</d>, replacing Language with the spoken language. The spoken script between the language tag and </d> must match the SCRIPT block character-for-character, including punctuation, capitalization, language, and line breaks. Never shorten, paraphrase, translate, correct, or invent dialogue. Put ambient and non-verbal sounds in overall_soundscape without repeating dialogue. Put only audience-facing music in non_diegetic_music; write N/A when no music is requested. Return only the final prompt with no Markdown fence or commentary.
+
+CUSTOM DESCRIPTION:
+{description or 'No additional visual direction.'}
+
+SCRIPT — COPY VERBATIM:
+{script}
+
+AUDIO DIRECTION:
+{audio_direction or 'Natural voice and clean production sound.'}
+
+BACKGROUND MUSIC:
+{music or 'N/A'}"""
+
+
+def _valid_h3_talking_prompt(prompt, script):
+    first_line = (prompt.splitlines() or [""])[0]
+    expected = ("For the target video, at 0.00 seconds into the target video, "
+                "<Picture 1> (from [Shot 1]) is fully referenced.")
+    if first_line != expected:
+        return False
+    section_positions = [prompt.find(name) for name in (
+        "integrated_multimodal_description:", "overall_soundscape:", "non_diegetic_music:")]
+    if any(position < 0 for position in section_positions) or section_positions != sorted(section_positions):
+        return False
+    dialogue = re.compile(r"<d>\[[^\]\r\n]+\]\s*" + re.escape(script) + r"</d>", re.DOTALL)
+    return dialogue.search(prompt) is not None
+
+
+@app.post("/api/runninghub/h3-talking/prompt")
+@cloud_workflow_required("h3_talking")
+def runninghub_build_h3_talking_prompt():
+    image = request.files.get("image")
+    if not image or not image.filename:
+        return jsonify({"error": "A source image is required."}), 400
+    if (image.mimetype or "").lower() not in {"image/png", "image/jpeg", "image/webp"}:
+        return jsonify({"error": "Choose a PNG, JPG, or WEBP source image."}), 400
+    model = (request.form.get("model") or RUNNINGHUB_H3_TALKING_DEFAULT_MODEL).strip()
+    if model not in RUNNINGHUB_H3_TALKING_MODELS:
+        return jsonify({"error": "Choose a supported AI model."}), 400
+    try:
+        duration = _parse_h3_talking_duration(request.form.get("duration"))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    script = request.form.get("script") or ""
+    if not script.strip():
+        return jsonify({"error": "Enter the spoken script."}), 400
+    source_bytes = image.read()
+    if len(source_bytes) > RUNNINGHUB_MAX_IMAGE_BYTES:
+        return jsonify({"error": "Source image exceeds the Cloud upload limit."}), 413
+    description = (request.form.get("description") or "").strip()[:4000]
+    audio_direction = (request.form.get("audio_direction") or "").strip()[:3000]
+    music = (request.form.get("music") or "").strip()[:2000]
+    instruction = _h3_talking_instruction(
+        description, script, audio_direction, music, duration)
+    try:
+        prompt = describe_image(
+            base64.b64encode(source_bytes).decode(), {}, model, instruction)
+    except Exception as exc:
+        return jsonify({"error": f"H3 prompt generation failed: {exc}"}), 502
+    if not _valid_h3_talking_prompt(prompt, script):
+        return jsonify({"error": "The AI did not return a valid H3 prompt with the exact script. Try again."}), 502
+    return jsonify({"prompt": prompt})
 
 
 @app.get("/api/openrouter/models")
