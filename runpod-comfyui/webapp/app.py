@@ -2081,6 +2081,8 @@ BACKGROUND MUSIC:
 
 
 def _valid_h3_talking_prompt(prompt, script):
+    if prompt.count("<d>") != 1 or prompt.count("</d>") != 1 or prompt.count(script) != 1:
+        return False
     first_line = (prompt.splitlines() or [""])[0]
     expected = ("For the target video, at 0.00 seconds into the target video, "
                 "<Picture 1> (from [Shot 1]) is fully referenced.")
@@ -2107,6 +2109,52 @@ def _normalize_h3_talking_language_tag(prompt, script):
         prompt,
         count=1,
     )
+
+
+def _repair_h3_talking_prompt(generated, script, description, audio_direction, music):
+    """Keep the AI's scene ideas, but assemble H3 syntax and dialogue ourselves."""
+    generated = (generated or "").strip()
+    if not generated:
+        return ""
+    flags = re.IGNORECASE | re.DOTALL
+    visual_match = re.search(
+        r"integrated_multimodal_description:\s*(.*?)(?=\boverall_soundscape:|\Z)",
+        generated, flags)
+    sound_match = re.search(
+        r"overall_soundscape:\s*(.*?)(?=\bnon_diegetic_music:|\Z)",
+        generated, flags)
+    music_match = re.search(r"non_diegetic_music:\s*(.*)", generated, flags)
+    visual = visual_match.group(1).strip() if visual_match else generated
+    visual = re.sub(
+        r"^For the target video, at 0\.00 seconds into the target video,.*?fully referenced\.\s*",
+        "", visual, flags=flags)
+    visual = re.sub(r"\b(?:says|speaks)\s*:?[ \t]*<d>.*?</d>", "", visual, flags=flags)
+    visual = re.sub(r"<d>.*?</d>", "", visual, flags=flags)
+    visual = re.sub(r"<d>.*", "", visual, flags=flags)
+    visual = re.sub(r"^\[Shot 1\]\s*", "", visual).replace(script, "").strip()
+    if description and description not in visual:
+        visual += " " + description.replace(script, "")
+    if audio_direction:
+        visual += " Voice and delivery direction: " + audio_direction.replace(script, "")
+    language_match = re.search(r"<d>\[([^\]\r\n]+)\]", generated)
+    language = language_match.group(1) if language_match else (
+        "English/Bengali" if re.search(r"[\u0980-\u09ff]", script) and re.search(r"[A-Za-z]", script)
+        else "Bengali" if re.search(r"[\u0980-\u09ff]", script)
+        else "English" if script.isascii() else "Original language")
+    soundscape = sound_match.group(1).strip() if sound_match else (
+        "Natural scene ambience and subtle breathing remain beneath the spoken line.")
+    soundscape = soundscape.replace(script, "")
+    requested_music = (music or "").strip()
+    score = ("N/A" if requested_music.lower() in {"no music", "none", "n/a"}
+             else requested_music or (music_match.group(1).strip() if music_match else "N/A"))
+    score = score.replace(script, "") or "N/A"
+    first_line = ("For the target video, at 0.00 seconds into the target video, "
+                  "<Picture 1> (from [Shot 1]) is fully referenced.")
+    return (f"{first_line}\n\n"
+            f"integrated_multimodal_description: [Shot 1] {visual} "
+            f"The on-screen speaker (S1) says: <d>[{language}] {script}</d>\n\n"
+            f"overall_soundscape: {soundscape}\n\n"
+            f"non_diegetic_music: {score}")
 
 
 @app.post("/api/runninghub/h3-talking/prompt")
@@ -2143,7 +2191,9 @@ def runninghub_build_h3_talking_prompt():
         return jsonify({"error": f"H3 prompt generation failed: {exc}"}), 502
     prompt = _normalize_h3_talking_language_tag(prompt, script)
     if not _valid_h3_talking_prompt(prompt, script):
-        return jsonify({"error": "The AI did not return a valid H3 prompt with the exact script. Try again."}), 422
+        prompt = _repair_h3_talking_prompt(prompt, script, description, audio_direction, music)
+        if not _valid_h3_talking_prompt(prompt, script):
+            return jsonify({"error": "The AI did not return enough visual detail to build an H3 prompt. Try again."}), 422
     return jsonify({"prompt": prompt})
 
 

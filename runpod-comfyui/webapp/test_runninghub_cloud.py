@@ -223,20 +223,59 @@ def test_talking_prompt_requires_supported_image(maker_client, monkeypatch):
     assert unsupported.status_code == 400
 
 
-@pytest.mark.parametrize("generated", [
-    "A plain paragraph with no H3 sections.",
-    ("For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\n"
-     "integrated_multimodal_description: [Shot 1] (S1) speaks <d>[English] Changed words</d>\n\n"
-     "overall_soundscape: Room tone.\n\nnon_diegetic_music: N/A"),
+@pytest.mark.parametrize("generated,visual", [
+    ("The woman smiles and gestures toward the camera.", "The woman smiles and gestures"),
+    (("For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\n"
+      "integrated_multimodal_description: [Shot 1] She faces the camera and says <d>[English] Changed words</d>\n\n"
+      "overall_soundscape: Room tone.\n\nnon_diegetic_music: N/A"), "She faces the camera"),
 ])
-def test_talking_prompt_rejects_malformed_or_changed_script(maker_client, monkeypatch, generated):
+def test_talking_prompt_repairs_ai_format_without_changing_user_script(maker_client, monkeypatch, generated, visual):
     monkeypatch.setattr(A, "describe_image", lambda *_args, **_kwargs: generated)
     response = maker_client.post("/api/runninghub/h3-talking/prompt", data={
         "image": (BytesIO(b"source-image"), "speaker.png"),
         "model": "openai/gpt-6-luna", "duration": "10", "script": "Exact words."
     })
-    assert response.status_code == 422
-    assert "valid h3 prompt" in response.get_json()["error"].lower()
+    assert response.status_code == 200
+    prompt = response.get_json()["prompt"]
+    assert prompt.startswith("For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\n")
+    assert visual in prompt
+    assert prompt.count("<d>[English] Exact words.</d>") == 1
+    assert "Changed words" not in prompt
+    assert A._valid_h3_talking_prompt(prompt, "Exact words.")
+
+
+def test_talking_prompt_keeps_spoken_script_in_one_dialogue_block(maker_client, monkeypatch):
+    generated = (
+        "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\n"
+        "integrated_multimodal_description: [Shot 1] She faces the camera. "
+        "<d>[English] Exact words.</d> She turns. <d>[English] Exact words.</d>\n\n"
+        "overall_soundscape: Room tone.\n\nnon_diegetic_music: N/A"
+    )
+    monkeypatch.setattr(A, "describe_image", lambda *_args, **_kwargs: generated)
+    response = maker_client.post("/api/runninghub/h3-talking/prompt", data={
+        "image": (BytesIO(b"source-image"), "speaker.png"),
+        "model": "openai/gpt-6-luna", "duration": "10", "script": "Exact words."
+    })
+    assert response.status_code == 200
+    prompt = response.get_json()["prompt"]
+    assert prompt.count("<d>") == 1
+    assert prompt.count("Exact words.") == 1
+
+
+def test_talking_prompt_removes_ai_script_echo_outside_dialogue(maker_client, monkeypatch):
+    generated = (
+        "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\n"
+        "integrated_multimodal_description: [Shot 1] She smiles. Exact words. "
+        "<d>[English] Exact words.</d>\n\n"
+        "overall_soundscape: Room tone.\n\nnon_diegetic_music: N/A"
+    )
+    monkeypatch.setattr(A, "describe_image", lambda *_args, **_kwargs: generated)
+    response = maker_client.post("/api/runninghub/h3-talking/prompt", data={
+        "image": (BytesIO(b"source-image"), "speaker.png"),
+        "model": "openai/gpt-6-luna", "duration": "10", "script": "Exact words."
+    })
+    assert response.status_code == 200
+    assert response.get_json()["prompt"].count("Exact words.") == 1
 
 
 def test_h3_talking_image_reaches_openrouter_with_its_real_media_type(monkeypatch):
