@@ -1,4 +1,7 @@
 from pathlib import Path
+import json
+import re
+import subprocess
 
 
 HTML = (Path(__file__).parents[1] / "webapp" / "index.html").read_text(encoding="utf-8")
@@ -118,5 +121,16 @@ def test_talking_prompt_generation_and_video_submission_use_separate_routes():
     assert "body.append('prompt',$('#h3TalkingPrompt').value)" in HTML
     generation = HTML.index("fetch('/api/runninghub/h3-talking/prompt'")
     assignment = HTML.index("$('#h3TalkingPrompt').value=d.prompt", generation)
-    failure = HTML.index("if(!r.ok)throw", generation)
+    failure = HTML.index("if(!r.ok||d.error)throw", generation)
     assert generation < failure < assignment
+    assert "safeJson(r,`H3 prompt service returned HTTP ${r.status}" in HTML[generation:assignment]
+
+
+def test_h3_prompt_html_gateway_failure_has_a_readable_error():
+    helper = re.search(r"async function safeJson\(resp[^\n]*\)\{.*?\n\}", HTML, re.DOTALL)
+    assert helper is not None
+    js = (helper.group(0) + "\n"
+          "safeJson({status:502,json:async()=>{throw new SyntaxError(\"Unexpected token '<'\")}},"
+          "'H3 prompt service failed.').then(x=>console.log(JSON.stringify(x)))")
+    result = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True)
+    assert json.loads(result.stdout) == {"error": "H3 prompt service failed."}

@@ -2041,9 +2041,10 @@ let WORKFLOW_ENABLED=null;   // Set of admin-enabled workflow ids, null until fi
 // Parse a JSON response, but fall back to a readable message when the body is
 // not JSON (e.g. nginx/Cloudflare returns an HTML 502/504 page when the home
 // ComfyUI agent is offline) — avoids the cryptic "Unexpected token '<'".
-async function safeJson(resp){
+async function safeJson(resp, fallbackError){
   try{ return await resp.json(); }
   catch(e){
+    if(fallbackError)return {error:fallbackError};
     if([502,503,504,530].includes(resp.status))
       return {error:'ComfyUI host is offline — make sure the home PC is on and the agent is running.'};
     return {error:`Server error (${resp.status}). Please try again.`};
@@ -3567,7 +3568,7 @@ $('#h3TalkingGeneratePrompt').onclick=async()=>{
   if($('#h3TalkingGeneratePrompt').disabled)return;
   const body=new FormData();body.append('image',h3TalkingFile);body.append('description',$('#h3TalkingDescription').value);body.append('script',$('#h3TalkingScript').value);body.append('audio_direction',$('#h3TalkingAudio').value);body.append('music',$('#h3TalkingMusic').value);body.append('duration',$('#h3TalkingDuration').value);body.append('model',$('#h3TalkingModel').value);
   h3TalkingPromptBusy=true;h3TalkingNotice='Analyzing portrait and writing H3 prompt…';h3TalkingValidate();
-  try{const r=await fetch('/api/runninghub/h3-talking/prompt',{method:'POST',body});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not generate an H3 prompt.');$('#h3TalkingPrompt').value=d.prompt;h3TalkingNotice='Prompt ready. Review or edit it before generating the video.';}
+  try{const r=await fetch('/api/runninghub/h3-talking/prompt',{method:'POST',body});const d=await safeJson(r,`H3 prompt service returned HTTP ${r.status}. Please retry or choose the other AI model.`);if(!r.ok||d.error)throw new Error(d.error||'Could not generate an H3 prompt.');$('#h3TalkingPrompt').value=d.prompt;h3TalkingNotice='Prompt ready. Review or edit it before generating the video.';}
   catch(e){h3TalkingNotice=String(e.message||e);}
   finally{h3TalkingPromptBusy=false;h3TalkingValidate();}
 };

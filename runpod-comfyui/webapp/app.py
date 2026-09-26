@@ -2094,6 +2094,21 @@ def _valid_h3_talking_prompt(prompt, script):
     return dialogue.search(prompt) is not None
 
 
+def _normalize_h3_talking_language_tag(prompt, script):
+    """Repair a missing pair of language brackets only when dialogue is exact."""
+    if prompt.count("<d>") != 1 or prompt.count("</d>") != 1:
+        return prompt
+    bare_language = re.compile(
+        r"<d>([^<>\[\]\r\n]{1,40}?)\s+" + re.escape(script) + r"</d>",
+        re.DOTALL,
+    )
+    return bare_language.sub(
+        lambda match: f"<d>[{match.group(1).strip()}] {script}</d>",
+        prompt,
+        count=1,
+    )
+
+
 @app.post("/api/runninghub/h3-talking/prompt")
 @cloud_workflow_required("h3_talking")
 def runninghub_build_h3_talking_prompt():
@@ -2126,8 +2141,9 @@ def runninghub_build_h3_talking_prompt():
             mime_type=image.mimetype.lower())
     except Exception as exc:
         return jsonify({"error": f"H3 prompt generation failed: {exc}"}), 502
+    prompt = _normalize_h3_talking_language_tag(prompt, script)
     if not _valid_h3_talking_prompt(prompt, script):
-        return jsonify({"error": "The AI did not return a valid H3 prompt with the exact script. Try again."}), 502
+        return jsonify({"error": "The AI did not return a valid H3 prompt with the exact script. Try again."}), 422
     return jsonify({"prompt": prompt})
 
 

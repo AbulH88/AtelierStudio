@@ -178,6 +178,23 @@ def test_talking_prompt_uses_selected_model_and_strict_i2va_contract(maker_clien
     assert instruction.index("integrated_multimodal_description") < instruction.index("overall_soundscape") < instruction.index("non_diegetic_music")
 
 
+def test_talking_prompt_accepts_unbracketed_language_when_script_is_exact(maker_client, monkeypatch):
+    script = "Hello, welcome to my video!"
+    generated = (
+        "For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\n\n"
+        "integrated_multimodal_description: [Shot 1] (S1) speaks <d>English " + script + "</d>\n\n"
+        "overall_soundscape: Quiet room tone.\n\n"
+        "non_diegetic_music: N/A"
+    )
+    monkeypatch.setattr(A, "describe_image", lambda *_args, **_kwargs: generated)
+    response = maker_client.post("/api/runninghub/h3-talking/prompt", data={
+        "image": (BytesIO(b"source-image"), "speaker.png"),
+        "model": "qwen/qwen3.8-27b", "duration": "10", "script": script,
+    })
+    assert response.status_code == 200
+    assert "<d>[English] " + script + "</d>" in response.get_json()["prompt"]
+
+
 @pytest.mark.parametrize("data,error", [
     ({"model": "not/allowed", "duration": "10", "script": "Hi"}, "model"),
     ({"model": "openai/gpt-6-luna", "duration": "10.5", "script": "Hi"}, "whole number"),
@@ -218,7 +235,7 @@ def test_talking_prompt_rejects_malformed_or_changed_script(maker_client, monkey
         "image": (BytesIO(b"source-image"), "speaker.png"),
         "model": "openai/gpt-6-luna", "duration": "10", "script": "Exact words."
     })
-    assert response.status_code == 502
+    assert response.status_code == 422
     assert "valid h3 prompt" in response.get_json()["error"].lower()
 
 
