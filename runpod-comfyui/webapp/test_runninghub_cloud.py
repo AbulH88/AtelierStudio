@@ -218,6 +218,132 @@ def test_talking_prompt_rejects_malformed_or_changed_script(maker_client, monkey
     assert "valid h3 prompt" in response.get_json()["error"].lower()
 
 
+def test_h3_talking_submit_maps_only_confirmed_nodes(monkeypatch):
+    seen = {}
+
+    class Response:
+        ok = True
+        status_code = 200
+        def json(self):
+            return {"taskId": "talking-task"}
+
+    monkeypatch.setattr(A.requests, "post", lambda url, **kwargs: (seen.update(url=url, **kwargs) or Response()))
+    job = {"talking_prompt": "structured H3 prompt", "talking_duration": 13}
+    result = A._runninghub_submit_h3_talking("key", job, "api/speaker.png")
+    assert result["taskId"] == "talking-task"
+    assert seen["url"].endswith("/run/workflow/2103082156684087297")
+    assert seen["json"]["instanceType"] == "default"
+    assert seen["json"]["usePersonalQueue"] is False
+    assert seen["json"]["nodeInfoList"] == [
+        {"nodeId": 9, "fieldName": "image", "fieldValue": "api/speaker.png"},
+        {"nodeId": 14, "fieldName": "value", "fieldValue": "structured H3 prompt"},
+        {"nodeId": 20, "fieldName": "value", "fieldValue": "13"},
+    ]
+
+
+@pytest.mark.parametrize("duration", range(5, 16))
+def test_h3_talking_job_accepts_every_whole_second(maker_client, monkeypatch, tmp_path, duration):
+    monkeypatch.setattr(A, "RUNNINGHUB_UPLOAD_DIR", str(tmp_path))
+    monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {})
+    monkeypatch.setattr(A, "_save_runninghub_jobs", lambda: None)
+    monkeypatch.setattr(A, "_runninghub_dispatch", lambda: None)
+    monkeypatch.setattr(A, "_runninghub_user_settings", lambda _user: {
+        "configured": True, "key_enc": "encrypted", "key_fingerprint": "fingerprint", "concurrency": 1,
+    })
+    response = maker_client.post("/api/runninghub/h3-talking/jobs", data={
+        "image": (BytesIO(b"source-image"), "speaker.png", "image/png"),
+        "prompt": "Final editable H3 prompt.",
+        "duration": str(duration),
+    })
+    assert response.status_code == 202
+    job = A.RUNNINGHUB_JOBS[response.get_json()["id"]]
+    assert job["workflow_key"] == "h3_talking"
+    assert job["talking_duration"] == duration
+    assert job["talking_prompt"] == "Final editable H3 prompt."
+
+
+@pytest.mark.parametrize("duration", [None, "4", "16", "7.5", "ten"])
+def test_h3_talking_job_rejects_missing_fractional_or_out_of_range_duration(
+        maker_client, monkeypatch, duration):
+    monkeypatch.setattr(A, "_runninghub_user_settings", lambda _user: {"configured": True})
+    data = {
+        "image": (BytesIO(b"source-image"), "speaker.png", "image/png"),
+        "prompt": "Final editable H3 prompt.",
+    }
+    if duration is not None:
+        data["duration"] = duration
+    response = maker_client.post("/api/runninghub/h3-talking/jobs", data=data)
+    assert response.status_code == 400
+
+
+def test_h3_talking_job_requires_supported_image_and_final_prompt(maker_client, monkeypatch):
+    monkeypatch.setattr(A, "_runninghub_user_settings", lambda _user: {"configured": True})
+    unsupported = maker_client.post("/api/runninghub/h3-talking/jobs", data={
+        "image": (BytesIO(b"source-image"), "speaker.gif", "image/gif"),
+        "prompt": "Final prompt", "duration": "10",
+    })
+    missing_prompt = maker_client.post("/api/runninghub/h3-talking/jobs", data={
+        "image": (BytesIO(b"source-image"), "speaker.png", "image/png"), "duration": "10",
+    })
+    assert unsupported.status_code == 400
+    assert missing_prompt.status_code == 400
+
+
+def test_h3_ref2v_and_talking_are_independent_but_two_talking_jobs_are_blocked(
+        maker_client, monkeypatch, tmp_path):
+    monkeypatch.setattr(A, "RUNNINGHUB_UPLOAD_DIR", str(tmp_path))
+    monkeypatch.setattr(A, "_save_runninghub_jobs", lambda: None)
+    monkeypatch.setattr(A, "_runninghub_dispatch", lambda: None)
+    monkeypatch.setattr(A, "_runninghub_user_settings", lambda _user: {
+        "configured": True, "key_enc": "encrypted", "key_fingerprint": "fingerprint", "concurrency": 1,
+    })
+    monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {
+        "ref2v": {"id": "ref2v", "user": "maker", "workflow_key": "h3", "status": "running"}
+    })
+    first = maker_client.post("/api/runninghub/h3-talking/jobs", data={
+        "image": (BytesIO(b"source-image"), "speaker.png", "image/png"),
+        "prompt": "Final prompt", "duration": "10",
+    })
+    second = maker_client.post("/api/runninghub/h3-talking/jobs", data={
+        "image": (BytesIO(b"source-image"), "speaker.png", "image/png"),
+        "prompt": "Final prompt", "duration": "10",
+    })
+    assert first.status_code == 202
+    assert second.status_code == 409
+
+
+def test_h3_talking_dispatch_uploads_submits_imports_usage_and_cleans(monkeypatch, tmp_path):
+    image_path = tmp_path / "talking" / "speaker.png"
+    image_path.parent.mkdir()
+    image_path.write_bytes(b"source-image")
+    seen = {}
+    monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {"talk": {
+        "id": "talk", "user": "maker", "workflow_key": "h3_talking", "status": "uploading",
+        "created_at": 1, "updated_at": 1, "key_enc": "encrypted",
+        "talking_image_path": str(image_path), "talking_image_type": "image/png",
+        "talking_prompt": "Final prompt", "talking_duration": 11,
+    }})
+    monkeypatch.setattr(A, "_save_runninghub_jobs", lambda: None)
+    monkeypatch.setattr(A, "_decrypt_runninghub_key", lambda _value: "key")
+    monkeypatch.setattr(A, "_runninghub_upload", lambda key, path, mime: (
+        seen.update(upload=(key, path, mime)) or "api/speaker.png"))
+    monkeypatch.setattr(A, "_runninghub_submit_h3_talking", lambda key, job, image: (
+        seen.update(submit=(key, job["id"], image)) or {"taskId": "rh-talk"}))
+    monkeypatch.setattr(A, "_runninghub_query", lambda _key, _task: {
+        "status": "SUCCESS", "usage": {"consumeCoins": "21", "taskCostTime": "94"},
+        "results": [{"outputType": "mp4", "url": "https://example.test/output.mp4"}],
+    })
+    monkeypatch.setattr(A, "_runninghub_import_result", lambda job, result: {
+        "gallery_key": "gallery/cloud/talking.mp4"})
+    A._runninghub_run("talk")
+    assert seen["upload"] == ("key", str(image_path), "image/png")
+    assert seen["submit"] == ("key", "talk", "api/speaker.png")
+    assert not image_path.exists()
+    assert A.RUNNINGHUB_JOBS["talk"]["status"] == "done"
+    assert A.RUNNINGHUB_JOBS["talk"]["rh_coins"] == "21"
+    assert A.RUNNINGHUB_JOBS["talk"]["runtime"] == "94"
+
+
 def test_krea_lora_registry_normalizes_paths_and_one_default():
     data = A._normalize_runninghub_loras([{"id": "sophie", "name": "Sophie", "versions": [
         {"id": "v1", "label": "V1", "filename": r"models\loras\Sophie-v1.safetensors", "default": True},

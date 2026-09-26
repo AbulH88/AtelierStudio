@@ -142,6 +142,9 @@ RUNNINGHUB_H3_DURATION_NODE = 259
 RUNNINGHUB_H3_TALKING_WORKFLOW_ID = os.environ.get(
     "RUNNINGHUB_H3_TALKING_WORKFLOW_ID", "2103082156684087297")
 RUNNINGHUB_H3_TALKING_INSTANCE = os.environ.get("RUNNINGHUB_H3_TALKING_INSTANCE", "default")
+RUNNINGHUB_H3_TALKING_IMAGE_NODE = 9
+RUNNINGHUB_H3_TALKING_PROMPT_NODE = 14
+RUNNINGHUB_H3_TALKING_DURATION_NODE = 20
 RUNNINGHUB_H3_TALKING_MODELS = {
     "openai/gpt-6-luna": "GPT-6 Luna",
     "qwen/qwen3.8-27b": "Qwen 3.8 27B",
@@ -3083,6 +3086,31 @@ def _runninghub_submit_h3(api_key, job, uploads):
     return data
 
 
+def _runninghub_submit_h3_talking(api_key, job, image_name):
+    """Submit the fixed portrait talking workflow with only its three user inputs."""
+    nodes = [
+        {"nodeId": RUNNINGHUB_H3_TALKING_IMAGE_NODE, "fieldName": "image", "fieldValue": image_name},
+        {"nodeId": RUNNINGHUB_H3_TALKING_PROMPT_NODE, "fieldName": "value",
+         "fieldValue": job["talking_prompt"]},
+        {"nodeId": RUNNINGHUB_H3_TALKING_DURATION_NODE, "fieldName": "value",
+         "fieldValue": str(job["talking_duration"])},
+    ]
+    response = requests.post(
+        f"{RUNNINGHUB_BASE_URL}/run/workflow/{RUNNINGHUB_H3_TALKING_WORKFLOW_ID}",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"addMetadata": True, "nodeInfoList": nodes,
+              "instanceType": RUNNINGHUB_H3_TALKING_INSTANCE, "usePersonalQueue": False},
+        timeout=90)
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    if not response.ok or not data.get("taskId"):
+        raise RuntimeError(data.get("errorMessage") or data.get("message") or
+                           f"RunningHub did not accept the H3 Talking task ({response.status_code}).")
+    return data
+
+
 def _runninghub_submit_krea2(api_key, job, image_name):
     loras = [{"name": job["krea_lora_filename"], "on": True, "sm": 1, "sc": 1, "triggers": []}]
     helpers = job.get("krea_helpers")
@@ -3277,7 +3305,8 @@ def _runninghub_import_result(job, result):
 
 
 def _runninghub_cleanup_uploads(job):
-    paths = [job.get("reference_path"), job.get("video_path"), job.get("krea_image_path")]
+    paths = [job.get("reference_path"), job.get("video_path"), job.get("krea_image_path"),
+             job.get("talking_image_path")]
     for items in (job.get("h3_refs") or {}).values():
         paths.extend(item.get("path") for item in items)
     for path in paths:
@@ -3328,6 +3357,15 @@ def _runninghub_run(job_id):
                     return
                 _runninghub_update(job_id, status="submitting", message="Submitting MiniMax H3 to RunningHub…")
                 submitted = _runninghub_submit_h3(api_key, job, uploads)
+            elif job.get("workflow_key") == "h3_talking":
+                _runninghub_update(job_id, status="uploading", message="Uploading Talking source image…")
+                image_name = _runninghub_upload(
+                    api_key, job["talking_image_path"], job.get("talking_image_type") or "image/png")
+                if _runninghub_is_cancelled(job_id):
+                    return
+                _runninghub_update(job_id, status="submitting",
+                                   message="Submitting H3 Optimized for Talking to RunningHub…")
+                submitted = _runninghub_submit_h3_talking(api_key, job, image_name)
             else:
                 _runninghub_update(job_id, status="uploading", message="Uploading reference image to RunningHub…")
                 image_name = _runninghub_upload(api_key, job["reference_path"], job.get("reference_type") or "image/png")
@@ -3701,6 +3739,58 @@ def runninghub_create_h3_job():
     return jsonify({"id": job_id, "status": "waiting"}), 202
 
 
+@app.post("/api/runninghub/h3-talking/jobs")
+@cloud_workflow_required("h3_talking")
+def runninghub_create_h3_talking_job():
+    username = session["user"]
+    settings = _runninghub_user_settings(username)
+    if not settings["configured"]:
+        return jsonify({"error": "Cloud access has not been assigned by an administrator."}), 403
+    with RUNNINGHUB_JOBS_LOCK:
+        if _runninghub_has_active_locked(username, "h3_talking"):
+            return jsonify({"error": "An H3 Optimized for Talking job is already active. Wait for it or cancel it first."}), 409
+    image = request.files.get("image")
+    if not image or not image.filename:
+        return jsonify({"error": "A source image is required."}), 400
+    if (image.mimetype or "").lower() not in {"image/png", "image/jpeg", "image/webp"}:
+        return jsonify({"error": "Choose a PNG, JPG, or WEBP source image."}), 400
+    prompt = request.form.get("prompt") or ""
+    if not prompt.strip():
+        return jsonify({"error": "Generate or enter the final H3 prompt."}), 400
+    try:
+        duration = _parse_h3_talking_duration(request.form.get("duration"))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    job_id = uuid.uuid4().hex
+    job_dir = os.path.join(RUNNINGHUB_UPLOAD_DIR, job_id)
+    os.makedirs(job_dir, exist_ok=False)
+    image_path = os.path.join(job_dir, "talking_" + (secure_filename(image.filename) or "source.png"))
+    try:
+        image.save(image_path)
+        if os.path.getsize(image_path) > RUNNINGHUB_MAX_IMAGE_BYTES:
+            raise ValueError("Source image exceeds the Cloud upload limit.")
+    except Exception as exc:
+        _runninghub_cleanup_uploads({"talking_image_path": image_path})
+        return jsonify({"error": str(exc)}), 413 if isinstance(exc, ValueError) else 400
+    job = {
+        "id": job_id, "user": username, "workflow_key": "h3_talking", "status": "waiting",
+        "message": "Waiting for a cloud slot…", "created_at": int(time.time()),
+        "updated_at": int(time.time()), "instance_type": RUNNINGHUB_H3_TALKING_INSTANCE,
+        "workflow_id": RUNNINGHUB_H3_TALKING_WORKFLOW_ID, "key_enc": settings["key_enc"],
+        "key_fingerprint": settings["key_fingerprint"], "key_concurrency": settings["concurrency"],
+        "talking_image_path": image_path, "talking_image_type": image.mimetype or "image/png",
+        "talking_prompt": prompt, "talking_duration": duration, "estimated_total_seconds": None,
+    }
+    with RUNNINGHUB_JOBS_LOCK:
+        if _runninghub_has_active_locked(username, "h3_talking"):
+            _runninghub_cleanup_uploads(job)
+            return jsonify({"error": "An H3 Optimized for Talking job is already active. Wait for it or cancel it first."}), 409
+        RUNNINGHUB_JOBS[job_id] = job
+        _save_runninghub_jobs()
+    _runninghub_dispatch()
+    return jsonify({"id": job_id, "status": "waiting"}), 202
+
+
 @app.post("/api/runninghub/krea2/jobs")
 @cloud_workflow_required("krea2_i2i_hq")
 def runninghub_create_krea2_job():
@@ -3846,7 +3936,7 @@ def runninghub_create_krea2_t2i_job():
 
 
 def _runninghub_public_job(job):
-    safe = {k: v for k, v in job.items() if k not in {"key_enc", "key_fingerprint", "key_concurrency", "reference_path", "video_path", "h3_refs", "krea_image_path"}}
+    safe = {k: v for k, v in job.items() if k not in {"key_enc", "key_fingerprint", "key_concurrency", "reference_path", "video_path", "h3_refs", "krea_image_path", "talking_image_path"}}
     elapsed = max(0, int(time.time()) - int(safe.get("created_at") or time.time()))
     safe["elapsed_seconds"] = elapsed
     if safe.get("status") in {"uploading", "submitting", "running", "importing"} and safe.get("estimated_total_seconds"):
@@ -3890,7 +3980,7 @@ def runninghub_list_jobs():
         workflow = (request.args.get("workflow") or "").strip()
         status = (request.args.get("status") or "").strip().lower()
         query = (request.args.get("q") or "").strip().lower()
-        if workflow and workflow not in {"scail", "h3", "krea2_i2i_hq", "krea2_t2i"}:
+        if workflow and workflow not in {"scail", "h3", "h3_talking", "krea2_i2i_hq", "krea2_t2i"}:
             return jsonify({"error": "Unknown Cloud workflow filter."}), 400
         jobs = all_jobs if scope == "all" else [j for j in all_jobs if j.get("user") == username]
         if workflow:

@@ -21,6 +21,8 @@ def test_cloud_workflows_deny_non_admins_by_default(monkeypatch):
     assert client.get("/api/runninghub/jobs").status_code == 403
     assert client.post("/api/runninghub/jobs").status_code == 403
     assert client.post("/api/runninghub/h3/jobs").status_code == 403
+    assert client.post("/api/runninghub/h3-talking/prompt").status_code == 403
+    assert client.post("/api/runninghub/h3-talking/jobs").status_code == 403
     assert client.post("/api/runninghub/krea2/jobs").status_code == 403
 
 
@@ -44,3 +46,10 @@ def test_admin_can_set_a_users_cloud_allowlist(monkeypatch):
     assert response.status_code == 200
     assert users["maker"]["cloud_workflows"] == ["h3", "jobs"]
     assert saved
+
+
+def test_h3_talking_permission_is_independent_from_h3(monkeypatch):
+    client, _ = _client(monkeypatch, workflows=["h3"])
+    monkeypatch.setattr(A, "_runninghub_user_settings", lambda _user: {"configured": True})
+    assert client.post("/api/runninghub/h3/jobs").status_code != 403
+    assert client.post("/api/runninghub/h3-talking/jobs").status_code == 403
