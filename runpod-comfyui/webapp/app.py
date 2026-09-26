@@ -3968,7 +3968,7 @@ def runninghub_create_krea2_t2i_job():
 
 
 def _runninghub_public_job(job):
-    safe = {k: v for k, v in job.items() if k not in {"key_enc", "key_fingerprint", "key_concurrency", "reference_path", "video_path", "h3_refs", "krea_image_path", "talking_image_path"}}
+    safe = {k: v for k, v in job.items() if k not in {"key_enc", "key_fingerprint", "key_concurrency", "reference_path", "video_path", "h3_refs", "krea_image_path", "talking_image_path", "talking_prompt"}}
     elapsed = max(0, int(time.time()) - int(safe.get("created_at") or time.time()))
     safe["elapsed_seconds"] = elapsed
     if safe.get("status") in {"uploading", "submitting", "running", "importing"} and safe.get("estimated_total_seconds"):

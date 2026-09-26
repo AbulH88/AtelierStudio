@@ -555,6 +555,18 @@ def test_public_completed_job_has_preview_download_and_timing():
     assert "key_fingerprint" not in public
 
 
+def test_talking_job_history_does_not_expose_private_script_or_server_upload_path():
+    public = A._runninghub_public_job({
+        "id": "talk", "user": "maker", "workflow_key": "h3_talking",
+        "status": "done", "created_at": 1,
+        "talking_prompt": "<d>[English] Private words</d>",
+        "talking_image_path": "C:/private/upload/speaker.png",
+    })
+    assert public["workflow_key"] == "h3_talking"
+    assert "talking_prompt" not in public
+    assert "talking_image_path" not in public
+
+
 def test_job_list_keeps_active_and_compact_recent_history(maker_client, monkeypatch):
     monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {
         "done-old": {"id": "done-old", "user": "maker", "status": "done", "created_at": 1},
