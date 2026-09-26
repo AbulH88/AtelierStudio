@@ -81,3 +81,42 @@ def test_h3_submit_uses_the_supported_runninghub_route():
     assert 'id="h3Run" class="cloud-run" disabled' in HTML
     assert "/api/runninghub/h3/jobs" in HTML
     assert "Ready to submit MiniMax H3" in HTML
+
+
+def test_talking_workflow_has_separate_navigation_permission_and_history_filter():
+    assert 'data-cloud-workflow="h3_talking"' in HTML
+    assert '<input type="checkbox" value="h3_talking">' in HTML
+    assert '<option value="h3_talking">H3 Optimized for Talking</option>' in HTML
+    assert "key==='h3_talking'?'H3 Optimized for Talking'" in HTML
+
+
+def test_talking_workflow_exposes_portrait_source_and_complete_prompt_inputs():
+    assert 'id="h3TalkingImage" type="file" accept="image/png,image/jpeg,image/webp"' in HTML
+    assert 'id="h3TalkingPreview"' in HTML
+    assert 'class="h3-talking-preview hide"' in HTML
+    assert 'id="h3TalkingDescription"' in HTML
+    assert 'id="h3TalkingScript"' in HTML
+    assert 'id="h3TalkingAudio"' in HTML
+    assert 'id="h3TalkingMusic"' in HTML
+    assert 'id="h3TalkingPrompt"' in HTML
+    assert 'object-fit:cover' in HTML
+    assert 'aspect-ratio:9/16' in HTML
+
+
+def test_talking_workflow_has_only_approved_models_and_integer_duration_contract():
+    select = ('<select id="h3TalkingModel"><option value="openai/gpt-6-luna" selected>GPT-6 Luna</option>'
+              '<option value="qwen/qwen3.8-27b">Qwen 3.8 27B</option></select>')
+    assert select in HTML
+    assert 'id="h3TalkingDuration" type="number" min="5" max="15" step="1" value="10"' in HTML
+
+
+def test_talking_prompt_generation_and_video_submission_use_separate_routes():
+    assert 'id="h3TalkingGeneratePrompt"' in HTML
+    assert 'id="h3TalkingRun" class="cloud-run" disabled' in HTML
+    assert "fetch('/api/runninghub/h3-talking/prompt',{method:'POST',body})" in HTML
+    assert "fetch('/api/runninghub/h3-talking/jobs',{method:'POST',body})" in HTML
+    assert "body.append('prompt',$('#h3TalkingPrompt').value)" in HTML
+    generation = HTML.index("fetch('/api/runninghub/h3-talking/prompt'")
+    assignment = HTML.index("$('#h3TalkingPrompt').value=d.prompt", generation)
+    failure = HTML.index("if(!r.ok)throw", generation)
+    assert generation < failure < assignment
