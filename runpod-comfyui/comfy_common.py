@@ -58,12 +58,11 @@ VIDEO_UPSCALE_CHAIN = ["367", "368", "369", "371", "372", "373", "375"]
 
 # LTX 2.5 image-to-video (workflow_ltx25i2v.json). First-frame photo + prompt ->
 # a short mp4 with audio, no driving video and no character LoRA (identity comes
-# straight from the uploaded photo). Width/height are computed app-side from the
-# same resolution-preset list Krea2 HQ uses (the workflow's own in-graph
-# ResolutionSelector node was dropped from the template in favor of that, same
-# pattern as krea2hq) and fed straight into the two PrimitiveInt nodes it used to
-# read from. Two-stage pipeline (half-res base pass -> 2x latent upsample -> full-res
-# refine pass) is baked into the graph as exported; only the seeds are randomized.
+# straight from the uploaded photo). The app computes the source ComfyUI
+# ResolutionSelector's 4M/2M dimensions and feeds them into its PrimitiveInt
+# nodes. The source's disabled prompt-enhancement and bypassed preprocessing
+# nodes are omitted from this runnable API graph. The two-stage pipeline
+# (half-res base pass -> 2x latent upsample -> full-res refine pass) is preserved.
 LTX25I2V = {"load_image": "45", "prompt": "8", "duration": "4",
             "width": "5", "height": "6", "seed_base": "44", "seed_refine": "41",
             "output": "39"}

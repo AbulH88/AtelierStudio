@@ -21,7 +21,7 @@
   },
   "5": {
     "inputs": {
-      "value": 1920
+      "value": 2720
     },
     "class_type": "PrimitiveInt",
     "_meta": {
@@ -30,7 +30,7 @@
   },
   "6": {
     "inputs": {
-      "value": 1088
+      "value": 1536
     },
     "class_type": "PrimitiveInt",
     "_meta": {
@@ -498,7 +498,7 @@
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
-      "save_metadata": true,
+      "save_metadata": false,
       "trim_to_audio": false,
       "pingpong": false,
       "save_output": true,
