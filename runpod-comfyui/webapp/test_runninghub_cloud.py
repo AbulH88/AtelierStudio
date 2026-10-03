@@ -717,6 +717,36 @@ def test_cancel_calls_runninghub_cancel_contract(monkeypatch):
     assert seen["headers"]["Authorization"] == "Bearer rh-secret"
 
 
+def test_pending_cancel_keeps_provider_monitor_alive(monkeypatch):
+    monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {"job": {"status": "cancelling"}})
+    assert not A._runninghub_is_cancelled("job")
+    A.RUNNINGHUB_JOBS["job"]["status"] = "cancelled"
+    assert A._runninghub_is_cancelled("job")
+
+
+@pytest.mark.parametrize("rejected", [True, False])
+def test_cancel_does_not_overwrite_completed_job(maker_client, monkeypatch, rejected):
+    monkeypatch.setattr(A, "RUNNINGHUB_JOBS", {"job": {
+        "id": "job", "user": "maker", "status": "running", "message": "Generating",
+        "task_id": "rh-task", "key_enc": "encrypted",
+    }})
+    monkeypatch.setattr(A, "_save_runninghub_jobs", lambda: None)
+    monkeypatch.setattr(A, "_decrypt_runninghub_key", lambda _key: "key")
+
+    def cancel(_key, _task):
+        A._runninghub_update("job", status="done", message="Saved to Gallery.",
+                            gallery_key="gallery/completed.png")
+        if rejected:
+            raise RuntimeError("APIKEY_TASK_CANCEL_NOT_ALLOWED")
+        return {"code": 0}
+
+    monkeypatch.setattr(A, "_runninghub_cancel", cancel)
+    response = maker_client.post("/api/runninghub/jobs/job/cancel")
+    assert response.status_code == 200
+    assert A.RUNNINGHUB_JOBS["job"]["status"] == "done"
+    assert response.get_json()["gallery_key"] == "gallery/completed.png"
+
+
 def test_owner_can_cancel_waiting_job_without_provider_call(maker_client, monkeypatch):
     monkeypatch.setattr(A, "_save_runninghub_jobs", lambda: None)
     monkeypatch.setattr(A, "_runninghub_dispatch", lambda: None)

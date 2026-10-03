@@ -3024,7 +3024,9 @@ def _runninghub_has_active_locked(username, workflow_key, exclude_id=None):
 
 def _runninghub_is_cancelled(job_id):
     with RUNNINGHUB_JOBS_LOCK:
-        return (RUNNINGHUB_JOBS.get(job_id) or {}).get("status") in {"cancelling", "cancelled"}
+        # Keep monitoring while the provider decides: it may reject cancellation
+        # after completing a task, and no replacement poller would be running.
+        return (RUNNINGHUB_JOBS.get(job_id) or {}).get("status") == "cancelled"
 
 
 def _runninghub_dispatch():
@@ -4146,18 +4148,38 @@ def runninghub_cancel_job(job_id):
         _runninghub_dispatch()
         return jsonify(_runninghub_public_job(cancelled or job))
 
-    previous_status, previous_message = job.get("status"), job.get("message")
-    _runninghub_update(job_id, status="cancelling", message="Cancelling on RunningHub…")
+    with RUNNINGHUB_JOBS_LOCK:
+        current = RUNNINGHUB_JOBS[job_id]
+        if current.get("status") in RUNNINGHUB_TERMINAL_STATUSES:
+            return jsonify(_runninghub_public_job(dict(current)))
+        previous_status, previous_message = current.get("status"), current.get("message")
+        current.update(status="cancelling", message="Cancelling on RunningHub…",
+                       updated_at=int(time.time()))
+        _save_runninghub_jobs()
     try:
         api_key = _decrypt_runninghub_key(job.get("key_enc", ""))
         if not api_key:
             raise RuntimeError("The RunningHub key is unavailable for this job.")
         _runninghub_cancel(api_key, task_id)
     except Exception as e:
-        _runninghub_update(job_id, status=previous_status, message=previous_message,
-                           error=f"Cancellation failed: {e}")
+        with RUNNINGHUB_JOBS_LOCK:
+            current = RUNNINGHUB_JOBS[job_id]
+            if current.get("status") in RUNNINGHUB_TERMINAL_STATUSES:
+                return jsonify(_runninghub_public_job(dict(current)))
+            # Never roll back progress made by the worker during this request.
+            if current.get("status") == "cancelling":
+                current.update(status=previous_status, message=previous_message)
+            current.update(error=f"Cancellation failed: {e}", updated_at=int(time.time()))
+            _save_runninghub_jobs()
         return jsonify({"error": str(e)}), 502
-    cancelled = _runninghub_update(job_id, status="cancelled", message="Cloud job cancelled.")
+    with RUNNINGHUB_JOBS_LOCK:
+        current = RUNNINGHUB_JOBS[job_id]
+        if current.get("status") in RUNNINGHUB_TERMINAL_STATUSES:
+            return jsonify(_runninghub_public_job(dict(current)))
+        current.update(status="cancelled", message="Cloud job cancelled.",
+                       updated_at=int(time.time()))
+        _save_runninghub_jobs()
+        cancelled = dict(current)
     _runninghub_cleanup_uploads(cancelled or job)
     _runninghub_dispatch()
     return jsonify(_runninghub_public_job(cancelled or job))
