@@ -163,6 +163,16 @@ RUNNINGHUB_KREA2_T2I_PROMPT_NODE = 6
 RUNNINGHUB_KREA2_T2I_LATENT_NODE = 10
 RUNNINGHUB_KREA2_T2I_SAMPLER_NODE = 98
 RUNNINGHUB_KREA2_T2I_LORA_NODE = 117
+RUNNINGHUB_KREA2_REALISM_WORKFLOW_ID = os.environ.get(
+    "RUNNINGHUB_KREA2_REALISM_WORKFLOW_ID", "2108901395561816066")
+RUNNINGHUB_KREA2_REALISM_MODELS = [
+    {"filename": "intorealismKrea2_FlashV1.safetensors", "label": "IntoRealism Krea2 Flash V1"},
+    {"filename": "lustifyNSFWCheckpoint_v10Krea2.safetensors", "label": "Lustify Krea2 V10"},
+]
+RUNNINGHUB_KREA2_REALISM_DEFAULT_RESOLUTION = {
+    "key": "workflow_default", "group": "Workflow", "label": "Workflow default",
+    "width": 1280, "height": 1728,
+}
 # Default entries for the administrator-managed Cloud Krea2 helper registry.
 RUNNINGHUB_KREA2_DEFAULT_HELPERS = (
     {"filename": "realism_engine_krea2_v3.1.safetensors", "enabled": True, "strength": 0.60},
@@ -418,7 +428,7 @@ def admin_required(fn):
     return w
 
 
-CLOUD_WORKFLOW_IDS = {"krea2_i2i_hq", "krea2_t2i", "scail", "h3", "h3_talking", "jobs"}
+CLOUD_WORKFLOW_IDS = {"krea2_i2i_hq", "krea2_t2i", "krea2_realism", "scail", "h3", "h3_talking", "jobs"}
 
 
 def _cloud_workflows_for(username):
@@ -3245,6 +3255,41 @@ def _runninghub_submit_krea2_t2i(api_key, job):
     return data
 
 
+def _runninghub_submit_krea2_realism(api_key, job):
+    """Override only user inputs; keep source rebalance, sampler and CRT processing."""
+    model = job["krea_model"]
+    if model not in {item["filename"] for item in RUNNINGHUB_KREA2_REALISM_MODELS}:
+        raise ValueError("Choose a supported Krea2 Realism Studio model.")
+    state = _json.dumps({"version": 1, "sep": ", ", "cacheMode": "last", "loras": [
+        {"id": "character", "name": job["krea_lora_filename"], "on": True,
+         "sm": 1, "sc": 1, "triggers": [], "custom": [], "at": False},
+    ]}, separators=(",", ":"))
+    seed = job.get("krea_seed") or int.from_bytes(os.urandom(4), "big")
+    nodes = [
+        {"nodeId": 541, "fieldName": "unet_name", "fieldValue": model},
+        {"nodeId": 500, "fieldName": "text", "fieldValue": job["krea_prompt"]},
+        {"nodeId": 508, "fieldName": "width", "fieldValue": str(job["krea_width"])},
+        {"nodeId": 508, "fieldName": "height", "fieldValue": str(job["krea_height"])},
+        {"nodeId": 508, "fieldName": "batch_size", "fieldValue": str(job["krea_batch_size"])},
+        {"nodeId": 504, "fieldName": "seed", "fieldValue": str(seed)},
+        {"nodeId": 538, "fieldName": "lora_name", "fieldValue": job["krea_lora_filename"]},
+        {"nodeId": 538, "fieldName": "LoraLoaderState", "fieldValue": state},
+    ]
+    response = requests.post(
+        f"{RUNNINGHUB_BASE_URL}/run/workflow/{job.get('workflow_id') or RUNNINGHUB_KREA2_REALISM_WORKFLOW_ID}",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"addMetadata": True, "nodeInfoList": nodes, "instanceType": "default",
+              "usePersonalQueue": False}, timeout=90)
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    if not response.ok or not data.get("taskId"):
+        raise RuntimeError(data.get("errorMessage") or data.get("message") or
+                           "RunningHub did not accept the Krea2 Realism Studio task.")
+    return data
+
+
 def _runninghub_query(api_key, task_id):
     response = requests.post(
         f"{RUNNINGHUB_BASE_URL}/query",
@@ -3355,11 +3400,11 @@ def _runninghub_normalize_talking_video(path):
 
 def _runninghub_import_result(job, result):
     outputs = result.get("results") or []
-    wanted = ("png", "jpg", "jpeg", "webp") if _runninghub_workflow_key(job) in {"krea2_i2i_hq", "krea2_t2i"} else ("mp4", "mov", "webm")
+    wanted = ("png", "jpg", "jpeg", "webp") if _runninghub_workflow_key(job) in {"krea2_i2i_hq", "krea2_t2i", "krea2_realism"} else ("mp4", "mov", "webm")
     matching = [o for o in outputs if str(o.get("outputType", "")).lower() in wanted and o.get("url")]
     if not matching:
         raise RuntimeError("RunningHub finished but returned no downloadable result.")
-    if job.get("workflow_key") == "krea2_t2i":
+    if job.get("workflow_key") in {"krea2_t2i", "krea2_realism"}:
         character = re.sub(r'[\\/:*?"<>|]+', "-", str(job.get("krea_character_name") or "Character")).strip(" .")
         stamp = time.strftime("%Y-%m-%d %H-%M-%S", time.localtime(job.get("created_at") or time.time()))
         folder = f"{character or 'Character'} · {stamp}"
@@ -3435,7 +3480,10 @@ def _runninghub_run(job_id):
             raise RuntimeError("The RunningHub key is unavailable for this job.")
         task_id = job.get("task_id")
         if not task_id:
-            if job.get("workflow_key") == "krea2_t2i":
+            if job.get("workflow_key") == "krea2_realism":
+                _runninghub_update(job_id, status="submitting", message="Submitting Krea2 Realism Studio…")
+                submitted = _runninghub_submit_krea2_realism(api_key, job)
+            elif job.get("workflow_key") == "krea2_t2i":
                 _runninghub_update(job_id, status="submitting", message="Submitting Krea2 Turbo Text-to-Image…")
                 submitted = _runninghub_submit_krea2_t2i(api_key, job)
             elif job.get("workflow_key") == "krea2_i2i_hq":
@@ -3495,7 +3543,7 @@ def _runninghub_run(job_id):
             elif state in ("RUNNING", "PROCESSING"):
                 _runninghub_update(job_id, status="running", message="Generating on RunningHub…", **changes)
             elif state == "SUCCESS":
-                _runninghub_update(job_id, status="importing", message="Saving completed video to Gallery…", **changes)
+                _runninghub_update(job_id, status="importing", message="Saving completed result to Gallery…", **changes)
                 with RUNNINGHUB_JOBS_LOCK:
                     completed_job = dict(RUNNINGHUB_JOBS[job_id])
                 imported = _runninghub_import_result(completed_job, result)
@@ -3980,14 +4028,36 @@ def runninghub_create_krea2_job():
 @app.post("/api/runninghub/krea2-t2i/jobs")
 @cloud_workflow_required("krea2_t2i")
 def runninghub_create_krea2_t2i_job():
+    return _runninghub_create_text_image_job("krea2_t2i")
+
+
+@app.get("/api/runninghub/krea2-realism/config")
+@cloud_workflow_required("krea2_realism")
+def runninghub_krea2_realism_config():
+    return jsonify({"models": RUNNINGHUB_KREA2_REALISM_MODELS,
+                    "res_presets": [RUNNINGHUB_KREA2_REALISM_DEFAULT_RESOLUTION, *RES_PRESETS]})
+
+
+@app.post("/api/runninghub/krea2-realism/jobs")
+@cloud_workflow_required("krea2_realism")
+def runninghub_create_krea2_realism_job():
+    return _runninghub_create_text_image_job("krea2_realism")
+
+
+def _runninghub_create_text_image_job(workflow):
+    realism = workflow == "krea2_realism"
     username = session["user"]
     settings = _runninghub_user_settings(username)
     prompt = (request.form.get("prompt") or "").strip()
-    preset = next((p for p in RES_PRESETS if p["key"] == (request.form.get("resolution_key") or "").strip()), None)
+    presets = [RUNNINGHUB_KREA2_REALISM_DEFAULT_RESOLUTION, *RES_PRESETS] if realism else RES_PRESETS
+    preset = next((p for p in presets if p["key"] == (request.form.get("resolution_key") or "").strip()), None)
     if not settings["configured"]:
         return jsonify({"error": "Cloud access has not been assigned by an administrator."}), 403
     if not prompt or not preset:
         return jsonify({"error": "Enter a prompt and choose a supported resolution."}), 400
+    model = (request.form.get("model") or RUNNINGHUB_KREA2_REALISM_MODELS[0]["filename"]).strip()
+    if realism and model not in {item["filename"] for item in RUNNINGHUB_KREA2_REALISM_MODELS}:
+        return jsonify({"error": "Choose a supported Krea2 Realism Studio model."}), 400
     try:
         batch_size, seed = int(request.form.get("batch_size", "1")), int(request.form.get("seed", "0"))
         submitted_helpers = _json.loads(request.form.get("helpers", "[]"))
@@ -3995,10 +4065,14 @@ def runninghub_create_krea2_t2i_job():
         return jsonify({"error": "Batch, seed, or helper LoRAs are invalid."}), 400
     if not 1 <= batch_size <= 16 or seed < 0:
         return jsonify({"error": "Batch must be from 1 to 16 and seed must be positive."}), 400
+    if realism and seed > 9007199254740991:
+        return jsonify({"error": "Seed is larger than the supported maximum."}), 400
     lora = _resolve_runninghub_lora((request.form.get("character_id") or "").strip(),
                                     (request.form.get("version_id") or "").strip())
     if not lora:
         return jsonify({"error": "Choose an available Cloud character and version."}), 400
+    if realism:
+        submitted_helpers = []
     with RUNNINGHUB_KREA2_HELPERS_LOCK:
         available = {item["filename"].lower(): item for item in _load_runninghub_krea2_t2i_helpers() if item["enabled"]}
     helpers = []
@@ -4017,18 +4091,23 @@ def runninghub_create_krea2_t2i_job():
         helpers.append({"filename": managed["filename"], "strength": strength})
     final_prompt = f"{lora.get('trigger_words', '').strip()}, {prompt}".strip(", ")
     job_id = uuid.uuid4().hex
-    job = {"id": job_id, "user": username, "workflow_key": "krea2_t2i", "status": "waiting",
+    job = {"id": job_id, "user": username, "workflow_key": workflow, "status": "waiting",
            "message": "Waiting for a cloud slot…", "created_at": int(time.time()), "updated_at": int(time.time()),
-           "instance_type": RUNNINGHUB_KREA2_T2I_INSTANCE, "workflow_id": RUNNINGHUB_KREA2_T2I_WORKFLOW_ID,
+           "instance_type": "default" if realism else RUNNINGHUB_KREA2_T2I_INSTANCE,
+           "workflow_id": RUNNINGHUB_KREA2_REALISM_WORKFLOW_ID if realism else RUNNINGHUB_KREA2_T2I_WORKFLOW_ID,
            "key_enc": settings["key_enc"], "key_fingerprint": settings["key_fingerprint"], "key_concurrency": settings["concurrency"],
            "krea_prompt": final_prompt, "krea_width": preset["width"], "krea_height": preset["height"],
            "krea_batch_size": batch_size, "krea_seed": seed, "krea_helpers": helpers,
            "krea_character_id": lora["character_id"], "krea_character_name": lora["character_name"],
            "krea_version_id": lora["version_id"], "krea_version_label": lora["version_label"],
            "krea_lora_filename": lora["filename"], "estimated_total_seconds": None}
+    if realism:
+        job["krea_model"] = model
+        job["krea_seed"] = seed or int.from_bytes(os.urandom(4), "big")
     with RUNNINGHUB_JOBS_LOCK:
-        if _runninghub_has_active_locked(username, "krea2_t2i"):
-            return jsonify({"error": "A Krea2 Turbo Text-to-Image job is already active."}), 409
+        if _runninghub_has_active_locked(username, workflow):
+            label = "Krea2 Realism Studio" if realism else "Krea2 Turbo Text-to-Image"
+            return jsonify({"error": f"A {label} job is already active."}), 409
         RUNNINGHUB_JOBS[job_id] = job
         _save_runninghub_jobs()
     _runninghub_dispatch()
@@ -4080,7 +4159,7 @@ def runninghub_list_jobs():
         workflow = (request.args.get("workflow") or "").strip()
         status = (request.args.get("status") or "").strip().lower()
         query = (request.args.get("q") or "").strip().lower()
-        if workflow and workflow not in {"scail", "h3", "h3_talking", "krea2_i2i_hq", "krea2_t2i"}:
+        if workflow and workflow not in {"scail", "h3", "h3_talking", "krea2_i2i_hq", "krea2_t2i", "krea2_realism"}:
             return jsonify({"error": "Unknown Cloud workflow filter."}), 400
         jobs = all_jobs if scope == "all" else [j for j in all_jobs if j.get("user") == username]
         if workflow:
