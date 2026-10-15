@@ -48,7 +48,7 @@
   },
   "8": {
     "inputs": {
-      "value": ""
+      "value": "Pottery and baskets line a flowered riverside lane beneath timber houses. The camera glides forward slowly along the stone path and stops. Leaves and flowers stir, river reflections ripple, and one small existing figure makes a restrained arranging motion. Preserve every pot, basket, house, awning, path, and riverbank. No new people or objects; no pottery multiplication or building deformation."
     },
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
@@ -538,20 +538,11 @@
   },
   "44": {
     "inputs": {
-      "noise_seed": 658769211939237
+      "noise_seed": 76932358836706
     },
     "class_type": "RandomNoise",
     "_meta": {
       "title": "RandomNoise"
-    }
-  },
-  "45": {
-    "inputs": {
-      "image": "example.png"
-    },
-    "class_type": "LoadImage",
-    "_meta": {
-      "title": "Load First Frame"
     }
   },
   "48": {
@@ -563,7 +554,7 @@
         0
       ],
       "image": [
-        "45",
+        "61",
         0
       ],
       "latent": [
@@ -585,7 +576,7 @@
         0
       ],
       "image": [
-        "45",
+        "61",
         0
       ],
       "latent": [
@@ -596,6 +587,15 @@
     "class_type": "LTXVImgToVideoInplace",
     "_meta": {
       "title": "LTXVImgToVideoInplace"
+    }
+  },
+  "61": {
+    "inputs": {
+      "image": "77eca765785e44af48467fd8c55e7437.jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load First Frame"
     }
   }
 }

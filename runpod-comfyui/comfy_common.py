@@ -63,7 +63,7 @@ VIDEO_UPSCALE_CHAIN = ["367", "368", "369", "371", "372", "373", "375"]
 # nodes. The source's disabled prompt-enhancement and bypassed preprocessing
 # nodes are omitted from this runnable API graph. The two-stage pipeline
 # (half-res base pass -> 2x latent upsample -> full-res refine pass) is preserved.
-LTX25I2V = {"load_image": "45", "prompt": "8", "duration": "4",
+LTX25I2V = {"load_image": "61", "prompt": "8", "duration": "4",
             "width": "5", "height": "6", "seed_base": "44", "seed_refine": "41",
             "output": "39"}
 
@@ -733,17 +733,20 @@ def _build_video(graph, inp, seed, video_name, ref_name):
 def _build_ltx25i2v(graph, inp, seed, image_name):
     """Inject the dynamic inputs into the LTX 2.5 I2V graph: first-frame photo,
     prompt, duration, width/height (from the app's resolution-preset list), and
-    both sampling-stage seeds. Everything else (negative prompt, fps, the two-stage
-    sampling pipeline) stays as the workflow defines it."""
+    the randomized base-stage seed. The source's refinement seed stays fixed at
+    23. Everything else (negative prompt, fps, the two-stage sampling pipeline)
+    stays as the workflow defines it."""
     nm = LTX25I2V
     graph[nm["load_image"]]["inputs"]["image"] = image_name
-    graph[nm["prompt"]]["inputs"]["value"] = inp.get("prompt", "") or ""
+    if "prompt" in inp:
+        graph[nm["prompt"]]["inputs"]["value"] = inp["prompt"] or ""
     if inp.get("duration"):
         graph[nm["duration"]]["inputs"]["value"] = max(1, int(inp["duration"]))
-    graph[nm["width"]]["inputs"]["value"] = int(inp.get("width") or 1920)
-    graph[nm["height"]]["inputs"]["value"] = int(inp.get("height") or 1088)
+    if inp.get("width"):
+        graph[nm["width"]]["inputs"]["value"] = int(inp["width"])
+    if inp.get("height"):
+        graph[nm["height"]]["inputs"]["value"] = int(inp["height"])
     graph[nm["seed_base"]]["inputs"]["noise_seed"] = seed
-    graph[nm["seed_refine"]]["inputs"]["noise_seed"] = seed
     return graph
 
 
