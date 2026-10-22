@@ -67,6 +67,24 @@ def test_restart_uncertainty_blocks_different_keys_even_before_gpu_memory_is_use
     assert service.launched==[KEY]
 
 
+def test_restart_uncertainty_also_reserves_legacy_enhance(service,monkeypatch):
+    assert submit(service).status_code==202
+    service.enhance.ACTIVE.update(job=None,process=None)
+    rife.RifeService(service.root,service.enhance,availability=lambda:{'free':True},launch=lambda key:None)
+    import enhance_service as legacy
+    monkeypatch.setattr(legacy,'ACTIVE',service.enhance.ACTIVE)
+    monkeypatch.setattr(legacy,'LOCK',service.enhance.LOCK)
+    monkeypatch.setattr(legacy,'ROOT',service.root/'legacy')
+    monkeypatch.setattr(legacy,'JOBS',{})
+    monkeypatch.setattr(legacy,'_models',lambda:['rife49.pth'])
+    monkeypatch.setattr(legacy,'capabilities',lambda:{'rife':{'available':True}})
+    monkeypatch.setattr(legacy,'_run',lambda job:None)
+    from werkzeug.datastructures import FileStorage
+    options=legacy.validate_options({'interpolation':'rife'})
+    with pytest.raises(RuntimeError,match='busy'):
+        legacy.create_job(FileStorage(stream=io.BytesIO(BLOB),filename='source.mp4'),options)
+
+
 def test_completed_result_survives_service_restart(service):
     assert submit(service).status_code == 202
     job = service.get(KEY)

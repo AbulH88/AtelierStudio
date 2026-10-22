@@ -91,6 +91,10 @@ class RifeService:
                     db.execute('UPDATE jobs SET payload=? WHERE key=?', (json.dumps(job), key))
                 if job['status'] == 'interrupted':
                     self.recovery_required = True
+        if self.recovery_required:
+            with self.enhance.LOCK:
+                if not self.enhance.ACTIVE['job']:
+                    self.enhance.ACTIVE['job'] = 'mediaos:recovery-hold'
 
     def connect(self):
         return sqlite3.connect(self.database, timeout=15)
@@ -228,7 +232,7 @@ class RifeService:
             process = self.enhance.ACTIVE.get('process')
             with self.enhance.LOCK:
                 if self.enhance.ACTIVE['job'] == 'mediaos:'+key and (not process or process.poll() is not None):
-                    self.enhance.ACTIVE.update(job=None, process=None)
+                    self.enhance.ACTIVE.update(job='mediaos:recovery-hold' if self.recovery_required else None, process=None)
 
 
 def register(app, authorized, service=None):
