@@ -14,7 +14,7 @@ import urllib.request
 from uuid import uuid4
 
 from flask import jsonify, request, send_file
-from rife_media import media_info, output_frames, audio_hash
+from rife_media import media_info, output_frames, audio_hash, audio_pcm_hash
 
 RECIPE = {'version': 1, 'engine': 'rife', 'model': 'rife49.pth', 'multiplier': 2,
           'native_dimensions': True, 'rtx': False, 'complete_audio': True}
@@ -205,8 +205,10 @@ class RifeService:
             after = media_info(output, ffmpeg)
             if (any(after[k] != before[k] for k in ('width', 'height')) or after['fps'] != 48 or
                 after['frames'] != expected_frames or after['video_duration'] < after['audio_duration'] or
-                abs(before['audio_duration']-after['audio_duration']) > 1/32000 or
-                audio_hash(source, ffmpeg) != audio_hash(output, ffmpeg)):
+                abs(before['audio_duration']-after['audio_duration']) > .001+1e-9 or
+                abs(before['audio_start']-after['audio_start']) > 1/32000 or
+                audio_hash(source, ffmpeg) != audio_hash(output, ffmpeg) or
+                audio_pcm_hash(source,ffmpeg) != audio_pcm_hash(output,ffmpeg)):
                 raise ValueError('result_verification_failed')
             decoded = subprocess.run([ffmpeg, '-v', 'error', '-xerror', '-i', str(output), '-f', 'null', '-'],
                 capture_output=True, timeout=120, check=True)
@@ -215,6 +217,8 @@ class RifeService:
             receipt = {'key': key, 'source_sha256': job['source_sha256'], 'recipe': RECIPE,
                 'model_sha256': MODEL_SHA, 'result_sha256': checksum(output), 'result_bytes': output.stat().st_size,
                 'source_metadata': before, 'result_metadata': after, 'audio_payload_sha256': audio_hash(output, ffmpeg),
+                'audio_pcm_sha256':audio_pcm_hash(output,ffmpeg),
+                'media_helper_sha256':checksum(Path(__file__).with_name('rife_media.py')),
                 'helper_sha256': checksum(Path(__file__).with_name('rife_video.py')),
                 'started_at': job['started_at'], 'finished_at': time.time()}
             job.update(status='succeeded', receipt=receipt, finished_at=receipt['finished_at'])

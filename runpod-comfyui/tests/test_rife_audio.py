@@ -33,3 +33,20 @@ def test_unaligned_native_audio_payload_survives_mux(tmp_path):
     assert result['video_duration'] >= result['audio_duration']
     assert audio_hash(source, 'ffmpeg') == audio_hash(final, 'ffmpeg')
     subprocess.run(['ffmpeg','-v','error','-i',str(final),'-f','null','-'],check=True)
+
+
+def test_container_duration_rounding_does_not_reject_identical_complete_audio(tmp_path,monkeypatch):
+    import rife_media
+    source,picture,final=(tmp_path/n for n in ('source.mp4','picture.mp4','final.mp4'))
+    subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','color=s=64x64:r=24:d=0.3',
+        '-f','lavfi','-i','sine=sample_rate=32000:duration=0.317','-c:v','libx264','-c:a','aac',str(source)],check=True)
+    subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','color=s=64x64:r=48:d=0.4',
+        '-c:v','libx264',str(picture)],check=True)
+    inspect=rife_media.media_info
+    def rounded(path,ffmpeg):
+        info=inspect(path,ffmpeg)
+        if Path(path)==source:info['audio_duration']+=10/32000
+        return info
+    monkeypatch.setattr(rife_media,'media_info',rounded)
+    rife_media.mux_audio(picture,source,final,'ffmpeg')
+    assert rife_media.audio_pcm_hash(source,'ffmpeg')==rife_media.audio_pcm_hash(final,'ffmpeg')
