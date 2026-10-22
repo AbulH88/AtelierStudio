@@ -32,6 +32,8 @@ def main() -> int:
     parser.add_argument("--output", required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--multiplier", type=int, choices=(2, 4), default=2)
+    parser.add_argument("--preserve-audio", action="store_true",
+                        help="Media OS: cover the complete native timeline and copy source audio")
     args = parser.parse_args()
 
     comfy = Path(args.comfy).resolve()
@@ -74,6 +76,10 @@ def main() -> int:
     output_fps = fps * args.multiplier
     target.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg = _ffmpeg(comfy)
+    output_count = count
+    if args.preserve_audio:
+        from rife_media import media_info, output_frames
+        output_count = output_frames(media_info(source, ffmpeg), output_fps, count)
     with tempfile.TemporaryDirectory(prefix="atelier-rife-") as temp:
         silent = Path(temp) / "silent.mp4"
         encode = subprocess.Popen([
@@ -83,22 +89,26 @@ def main() -> int:
             "-pix_fmt", "yuv420p", str(silent),
         ], stdin=subprocess.PIPE)
         assert encode.stdin
-        for index in range(count):
-            pixels = result[index].clamp(0, 1).mul(255).byte().numpy()
+        for index in range(output_count):
+            pixels = result[min(index, count - 1)].clamp(0, 1).mul(255).byte().numpy()
             encode.stdin.write(pixels.tobytes())
             if index % 24 == 0:
                 print(f'{{"progress":{index / count:.6f},"message":"Encoding RIFE"}}', flush=True)
         encode.stdin.close()
         if encode.wait() != 0:
             raise RuntimeError("RIFE NVENC export failed")
-        mux = subprocess.run([
+        if args.preserve_audio:
+            from rife_media import mux_audio
+            mux_audio(silent, source, target, ffmpeg)
+        else:
+            mux = subprocess.run([
             ffmpeg, "-y", "-i", str(silent), "-i", str(source),
             "-map", "0:v:0", "-map", "1:a?", "-c:v", "copy", "-c:a", "aac",
             "-shortest", str(target),
-        ], capture_output=True, text=True)
-        if mux.returncode:
-            raise RuntimeError("RIFE audio mux failed: " + mux.stderr[-1200:])
-    print(f'{{"progress":1,"message":"RIFE complete","frames":{count}}}', flush=True)
+            ], capture_output=True, text=True)
+            if mux.returncode:
+                raise RuntimeError("RIFE audio mux failed: " + mux.stderr[-1200:])
+    print(f'{{"progress":1,"message":"RIFE complete","frames":{output_count}}}', flush=True)
     return 0
 
 

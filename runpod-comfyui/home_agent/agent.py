@@ -45,6 +45,10 @@ def authed():
     return bool(SECRET) and request.headers.get("x-agent-secret") == SECRET
 
 
+from mediaos_rife import register as register_mediaos_rife
+register_mediaos_rife(app, authed)
+
+
 def comfy_up():
     try:
         urllib.request.urlopen(COMFY_URL + "/system_stats", timeout=3)
