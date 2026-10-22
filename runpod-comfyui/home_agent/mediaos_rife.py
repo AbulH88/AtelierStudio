@@ -81,6 +81,7 @@ class RifeService:
         self.availability_probe = availability or local_availability
         self.launch = launch or self._launch
         self.spawn = subprocess.Popen
+        self.recovery_required = False
         with self.connect() as db:
             db.execute('CREATE TABLE IF NOT EXISTS jobs (key TEXT PRIMARY KEY, payload TEXT NOT NULL)')
             for key, payload in db.execute('SELECT key,payload FROM jobs').fetchall():
@@ -88,6 +89,8 @@ class RifeService:
                 if job['status'] in ('accepted', 'running'):
                     job.update(status='interrupted', error='agent_restarted', finished_at=time.time())
                     db.execute('UPDATE jobs SET payload=? WHERE key=?', (json.dumps(job), key))
+                if job['status'] == 'interrupted':
+                    self.recovery_required = True
 
     def connect(self):
         return sqlite3.connect(self.database, timeout=15)
@@ -103,6 +106,8 @@ class RifeService:
                 (job['key'], json.dumps(job, sort_keys=True)))
 
     def availability(self):
+        if self.recovery_required:
+            return {'free': False, 'reason': 'interrupted_work_requires_reconciliation'}
         if self.enhance.ACTIVE['job']:
             return {'free': False, 'reason': 'enhance_busy'}
         try:
@@ -159,6 +164,7 @@ class RifeService:
     def work(self, key):
         folder = self.root/key
         job = self.get(key)
+        spawned = clean_exit = False
         try:
             from rife_video import _ffmpeg
             comfy = self.enhance._comfy_root()
@@ -184,20 +190,24 @@ class RifeService:
             self.save(job)
             with (folder/'worker.log').open('w', encoding='utf-8') as log:
                 process = self.spawn(command, stdout=log, stderr=subprocess.STDOUT)
+                spawned = True
                 job['pid'] = process.pid
                 self.save(job)
                 with self.enhance.LOCK:
                     self.enhance.ACTIVE['process'] = process
                 if process.wait(timeout=600):
                     raise ValueError('processor_failed')
+                clean_exit = True
             after = media_info(output, ffmpeg)
             if (any(after[k] != before[k] for k in ('width', 'height')) or after['fps'] != 48 or
                 after['frames'] != expected_frames or after['video_duration'] < after['audio_duration'] or
                 abs(before['audio_duration']-after['audio_duration']) > 1/32000 or
                 audio_hash(source, ffmpeg) != audio_hash(output, ffmpeg)):
                 raise ValueError('result_verification_failed')
-            subprocess.run([ffmpeg, '-v', 'error', '-i', str(output), '-f', 'null', '-'],
+            decoded = subprocess.run([ffmpeg, '-v', 'error', '-xerror', '-i', str(output), '-f', 'null', '-'],
                 capture_output=True, timeout=120, check=True)
+            if decoded.stderr.strip():
+                raise ValueError('decode_failed')
             receipt = {'key': key, 'source_sha256': job['source_sha256'], 'recipe': RECIPE,
                 'model_sha256': MODEL_SHA, 'result_sha256': checksum(output), 'result_bytes': output.stat().st_size,
                 'source_metadata': before, 'result_metadata': after, 'audio_payload_sha256': audio_hash(output, ffmpeg),
@@ -207,7 +217,10 @@ class RifeService:
             self.save(job)
         except Exception as exc:
             reason = str(exc) if type(exc) is ValueError and re.fullmatch('[a-z_]+', str(exc)) else 'processor_failed'
-            job.update(status='failed', error=reason, finished_at=time.time())
+            interrupted = spawned and not clean_exit
+            if interrupted:
+                self.recovery_required = True
+            job.update(status='interrupted' if interrupted else 'failed', error=reason, finished_at=time.time())
             self.save(job)
         finally:
             # A timed-out owned child can still be alive. Keep its reservation;

@@ -57,6 +57,16 @@ def test_idempotent_submit_is_persistent_and_does_not_launch_twice(service):
     assert restored.get(KEY)['source_sha256'] == SHA
 
 
+def test_restart_uncertainty_blocks_different_keys_even_before_gpu_memory_is_used(service):
+    assert submit(service).status_code==202
+    service.enhance.ACTIVE.update(job=None,process=None)  # fresh agent globals
+    restored=rife.RifeService(service.root,service.enhance,availability=lambda:{'free':True,'reason':'idle'},launch=service.launched.append)
+    from werkzeug.datastructures import FileStorage
+    body,code=restored.submit('b'*64,{'source_sha256':SHA,'recipe':rife.RECIPE},FileStorage(stream=io.BytesIO(BLOB),filename='source.mp4'))
+    assert code==409 and restored.get('b'*64) is None
+    assert service.launched==[KEY]
+
+
 def test_completed_result_survives_service_restart(service):
     assert submit(service).status_code == 202
     job = service.get(KEY)
